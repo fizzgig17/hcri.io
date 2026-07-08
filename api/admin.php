@@ -1,0 +1,2199 @@
+<?php
+
+
+
+
+
+
+
+// api/admin.php
+
+
+
+
+
+
+
+declare(strict_types=1);
+
+
+
+
+
+
+
+require_once __DIR__ . '/_core/response.php';
+
+
+
+
+
+
+
+require_once __DIR__ . '/_core/db.php';
+
+
+
+
+
+
+
+require_once __DIR__ . '/_core/auth.php';
+
+
+
+require_once __DIR__ . '/_core/categories.php';
+
+require_once __DIR__ . '/_core/settings.php';
+
+
+
+require_once __DIR__ . '/_core/spd.php';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cors_headers();
+
+
+
+
+
+
+
+$admin = require_admin();
+
+
+
+
+
+
+
+// Only the owner account (fizzgig) may grant or revoke the super-admin role.
+
+
+
+function is_fizzgig(array $u): bool {
+
+
+
+    $email = strtolower(trim((string)($u['email'] ?? '')));
+
+
+
+    $name  = strtolower(trim((string)($u['name']  ?? '')));
+
+
+
+    return $email === 'fizzgig@hcri.io' || $name === 'fizzgig';
+
+
+
+}
+
+
+
+
+
+
+
+$db    = get_db();
+
+
+
+
+
+
+
+$m     = $_SERVER['REQUEST_METHOD'];
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Parse sub-path: /api/admin, /api/admin/users, /api/admin/users/5, /api/admin/users/5/reports, /api/admin/users/5/reports/3
+
+
+
+
+
+
+
+$uri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+
+
+
+
+
+
+$path = preg_replace('#^.*?/api/admin#', '', $uri);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// POST /api/admin/categories/rename — { id, value }
+
+
+
+
+
+
+
+if ($m === 'POST' && $path === '/categories/rename') {
+
+
+
+
+
+
+
+    $b = body();
+
+
+
+
+
+
+
+    $id = (int)($b['id'] ?? 0);
+
+
+
+
+
+
+
+    $value = trim((string)($b['value'] ?? ''));
+
+
+
+
+
+
+
+    if (!$id) json_error('id required', 400);
+
+
+
+
+
+
+
+    if ($value === '') json_error('value required', 400);
+
+
+
+
+
+
+
+    if (mb_strlen($value) > 255) json_error('Value too long', 400);
+
+
+
+
+
+
+
+    try { json_out(rename_category($db, $id, $value)); }
+
+
+
+
+
+
+
+    catch (\Throwable $e) { json_error($e->getMessage(), 400); }
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+// ── Category management ───────────────────────────────────────────────────────
+
+
+
+// GET /api/admin/categories — every value, grouped by kind, with usage counts.
+
+
+
+if ($m === 'GET' && $path === '/categories') {
+
+
+
+    json_out(all_categories($db, true));
+
+
+
+}
+
+
+
+// POST /api/admin/categories/delete — { id, reassignTo? }
+
+
+
+// Reassign moves all reports using the old value to the chosen value (same kind),
+
+
+
+// then deletes the old value. Without reassignTo, affected reports lose that kind
+
+
+
+// (ON DELETE CASCADE), staying categorized on every other kind.
+
+
+
+if ($m === 'POST' && $path === '/categories/delete') {
+
+
+
+    $b   = body();
+
+
+
+    $id  = (int)($b['id'] ?? 0);
+
+
+
+    $to  = isset($b['reassignTo']) && $b['reassignTo'] !== '' ? (int)$b['reassignTo'] : null;
+
+
+
+    if (!$id) json_error('id required', 400);
+
+
+
+
+
+
+
+    $s = $db->prepare('SELECT id, kind FROM categories WHERE id = ?');
+
+
+
+    $s->execute([$id]);
+
+
+
+    $cat = $s->fetch();
+
+
+
+    if (!$cat) json_error('Category not found', 404);
+
+
+
+
+
+
+
+    if ($to !== null) {
+
+
+
+        if ($to === $id) json_error('Cannot reassign a value to itself', 400);
+
+
+
+        $t = $db->prepare('SELECT kind FROM categories WHERE id = ?');
+
+
+
+        $t->execute([$to]);
+
+
+
+        $trow = $t->fetch();
+
+
+
+        if (!$trow) json_error('reassignTo not found', 404);
+
+
+
+        if ($trow['kind'] !== $cat['kind']) json_error('reassignTo must be the same category kind', 400);
+
+
+
+        // Move assignments; a report may already hold the target value for this kind,
+
+
+
+        // so delete any would-be duplicates first, then repoint the rest.
+
+
+
+        $db->prepare('DELETE FROM report_categories
+
+
+
+                       WHERE category_id = ?
+
+
+
+                         AND report_id IN (SELECT report_id FROM (
+
+
+
+                               SELECT report_id FROM report_categories WHERE category_id = ?
+
+
+
+                             ) x)')->execute([$id, $to]);
+
+
+
+        $db->prepare('UPDATE report_categories SET category_id = ? WHERE category_id = ?')
+
+
+
+           ->execute([$to, $id]);
+
+
+
+    }
+
+
+
+    $db->prepare('DELETE FROM categories WHERE id = ?')->execute([$id]);
+
+
+
+    json_out(['ok' => true]);
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+preg_match('#^(/users(/(\d+)(/reports(/(\d+))?)?)?)?$#', $path, $pm);
+
+
+
+
+
+
+
+$section    = $pm[1] ?? '';
+
+
+
+
+
+
+
+$userId     = isset($pm[3]) && $pm[3] !== '' ? (int)$pm[3] : null;
+
+
+
+
+
+
+
+$subSection = $pm[4] ?? '';
+
+
+
+
+
+
+
+$reportId   = isset($pm[6]) && $pm[6] !== '' ? (int)$pm[6] : null;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ââ Notice management ââ
+
+
+
+function notice_payload(array $r): array {
+
+
+
+    return [
+
+
+
+        'id'        => (int)$r['id'],
+
+
+
+        'type'      => $r['type'],
+
+
+
+        'location'  => $r['location'],
+
+
+
+        'message'   => $r['message'],
+
+
+
+        'startsAt'  => $r['starts_at'],
+
+
+
+        'endsAt'    => $r['ends_at'],
+
+
+
+        'enabled'   => !empty($r['enabled']),
+
+
+
+        'createdAt' => $r['created_at'] ?? null,
+
+
+
+    ];
+
+
+
+}
+
+
+
+function notice_norm_dt($v): ?string {
+
+
+
+    if (!$v) return null;
+
+
+
+    $ts = strtotime(str_replace('T', ' ', (string)$v));
+
+
+
+    return $ts ? date('Y-m-d H:i:s', $ts) : null;
+
+
+
+}
+
+
+
+function notice_validate(array $b): array {
+
+
+
+    $type = in_array($b['type'] ?? '', ['news','important','issue'], true) ? $b['type'] : 'news';
+
+
+
+    $loc  = in_array($b['location'] ?? '', ['top','report','both'], true) ? $b['location'] : 'top';
+
+
+
+    $msg  = trim((string)($b['message'] ?? ''));
+
+
+
+    if ($msg === '') json_error('message required', 400);
+
+
+
+    $sa = notice_norm_dt($b['startsAt'] ?? null);
+
+
+
+    $ea = notice_norm_dt($b['endsAt'] ?? null);
+
+
+
+    if (!$sa) json_error('startsAt required', 400);
+
+
+
+    if (!$ea) json_error('endsAt required', 400);
+
+
+
+    $en = array_key_exists('enabled', $b) ? (int)!empty($b['enabled']) : 1;
+
+
+
+    return [$type, $loc, $msg, $sa, $ea, $en];
+
+
+
+}
+
+
+
+$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at';
+
+
+
+if ($m === 'GET' && $path === '/notices') {
+
+
+
+    try { $rows = $db->query("SELECT $NOTICE_COLS FROM notices ORDER BY id DESC")->fetchAll(); }
+
+
+
+    catch (\Throwable $e) { $rows = []; }
+
+
+
+    json_out(array_map('notice_payload', $rows));
+
+
+
+}
+
+
+
+if ($m === 'POST' && $path === '/notices') {
+
+
+
+    [$type,$loc,$msg,$sa,$ea,$en] = notice_validate(body());
+
+
+
+    $db->prepare('INSERT INTO notices (type,location,message,starts_at,ends_at,enabled) VALUES (?,?,?,?,?,?)')
+
+
+
+       ->execute([$type,$loc,$msg,$sa,$ea,$en]);
+
+
+
+    $row = $db->query("SELECT $NOTICE_COLS FROM notices WHERE id=".(int)$db->lastInsertId())->fetch();
+
+
+
+    json_out(notice_payload($row));
+
+
+
+}
+
+
+
+if ($m === 'PATCH' && preg_match('#^/notices/(\d+)$#', $path, $nm)) {
+
+
+
+    $id = (int)$nm[1];
+
+
+
+    [$type,$loc,$msg,$sa,$ea,$en] = notice_validate(body());
+
+
+
+    $db->prepare('UPDATE notices SET type=?,location=?,message=?,starts_at=?,ends_at=?,enabled=? WHERE id=?')
+
+
+
+       ->execute([$type,$loc,$msg,$sa,$ea,$en,$id]);
+
+
+
+    $row = $db->query("SELECT $NOTICE_COLS FROM notices WHERE id=".$id)->fetch();
+
+
+
+    if (!$row) json_error('not found', 404);
+
+
+
+    json_out(notice_payload($row));
+
+
+
+}
+
+
+
+if ($m === 'DELETE' && preg_match('#^/notices/(\d+)$#', $path, $nm)) {
+
+
+
+    $db->prepare('DELETE FROM notices WHERE id=?')->execute([(int)$nm[1]]);
+
+
+
+    json_out(['deleted'=>true,'id'=>(int)$nm[1]]);
+
+
+
+}
+
+
+
+if ($m === 'GET' && $path === '/featured') {
+
+    $ids = setting_get($db, 'featured_reports', []);
+
+    $ids = is_array($ids) ? array_values(array_filter(array_map('intval', $ids), fn($v)=>$v>0)) : [];
+
+    $reports = [];
+
+    if ($ids) {
+
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+
+        $st = $db->prepare("SELECT id, label, cct, rf, rg, is_public FROM reports WHERE id IN ($ph)");
+
+        $st->execute($ids);
+
+        $byId = [];
+
+        foreach ($st->fetchAll() as $r) {
+
+            $byId[(int)$r['id']] = ['id'=>(int)$r['id'],'label'=>$r['label'],'cct'=>$r['cct']!==null?(int)$r['cct']:null,'Rf'=>$r['rf']!==null?(int)$r['rf']:null,'Rg'=>$r['rg']!==null?(int)$r['rg']:null,'isPublic'=>((int)$r['is_public'])===1];
+
+        }
+
+        foreach ($ids as $id) { if (isset($byId[$id])) $reports[] = $byId[$id]; }
+
+    }
+
+    json_out(['ids'=>$ids,'reports'=>$reports]);
+
+}
+
+if ($m === 'POST' && $path === '/featured') {
+
+    $b = body();
+
+    $ids = $b['ids'] ?? [];
+
+    if (!is_array($ids)) json_error('ids must be an array', 400);
+
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($v)=>$v>0)));
+
+    $ids = array_slice($ids, 0, 3);
+
+    setting_set($db, 'featured_reports', $ids);
+
+    json_out(['ids'=>$ids]);
+
+}
+
+
+
+
+
+
+
+// Build the full admin view payload for a report (including categories).
+
+
+
+function admin_report_payload(PDO $db, int $rid): ?array {
+
+
+
+    $r = $db->prepare('SELECT r.*, u.name as user_name, u.email as user_email
+
+
+
+                       FROM reports r JOIN users u ON u.id=r.user_id
+
+
+
+                       WHERE r.id=?');
+
+
+
+    $r->execute([$rid]);
+
+
+
+    $row = $r->fetch();
+
+
+
+    if (!$row) return null;
+
+
+
+    $meta   = json_decode($row['meta'] ?: '{}', true) ?? [];
+
+
+
+    spd_recompute($row, $meta);
+
+
+
+    // Backfill missing metrics (ri, rfBins, etc.) from the stored SPD — parity with reports_item/explore.
+
+
+
+    $pairs = !empty($row['spd_data']) ? json_decode($row['spd_data'], true) : null;
+
+
+
+    if ($pairs && (empty($meta['ri']) || empty($meta['rfBins']) || empty($meta['rcsBins']) || $row['cct']===null || $row['rf']===null || $row['rg']===null)) {
+
+
+
+        try {
+
+
+
+            $instMeta = $meta['instrumentMeta'] ?? [];
+
+
+
+            $wls = array_column($pairs, 0); $vals = array_column($pairs, 1);
+
+
+
+            if ($wls && $vals) {
+
+
+
+                $res = analyze_spd($wls, $vals, $instMeta);
+
+
+
+                if (empty($meta['rfBins']))  $meta['rfBins']  = $res['rfBins']  ?? null;
+
+
+
+                if (empty($meta['rcsBins'])) $meta['rcsBins'] = $res['rcsBins'] ?? [];
+
+
+
+                if (empty($meta['rhsBins'])) $meta['rhsBins'] = $res['rhsBins'] ?? [];
+
+
+
+                if (empty($meta['ra']))      $meta['ra']      = $res['ra']      ?? null;
+
+
+
+                if (empty($meta['r9']))      $meta['r9']      = $res['r9']      ?? null;
+
+
+
+                if (empty($meta['ri']))      $meta['ri']      = $res['ri']      ?? null;
+
+
+
+                if ($row['cct']   === null && isset($res['cct'])) $row['cct']   = $res['cct'];
+
+
+
+                if ($row['duv']   === null && isset($res['duv'])) $row['duv']   = $res['duv'];
+
+
+
+                if ($row['cie_x'] === null && isset($res['x']))   $row['cie_x'] = $res['x'];
+
+
+
+                if ($row['cie_y'] === null && isset($res['y']))   $row['cie_y'] = $res['y'];
+
+
+
+                if ($row['rf']    === null && isset($res['Rf']))  $row['rf']    = $res['Rf'];
+
+
+
+                if ($row['rg']    === null && isset($res['Rg']))  $row['rg']    = $res['Rg'];
+
+
+
+            }
+
+
+
+        } catch (\Throwable $e) { /* keep whatever meta already has */ }
+
+
+
+    }
+
+
+
+    // Robust R1-R15: stored value, else read straight from raw headers.
+
+
+
+    $riOut = $meta['ri'] ?? null;
+
+
+
+    if (empty($riOut) && !empty($meta['instrumentMeta']['raw_headers'])) {
+
+
+
+        $rh = $meta['instrumentMeta']['raw_headers']; $tmp = [];
+
+
+
+        for ($i = 1; $i <= 15; $i++) {
+
+
+
+            foreach (["R$i", "r$i"] as $kk) {
+
+
+
+                if (isset($rh[$kk]) && is_numeric($rh[$kk])) { $tmp["r$i"] = (int)round((float)$rh[$kk]); break; }
+
+
+
+            }
+
+
+
+        }
+
+
+
+        if ($tmp) $riOut = $tmp;
+
+
+
+    }
+
+
+
+    $rfBins = $meta['rfBins'] ?? null;
+
+
+
+    $out = [
+
+
+
+        'id'           => (int)$row['id'],
+
+
+
+        'label'        => $row['label'],
+
+
+
+        'sourceType'   => $row['source_type'],
+
+
+
+        'cct'          => $row['cct']   !== null ? (int)$row['cct']    : null,
+
+
+
+        'duv'          => $row['duv']   !== null ? (float)$row['duv']  : null,
+
+
+
+        'x'            => $row['cie_x'] !== null ? (float)$row['cie_x']: null,
+
+
+
+        'y'            => $row['cie_y'] !== null ? (float)$row['cie_y']: null,
+
+
+
+        'Rf'           => $row['rf']    !== null ? (int)$row['rf']     : null,
+
+
+
+        'Rg'           => $row['rg']    !== null ? (int)$row['rg']     : null,
+
+
+
+        'rfBins'       => $rfBins,
+
+
+
+        'rcsBins'      => $meta['rcsBins'] ?? [],
+
+
+
+        'rhsBins'      => $meta['rhsBins'] ?? [],
+
+
+
+        'ra'              => isset($meta['ra']) ? (float)$meta['ra'] : null,
+
+
+
+        'r9'              => isset($meta['r9']) ? (float)$meta['r9'] : null,
+
+
+
+        'ri'              => $riOut,
+
+
+
+        'instrumentModel'  => $meta['instrumentMeta']['instrument_model']   ?? null,
+
+
+
+        'instrumentVersion'=> $meta['instrumentMeta']['instrument_version'] ?? null,
+
+
+
+        'rawHeaders'       => $meta['instrumentMeta']['raw_headers']        ?? null,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        'notes'        => $row['notes']        ?? null,
+
+
+
+        'createdAt'    => $row['created_at'],
+
+
+
+        'userName'     => $row['user_name'],
+
+
+
+        'userEmail'    => $row['user_email'],
+
+
+
+        'categories'   => report_categories_map($db, $rid),
+
+
+
+        'isPublic'     => !empty($row['is_public']),
+
+
+
+    ];
+
+
+
+    if (!empty($row['spd_data'])) {
+
+
+
+        $pairs       = json_decode($row['spd_data'], true);
+
+
+
+        $out['wls']  = is_array($pairs) ? array_column($pairs, 0) : null;
+
+
+
+        $out['vals'] = is_array($pairs) ? array_column($pairs, 1) : null;
+
+
+
+    }
+
+
+
+    return $out;
+
+
+
+}
+
+
+
+
+
+
+
+// ── GET /api/admin/reports/:id — fetch any report for viewing ──
+
+
+
+if ($m === 'GET' && preg_match('#^/reports/(\d+)$#', $path, $rm)) {
+
+
+
+    $out = admin_report_payload($db, (int)$rm[1]);
+
+
+
+    if (!$out) json_error('Report not found', 404);
+
+
+
+    json_out($out);
+
+
+
+}
+
+
+
+
+
+
+
+// ── PATCH /api/admin/reports/:id — edit title/notes/categories on any report ──
+
+
+
+if ($m === 'PATCH' && preg_match('#^/reports/(\d+)$#', $path, $rm)) {
+
+
+
+    $rid = (int)$rm[1];
+
+
+
+    $chk = $db->prepare('SELECT id FROM reports WHERE id=?'); $chk->execute([$rid]);
+
+
+
+    if (!$chk->fetch()) json_error('Report not found', 404);
+
+
+
+    $b = body();
+
+
+
+    $sets = []; $params = [];
+
+
+
+    if (array_key_exists('label', $b))        { $sets[] = 'label=?';        $params[] = trim((string)$b['label']); }
+
+
+
+    if (array_key_exists('notes', $b))        { $sets[] = 'notes=?';        $params[] = (string)$b['notes']; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if (array_key_exists('isPublic', $b))     { $sets[] = 'is_public=?';   $params[] = $b['isPublic'] ? 1 : 0; }
+
+
+
+    if ($sets) { $params[] = $rid; $db->prepare('UPDATE reports SET '.implode(',', $sets).' WHERE id=?')->execute($params); }
+
+
+
+    if (isset($b['categories']) && is_array($b['categories'])) {
+
+
+
+        foreach ($b['categories'] as $kind => $value) {
+
+
+
+            if (!is_category_kind($kind)) continue;
+
+
+
+            $values = is_array($value) ? $value : (trim((string)$value) === '' ? [] : [$value]);
+
+
+
+            set_report_categories($db, $rid, $kind, $values, $admin['id']);
+
+
+
+        }
+
+
+
+    }
+
+
+
+    json_out(admin_report_payload($db, $rid));
+
+
+
+}
+
+
+
+
+
+
+
+// ── GET /api/admin — dashboard stats ─────────────────────────────────────────
+
+
+
+
+
+
+
+if ($m === 'GET' && $section === '') {
+
+
+
+
+
+
+
+    $stats = [
+
+
+
+
+
+
+
+        'users'   => $db->query('SELECT COUNT(*) FROM users')->fetchColumn(),
+
+
+
+
+
+
+
+        'reports' => $db->query('SELECT COUNT(*) FROM reports')->fetchColumn(),
+
+
+
+
+
+
+
+    ];
+
+
+
+
+
+
+
+    json_out($stats);
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── GET /api/admin/users — list all users ─────────────────────────────────────
+
+
+
+
+
+
+
+if ($m === 'GET' && $section === '/users' && $userId === null) {
+
+
+
+    // Prefer the activity columns; fall back gracefully if the migration hasn't run.
+
+
+
+    try {
+
+
+
+        $rows = $db->query(
+
+
+
+            'SELECT u.id, u.name, u.email, u.is_admin, u.is_super_admin, u.disabled, u.name_masked, u.created_at, u.last_login_at, u.last_active_at,
+
+
+
+                    COUNT(r.id) AS report_count
+
+
+
+             FROM users u
+
+
+
+             LEFT JOIN reports r ON r.user_id = u.id
+
+
+
+             GROUP BY u.id
+
+
+
+             ORDER BY u.created_at DESC'
+
+
+
+        )->fetchAll();
+
+
+
+    } catch (\Throwable $e) {
+
+
+
+        $rows = $db->query(
+
+
+
+            'SELECT u.id, u.name, u.email, u.is_admin, u.created_at,
+
+
+
+                    COUNT(r.id) AS report_count
+
+
+
+             FROM users u
+
+
+
+             LEFT JOIN reports r ON r.user_id = u.id
+
+
+
+             GROUP BY u.id
+
+
+
+             ORDER BY u.created_at DESC'
+
+
+
+        )->fetchAll();
+
+
+
+    }
+
+
+
+    json_out(array_map(fn($r) => [
+
+
+
+        'id'           => (int)$r['id'],
+
+
+
+        'name'         => $r['name'],
+
+
+
+        'email'        => $r['email'],
+
+
+
+        'isAdmin'      => (bool)$r['is_admin'],
+
+
+
+        'isSuper'      => (bool)($r['is_super_admin'] ?? 0),
+
+
+
+
+
+
+
+        'disabled'     => (bool)($r['disabled'] ?? 0),
+
+
+
+
+
+
+
+        'nameMasked'   => (bool)($r['name_masked'] ?? 0),
+
+
+
+        'reportCount'  => (int)$r['report_count'],
+
+
+
+        'createdAt'    => $r['created_at'],
+
+
+
+        'lastLoginAt'  => $r['last_login_at']  ?? null,
+
+
+
+        'lastActiveAt' => $r['last_active_at'] ?? null,
+
+
+
+    ], $rows));
+
+
+
+}
+
+
+
+
+
+
+
+// ── POST /api/admin/users — create user ──────────────────────────────────────
+
+
+
+
+
+
+
+if ($m === 'POST' && $section === '/users' && $userId === null) {
+
+
+
+
+
+
+
+    $b = body();
+
+
+
+
+
+
+
+    $name  = trim($b['name']  ?? '');
+
+
+
+
+
+
+
+    $email = strtolower(trim($b['email'] ?? ''));
+
+
+
+
+
+
+
+    $pass  = $b['password'] ?? '';
+
+
+
+
+
+
+
+    if (!$name || !$email || !$pass) json_error('name, email and password required');
+
+
+
+
+
+
+
+    if (strlen($pass) < 8) json_error('Password must be at least 8 characters');
+
+
+
+
+
+
+
+    $check = $db->prepare('SELECT id FROM users WHERE email = ?');
+
+
+
+
+
+
+
+    $check->execute([$email]);
+
+
+
+
+
+
+
+    if ($check->fetch()) json_error('Email already registered');
+
+
+
+
+
+
+
+    $db->prepare('INSERT INTO users (name,email,password,is_admin) VALUES (?,?,?,?)')
+
+
+
+
+
+
+
+       ->execute([$name, $email, password_hash($pass, PASSWORD_BCRYPT), 0]);
+
+
+
+
+
+
+
+    $id = (int)$db->lastInsertId();
+
+
+
+
+
+
+
+    json_out(['id' => $id, 'name' => $name, 'email' => $email, 'isAdmin' => false, 'reportCount' => 0, 'createdAt' => date('Y-m-d H:i:s')], 201);
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── DELETE /api/admin/users/:id — delete user + all their reports ─────────────
+
+
+
+
+
+
+
+function anonymous_user_id(PDO $db): int {
+
+
+
+
+
+
+
+    $s = $db->prepare("SELECT id FROM users WHERE email = 'anonymous@hcri.io' LIMIT 1");
+
+
+
+
+
+
+
+    $s->execute();
+
+
+
+
+
+
+
+    $id = $s->fetchColumn();
+
+
+
+
+
+
+
+    if ($id) return (int)$id;
+
+
+
+
+
+
+
+    $db->prepare('INSERT INTO users (name,email,password,is_admin) VALUES (?,?,?,?)')
+
+
+
+
+
+
+
+       ->execute(['Anonymous', 'anonymous@hcri.io', password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT), 0]);
+
+
+
+
+
+
+
+    return (int)$db->lastInsertId();
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if ($m === 'DELETE' && $userId && $subSection === '') {
+
+
+
+
+
+
+
+    if ($userId === $admin['id']) json_error('Cannot delete your own account', 400);
+
+
+
+
+
+
+
+    $anonId = anonymous_user_id($db);
+
+
+
+
+
+
+
+    if ($userId === $anonId) json_error('Cannot delete the Anonymous account', 400);
+
+
+
+
+
+
+
+    // Reports use ON DELETE CASCADE; reassign to the Anonymous account first to preserve them.
+
+
+
+
+
+
+
+    $db->prepare('UPDATE reports SET user_id = ? WHERE user_id = ?')->execute([$anonId, $userId]);
+
+
+
+
+
+
+
+    $db->prepare('DELETE FROM users WHERE id = ?')->execute([$userId]);
+
+
+
+
+
+
+
+    json_out(['ok' => true, 'reportsReassigned' => true]);
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── PATCH /api/admin/users/:id — update user (toggle admin, reset password) ──
+
+
+
+
+
+
+
+if ($m === 'PATCH' && $userId && $subSection === '') {
+
+
+
+
+
+
+
+    $b = body();
+
+
+
+
+
+
+
+    if ($userId === $admin['id'] && isset($b['isAdmin']) && !$b['isAdmin']) {
+
+
+
+
+
+
+
+        json_error('Cannot remove your own admin status', 400);
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+    $sets = []; $params = [];
+
+
+
+
+
+
+
+    if (isset($b['name']))    { $sets[] = 'name=?';     $params[] = trim($b['name']); }
+
+
+
+
+
+
+
+    if (isset($b['email']))   { $sets[] = 'email=?';    $params[] = strtolower(trim($b['email'])); }
+
+
+
+
+
+
+
+    if (isset($b['isAdmin'])) { $sets[] = 'is_admin=?'; $params[] = $b['isAdmin'] ? 1 : 0; }
+
+
+
+
+
+
+
+    if (isset($b['isSuperAdmin'])) {
+
+
+
+        if (!is_fizzgig($admin)) json_error('Forbidden â only the owner may change super-admin status', 403);
+
+
+
+        $sets[] = 'is_super_admin=?'; $params[] = $b['isSuperAdmin'] ? 1 : 0;
+
+
+
+    }
+
+
+
+
+
+
+
+    if (isset($b['disabled'])) { if ($userId === $admin['id'] && $b['disabled']) json_error('Cannot disable your own account', 400); $sets[] = 'disabled=?'; $params[] = $b['disabled'] ? 1 : 0; }
+
+
+
+
+
+
+
+    if (isset($b['nameMasked'])) { $sets[] = 'name_masked=?'; $params[] = $b['nameMasked'] ? 1 : 0; }
+
+
+
+
+
+
+
+    if (isset($b['password'])&& strlen($b['password']) >= 8) {
+
+
+
+
+
+
+
+        $sets[] = 'password=?'; $params[] = password_hash($b['password'], PASSWORD_BCRYPT);
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+    if (empty($sets)) json_error('Nothing to update');
+
+
+
+
+
+
+
+    $params[] = $userId;
+
+
+
+
+
+
+
+    $db->prepare('UPDATE users SET '.implode(',',$sets).' WHERE id=?')->execute($params);
+
+
+
+
+
+
+
+    json_out(['ok' => true]);
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── GET /api/admin/users/:id/reports — list user's reports ───────────────────
+
+
+
+
+
+
+
+if ($m === 'GET' && $userId && $subSection === '/reports' && $reportId === null) {
+
+
+
+
+
+
+
+    $rows = $db->prepare(
+
+
+
+
+
+
+
+        'SELECT id,label,source_type,cct,duv,rf,rg,notes,created_at,meta
+
+
+
+
+
+
+
+         FROM reports WHERE user_id=? ORDER BY created_at DESC'
+
+
+
+
+
+
+
+    );
+
+
+
+
+
+
+
+    $rows->execute([$userId]);
+
+
+
+
+
+
+
+    json_out(array_map(function($r) {
+
+
+
+
+
+
+
+        $m = json_decode($r['meta'] ?: '{}', true) ?? [];
+
+
+
+
+
+
+
+        return [
+
+
+
+
+
+
+
+            'id'              => (int)$r['id'],
+
+
+
+
+
+
+
+            'label'           => $r['label'],
+
+
+
+
+
+
+
+            'sourceType'      => $r['source_type'],
+
+
+
+
+
+
+
+            'cct'             => $r['cct']  !== null ? (int)$r['cct']    : null,
+
+
+
+
+
+
+
+            'duv'             => $r['duv']  !== null ? (float)$r['duv']  : null,
+
+
+
+
+
+
+
+            'Rf'              => $r['rf']   !== null ? (int)$r['rf']     : null,
+
+
+
+
+
+
+
+            'Rg'              => $r['rg']   !== null ? (int)$r['rg']     : null,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            'notes'           => $r['notes']        ?? null,
+
+
+
+
+
+
+
+            'createdAt'       => $r['created_at'],
+
+
+
+
+
+
+
+            'instrumentModel' => $m['instrumentMeta']['instrument_model']   ?? null,
+
+
+
+
+
+
+
+            'instrumentVersion'=> $m['instrumentMeta']['instrument_version'] ?? null,
+
+
+
+
+
+
+
+        ];
+
+
+
+
+
+
+
+    }, $rows->fetchAll()));
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── DELETE /api/admin/users/:id/reports/:rid — delete a specific report ───────
+
+
+
+
+
+
+
+if ($m === 'DELETE' && $userId && str_starts_with($subSection, '/reports') && $reportId) {
+
+
+
+
+
+
+
+    $db->prepare('DELETE FROM reports WHERE id=? AND user_id=?')->execute([$reportId, $userId]);
+
+
+
+
+
+
+
+    json_out(['ok' => true]);
+
+
+
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+json_error('Not found', 404);

@@ -1,0 +1,11 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+html, body, #root { height: 100%; overflow: hidden; }
+body { transition: background 0.2s; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a4a6a; border-radius: 3px; }
+input[type=range] { accent-color: #00d4ff; }
+button { font-family: 'Courier New', Courier, monospace; }
+body { font-family: 'Courier New', Courier, monospace; -webkit-font-smoothing: antialiased; }
