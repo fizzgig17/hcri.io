@@ -31,7 +31,7 @@ $db->prepare('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?
 // Build reset URL
 $proto   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host    = $_SERVER['HTTP_HOST'] ?? 'hcri.io';
-$url     = $proto . '://' . $host . '/spd/?reset=' . $token;
+$url     = $proto . '://' . $host . '/?reset=' . $token;
 
 $name    = $u['name'] ?: 'there';
 $body    = "Hi $name,\n\nYou requested a password reset for your hCRI.io account.\n\nClick the link below to set a new password (valid for 1 hour):\n\n$url\n\nIf you didn't request this, you can ignore this email.\n\nhCRI.io";

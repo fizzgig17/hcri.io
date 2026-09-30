@@ -408,7 +408,7 @@ if ($method === 'POST') {
 
 
 
-        $url     = $proto . '://' . $host . '/spd/?reset=' . $token;
+        $url     = $proto . '://' . $host . '/?reset=' . $token;
 
 
 
