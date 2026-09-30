@@ -2,7 +2,14 @@
 
 declare(strict_types=1);
 
-
+// Real secret is supplied via api/_core/secrets.local.php (gitignored,
+// server-only -- see secrets.local.php.example). The hardcoded fallback
+// below is ONLY for local dev (MAMP etc.) -- if this is ever used in
+// production, every login token becomes forgeable by anyone who's read
+// this file, so secrets.local.php must set a real JWT_SECRET on any real
+// deployment.
+$secretsFile = __DIR__ . '/secrets.local.php';
+if (is_file($secretsFile)) require_once $secretsFile;
 
 define('JWT_SECRET', getenv('JWT_SECRET') ?: 'spd-dev-secret-change-in-production');
 
