@@ -4,3 +4,4 @@ error_log
 # Real secrets -- copy api/_core/secrets.local.php.example to this filename
 # on the server and fill in real values. Never commit this file.
 api/_core/secrets.local.php
+companion/hCRICompanion.apk
