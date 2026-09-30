@@ -1,0 +1,6 @@
+# robots.txt
+User-agent: Discordbot
+Allow: /
+
+User-agent: *
+Allow: /

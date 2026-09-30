@@ -8,7 +8,7 @@ function hueRGB(h) {
   ];
 }
 
-export default function CVGWheel({ rfBins=[], Rg=100, Rf=80, size=260 }) {
+export default function CVGWheel({ rfBins=[], rcsBins=[], rhsBins=[], cvgTest=[], Rg=100, Rf=80, size=260 }) {
   const ref = useRef();
 
   useEffect(() => {
@@ -41,7 +41,12 @@ export default function CVGWheel({ rfBins=[], Rg=100, Rf=80, size=260 }) {
     }
 
     // Vectors
-    const bins=rfBins.length===16?rfBins:Array(16).fill(Rf||75);
+    // TM-30-18 CVG radii: chroma ratio C_test/C_ref (== 1 + Rcs,hj), scaled
+    // to a percentage so the existing r = bins[i]/100 maths still applies.
+    const cvg = cvgTest.length===16
+      ? cvgTest.map(p=>Math.hypot(p[0],p[1]))
+      : (rcsBins.length===16 ? rcsBins.map(v=>1+Number(v||0)) : null);
+    const bins=(cvg||Array(16).fill(1)).map(r=>r*100);
     bins.forEach((v,h)=>{
       const t=v/100, binR=rRef*t;
       const ang=(90-h*22.5)*Math.PI/180;

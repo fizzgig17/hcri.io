@@ -1,44 +1,44 @@
-# .htaccess
-# Disable caching for JS, CSS and API responses
-<FilesMatch "\.(js|css)$">
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Pragma "no-cache"
-    Header set Expires 0
-</FilesMatch>
-
-# No cache for PHP/API
-<FilesMatch "\.php$">
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Pragma "no-cache"
-    Header set Expires 0
-</FilesMatch>
-
-# Pass Authorization header to PHP
-SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
-
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-
-    # Pass Authorization header through rewrite
-    RewriteCond %{HTTP:Authorization} .
-    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-    # Some upload/linking tools encode spaces in filenames as a literal "+"
-    # instead of %20. If the exact requested path doesn't exist as a file,
-    # but it does once "+" is treated as a space, rewrite to that real path
-    # so links using either encoding resolve to the same file. Runs once per
-    # "+" found (via [N]) until either the file is found or none remain.
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^(.*)\+(.*)$ $1%20$2 [N]
-
-    # Static files — serve directly, never rewrite
-    RewriteCond %{REQUEST_FILENAME} -f
-    RewriteRule ^ - [L]
-
-    # Static directories — serve directly
-    RewriteCond %{REQUEST_FILENAME} -d
-    RewriteRule ^ - [L]
-
-    # Everything else → index.php
-    RewriteRule ^ index.php [L,QSA]
+# .htaccess
+# Disable caching for JS, CSS and API responses
+<FilesMatch "\.(js|css)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+</FilesMatch>
+
+# No cache for PHP/API
+<FilesMatch "\.php$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+</FilesMatch>
+
+# Pass Authorization header to PHP
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass Authorization header through rewrite
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Some upload/linking tools encode spaces in filenames as a literal "+"
+    # instead of %20. If the exact requested path doesn't exist as a file,
+    # but it does once "+" is treated as a space, rewrite to that real path
+    # so links using either encoding resolve to the same file. Runs once per
+    # "+" found (via [N]) until either the file is found or none remain.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)\+(.*)$ $1%20$2 [N]
+
+    # Static files — serve directly, never rewrite
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Static directories — serve directly
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Everything else → index.php
+    RewriteRule ^ index.php [L,QSA]
 </IfModule>

@@ -120,6 +120,30 @@ foreach ($rows as $row) {
 
         $meta['rhsBins'] = $result['rhsBins'];
 
+        // Everything else analyze_spd() produces. Previously only rfBins/rcsBins/
+
+        // rhsBins were persisted, so the per-sample fidelities and the CVG
+
+        // coordinates were recomputed on every page view and were missing
+
+        // entirely from PDF exports (which read meta directly).
+
+        $meta['rlsBins']   = $result['rlsBins']   ?? [];
+
+        $meta['rfSamples'] = $result['rfSamples'] ?? [];
+
+        $meta['sampleHues']= $result['sampleHues'] ?? [];
+
+        $meta['binRgb']    = $result['binRgb']    ?? [];
+
+        $meta['binRgbRef'] = $result['binRgbRef'] ?? [];
+
+        $meta['cvgTest']   = $result['cvgTest']   ?? [];
+
+        $meta['cvgRef']    = $result['cvgRef']    ?? [];
+
+        $meta['cvgRefAng'] = $result['cvgRefAng'] ?? [];
+
         if (!empty($result['ra'])) $meta['ra'] = $result['ra'];
 
         if (!empty($result['r9'])) $meta['r9'] = $result['r9'];

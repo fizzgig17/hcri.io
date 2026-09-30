@@ -1,0 +1,9 @@
+7aa2fa0c95154fe9896c1875bb8da1d4  api/_core/share_lookup.php
+82df78d65bfa6d16a8887e6fc49ba4a7  api/_core/spd.php
+ea2536718eb8e4d2750ee9d3045fe575  api/_core/tm30_pdf_builder.php
+792b5f906d15468b90ddcd386e08114e  api/guest_pdf.php
+f101fd554dc6c6fad5276648ad3e7b71  api/reports_item.php
+f7f088d4e2aa08531dcff207a78f0d8a  assets/app.js
+b571eb0d4dbd300a7623497e0f5063cb  assets/hcri-photo.js
+b5a3e2d6ad75824d8d4eb32a92da7ebb  frontend/src/components/CVGWheel.jsx
+2b5c8d8e4d5b82bc2780bf0b8913dda7  frontend/src/components/ReportView.jsx

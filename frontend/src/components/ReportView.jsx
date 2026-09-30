@@ -1,3 +1,4 @@
+// frontend/src/components/ReportView.jsx
 import { useState, useEffect, useRef } from 'react';
 import { getToken } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
@@ -277,7 +278,10 @@ function CVGWheel({ rfBins, Rg, Rf, cct, duv, size=280, theme: T = {} }) {
     // Test polygon
     const bins=rfBins.length===16?rfBins:Array(16).fill(Rf||75);
     const polyPts=bins.map((v,h)=>{
-      const t=Math.max(0.05,Math.min(1.45,v/100));
+      // TM-30-18 CVG: radius is the chroma ratio C_test/C_ref, not Rf,hj.
+      const cp=(report?.cvgTest&&report.cvgTest.length===16)?report.cvgTest[i]:null;
+      const rcs=(report?.rcsBins&&report.rcsBins.length===16)?report.rcsBins[i]:null;
+      const t=Math.max(0.05,Math.min(1.45,cp?Math.hypot(cp[0],cp[1]):(rcs!==null?1+Number(rcs||0):1)));
       const a=(90-h*22.5)*Math.PI/180;
       return[cx+rRef*t*Math.cos(a), cy-rRef*t*Math.sin(a)];
     });
@@ -676,9 +680,12 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
     setDL(true);
     try {
       let res;
+      // Match the PDF to whatever the user is looking at on screen. Saved
+      // reports take it as a query param, guest reports in the POST body.
+      const pdfTheme = themeName === 'dark' ? 'dark' : 'light';
       if (report.id) {
         // Saved report — use authenticated endpoint
-        res = await fetch(`./index.php/api/reports/${report.id}/pdf`, {
+        res = await fetch(`./index.php/api/reports/${report.id}/pdf?theme=${pdfTheme}`, {
           headers: { Authorization: `Bearer ${getToken()}` }
         });
       } else {
@@ -686,7 +693,7 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
         res = await fetch('./index.php/api/guest_pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(report),
+          body: JSON.stringify({ ...report, theme: pdfTheme }),
         });
       }
       if (!res.ok) throw new Error('PDF generation failed');
