@@ -1,4 +1,5 @@
 <?php
+// api/_core/inbound_ingest.php
 declare(strict_types=1);
 
 /**
@@ -83,7 +84,7 @@ function inbound_ingest_files(PDO $db, int $uid, string $subject, array $files):
         try {
             $label = $subject !== '' ? $subject : pathinfo($f['filename'], PATHINFO_FILENAME);
             if ($n > 1 && $subject !== '') $label .= ' (' . ($i + 1) . ')';
-            $r = ingest_spd_upload($db, $uid, $tmp, $f['filename'], $label);
+            $r = ingest_spd_upload($db, $uid, $tmp, $f['filename'], $label, false);
             $r['_file'] = $f['filename'];
             $made[] = $r;
         } catch (\Throwable $e) {

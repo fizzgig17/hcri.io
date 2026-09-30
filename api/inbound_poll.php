@@ -1,4 +1,5 @@
 <?php
+// api/inbound_poll.php
 declare(strict_types=1);
 
 /**
@@ -144,7 +145,7 @@ if (is_array($ids)) {
                 try {
                     $label = $msg['subject'] !== '' ? $msg['subject'] : pathinfo($f['filename'], PATHINFO_FILENAME);
                     if (count($files) > 1 && $msg['subject'] !== '') $label .= ' (' . ($i + 1) . ')';
-                    $r = ingest_spd_upload($db, $uid, $tmp, $f['filename'], $label);
+                    $r = ingest_spd_upload($db, $uid, $tmp, $f['filename'], $label, false);
                     $r['_file'] = $f['filename'];
                     $made[] = $r;
                     $entry['reports'][] = $r['id'];

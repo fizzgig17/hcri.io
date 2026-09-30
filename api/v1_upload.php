@@ -1,4 +1,5 @@
 <?php
+// api/v1_upload.php
 declare(strict_types=1);
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
@@ -45,7 +46,7 @@ try {
         $srcPath = $tmp;
     }
 
-    $response = ingest_spd_upload($db, (int)$user['id'], $srcPath, $origName, $label);
+    $response = ingest_spd_upload($db, (int)$user['id'], $srcPath, $origName, $label, true);
     if ($tmp) @unlink($tmp);
     json_out($response, 201);
 

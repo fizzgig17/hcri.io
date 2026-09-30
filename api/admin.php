@@ -330,38 +330,53 @@ if ($m === 'GET' && $section === '') {
 }
 // ── GET /api/admin/users — list all users ─────────────────────────────────────
 if ($m === 'GET' && $section === '/users' && $userId === null) {
-    // Prefer the activity columns; fall back gracefully if the migration hasn't run.
+    // Prefer the activity + via_api columns; fall back gracefully if a migration hasn't run.
     try {
         $rows = $db->query(
             'SELECT u.id, u.name, u.email, u.is_admin, u.is_super_admin, u.disabled, u.name_masked, u.created_at, u.last_login_at, u.last_active_at,
-                    COUNT(r.id) AS report_count
+                    COUNT(r.id) AS report_count,
+                    COALESCE(SUM(r.via_api), 0) AS api_report_count
              FROM users u
              LEFT JOIN reports r ON r.user_id = u.id
              GROUP BY u.id
              ORDER BY u.created_at DESC'
         )->fetchAll();
     } catch (\Throwable $e) {
-        $rows = $db->query(
-            'SELECT u.id, u.name, u.email, u.is_admin, u.created_at,
-                    COUNT(r.id) AS report_count
-             FROM users u
-             LEFT JOIN reports r ON r.user_id = u.id
-             GROUP BY u.id
-             ORDER BY u.created_at DESC'
-        )->fetchAll();
+        try {
+            $rows = $db->query(
+                'SELECT u.id, u.name, u.email, u.is_admin, u.created_at,
+                        COUNT(r.id) AS report_count,
+                        COALESCE(SUM(r.via_api), 0) AS api_report_count
+                 FROM users u
+                 LEFT JOIN reports r ON r.user_id = u.id
+                 GROUP BY u.id
+                 ORDER BY u.created_at DESC'
+            )->fetchAll();
+        } catch (\Throwable $e2) {
+            // via_api column doesn't exist yet either (migration not run at all).
+            $rows = $db->query(
+                'SELECT u.id, u.name, u.email, u.is_admin, u.created_at,
+                        COUNT(r.id) AS report_count
+                 FROM users u
+                 LEFT JOIN reports r ON r.user_id = u.id
+                 GROUP BY u.id
+                 ORDER BY u.created_at DESC'
+            )->fetchAll();
+        }
     }
     json_out(array_map(fn($r) => [
-        'id'           => (int)$r['id'],
-        'name'         => $r['name'],
-        'email'        => $r['email'],
-        'isAdmin'      => (bool)$r['is_admin'],
-        'isSuper'      => (bool)($r['is_super_admin'] ?? 0),
-        'disabled'     => (bool)($r['disabled'] ?? 0),
-        'nameMasked'   => (bool)($r['name_masked'] ?? 0),
-        'reportCount'  => (int)$r['report_count'],
-        'createdAt'    => $r['created_at'],
-        'lastLoginAt'  => $r['last_login_at']  ?? null,
-        'lastActiveAt' => $r['last_active_at'] ?? null,
+        'id'            => (int)$r['id'],
+        'name'          => $r['name'],
+        'email'         => $r['email'],
+        'isAdmin'       => (bool)$r['is_admin'],
+        'isSuper'       => (bool)($r['is_super_admin'] ?? 0),
+        'disabled'      => (bool)($r['disabled'] ?? 0),
+        'nameMasked'    => (bool)($r['name_masked'] ?? 0),
+        'reportCount'   => (int)$r['report_count'],
+        'apiReportCount'=> (int)($r['api_report_count'] ?? 0),
+        'createdAt'     => $r['created_at'],
+        'lastLoginAt'   => $r['last_login_at']  ?? null,
+        'lastActiveAt'  => $r['last_active_at'] ?? null,
     ], $rows));
 }
 // ── POST /api/admin/users — create user ──────────────────────────────────────

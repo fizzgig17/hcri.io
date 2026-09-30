@@ -1,3 +1,4 @@
+-- database.sql
 -- hCRI.io Database Setup
 -- Run this in phpMyAdmin or any MySQL client
 
@@ -31,6 +32,7 @@ CREATE TABLE reports (
   spd_data     LONGTEXT,
   meta         TEXT,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  via_api      TINYINT(1) NOT NULL DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_user (user_id)
 );

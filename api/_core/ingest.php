@@ -8,7 +8,13 @@ require_once __DIR__ . '/pdf_extract.php';
 // Parse an uploaded SPD file (any UI-supported format) and insert a report for
 // the given user. Mirrors the UI upload path. Returns the response array.
 // Throws RuntimeException on validation/parse failure (message is user-safe).
-function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origName, string $label = ''): array {
+//
+// $viaApi marks the report as having come in through the token-authenticated
+// v1_upload.php endpoint (as opposed to inbound email or the browser UI), so
+// it powers the "uploaded via API" count on the admin user list. Only
+// v1_upload.php should pass true; the inbound-email callers explicitly pass
+// false so a mail-in report is never miscounted as an API upload.
+function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origName, string $label = '', bool $viaApi = false): array {
     $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
     if (!in_array($ext, ['csv', 'tsv', 'txt', 'json', 'sp', 'pdf'], true)) {
         throw new RuntimeException('Unsupported format ".' . $ext . '". Allowed: csv, tsv, txt, json, sp, pdf');
@@ -73,12 +79,12 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
         catch (\Throwable $e) {}
         $pub = $defPriv ? 0 : 1;
 
-        $s = $db->prepare('INSERT INTO reports(user_id,label,source_type,file_name,cct,duv,cie_x,cie_y,rf,rg,spd_data,meta,created_at,is_public) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,' . $pub . ')');
+        $s = $db->prepare('INSERT INTO reports(user_id,label,source_type,file_name,cct,duv,cie_x,cie_y,rf,rg,spd_data,meta,created_at,is_public,via_api) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,' . $pub . ',?)');
         $s->execute([
             $userId, $label, $sourceType, $filename,
             $result['cct'], $result['duv'], $result['x'] ?? null, $result['y'] ?? null,
             $result['Rf'], $result['Rg'],
-            $spdData, $meta, $now,
+            $spdData, $meta, $now, $viaApi ? 1 : 0,
         ]);
         $newId = (int)$db->lastInsertId();
 
@@ -96,6 +102,7 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
             'r9'         => $result['r9']  !== null ? (float)$result['r9']  : null,
             'isPublic'   => $pub ? true : false,
             'createdAt'  => $now,
+            'viaApi'     => $viaApi,
         ];
     } catch (\Throwable $e) {
         @unlink($dest);
