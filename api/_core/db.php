@@ -1,12 +1,19 @@
 <?php
 declare(strict_types=1);
 
-// ── MAMP Default Credentials (local development) ─────────────────────────────
+// api/_core/db.php
+//
+// Database config. Real secrets are supplied via api/_core/secrets.local.php
+// (gitignored, server-only -- see secrets.local.php.example) rather than
+// hardcoded here, so this file is safe to be public.
+$secretsFile = __DIR__ . '/secrets.local.php';
+if (is_file($secretsFile)) require_once $secretsFile;
+
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
 define('DB_NAME', getenv('DB_NAME') ?: 'dcvgnomgak_spd_analyzer');
 define('DB_USER', getenv('DB_USER') ?: 'dcvgnomgak_spd_admin');
-define('DB_PASS', getenv('DB_PASS') ?: '?dBt^+g[pLB;X$jK');
+define('DB_PASS', getenv('DB_PASS') ?: '');
 
 function get_db(): PDO {
     static $pdo = null;
