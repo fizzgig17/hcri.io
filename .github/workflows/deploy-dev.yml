@@ -1,0 +1,39 @@
+# .github/workflows/deploy-dev.yml
+#
+# Deploys hcri.io's `develop` branch to the dev.hcri.io staging site on
+# every push to `develop`. Mirrors deploy.yml (which deploys `master` to
+# production) -- see that file for the fuller explanation of how the
+# fast-forward-only merge behaves and why no build/migration step runs here.
+#
+# Reuses the same SSH connection secrets as the production workflow (same
+# server, same account) -- only the target path and branch differ.
+#
+# Additional required repo secret beyond the ones deploy.yml already needs:
+#   SPACESHIP_DEV_PATH - absolute path to the dev site's document root,
+#                         e.g. /home/dcvgnomgak/dev.hcri.io
+
+name: Deploy to Spaceship (dev)
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: git fetch + fast-forward on dev server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SPACESHIP_HOST }}
+          port: ${{ secrets.SPACESHIP_PORT }}
+          username: ${{ secrets.SPACESHIP_USER }}
+          key: ${{ secrets.SPACESHIP_SSH_KEY }}
+          passphrase: ${{ secrets.SPACESHIP_SSH_PASSPHRASE }}
+          script: |
+            set -e
+            cd "${{ secrets.SPACESHIP_DEV_PATH }}"
+            git fetch origin develop
+            git merge --ff-only origin/develop
+            echo "Deployed $(git rev-parse --short HEAD)"
