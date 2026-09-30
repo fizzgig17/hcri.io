@@ -19,6 +19,10 @@
 #   SPACESHIP_PORT  - SSH port (22 unless Spaceship told you otherwise)
 #   SPACESHIP_USER  - SSH username
 #   SPACESHIP_SSH_KEY - the PRIVATE half of a deploy keypair (see deploy notes)
+#   SPACESHIP_SSH_PASSPHRASE - passphrase for that key (cPanel's key generator
+#                      won't create a passphrase-less key, so the key is
+#                      encrypted; this unlocks it for the non-interactive
+#                      SSH connection below)
 #   SPACESHIP_PATH  - absolute path to the site root on the server,
 #                      e.g. /home/youruser/hcri.io/spd
 
@@ -40,6 +44,7 @@ jobs:
           port: ${{ secrets.SPACESHIP_PORT }}
           username: ${{ secrets.SPACESHIP_USER }}
           key: ${{ secrets.SPACESHIP_SSH_KEY }}
+          passphrase: ${{ secrets.SPACESHIP_SSH_PASSPHRASE }}
           script: |
             set -e
             cd "${{ secrets.SPACESHIP_PATH }}"
