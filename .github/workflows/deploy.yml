@@ -1,0 +1,48 @@
+# .github/workflows/deploy.yml
+#
+# Deploys hcri.io to Spaceship on every push to `master`.
+#
+# How it works: SSHs into the server and runs `git fetch` + a fast-forward-only
+# merge in the site root (which must already be a git clone of this repo --
+# see the one-time server setup in the deploy notes). Fast-forward-only means
+# if anyone has hand-edited a tracked file directly on the server (e.g. via
+# the cPanel file manager) since the last deploy, this step FAILS loudly
+# instead of silently overwriting that edit -- you'll get a red X on the
+# Actions tab and (by default) a GitHub email. Fix it by reconciling that
+# server-side edit into a real commit, then re-running the workflow.
+#
+# This does NOT run `npm run build`, and does NOT run any database
+# migrations -- both stay manual, on purpose (see the deploy notes).
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   SPACESHIP_HOST  - server hostname or IP
+#   SPACESHIP_PORT  - SSH port (22 unless Spaceship told you otherwise)
+#   SPACESHIP_USER  - SSH username
+#   SPACESHIP_SSH_KEY - the PRIVATE half of a deploy keypair (see deploy notes)
+#   SPACESHIP_PATH  - absolute path to the site root on the server,
+#                      e.g. /home/youruser/hcri.io/spd
+
+name: Deploy to Spaceship
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: git fetch + fast-forward on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SPACESHIP_HOST }}
+          port: ${{ secrets.SPACESHIP_PORT }}
+          username: ${{ secrets.SPACESHIP_USER }}
+          key: ${{ secrets.SPACESHIP_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.SPACESHIP_PATH }}"
+            git fetch origin master
+            git merge --ff-only origin/master
+            echo "Deployed $(git rev-parse --short HEAD)"
