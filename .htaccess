@@ -19,6 +19,13 @@ SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Force HTTPS (host-agnostic -- works for hcri.io, www.hcri.io and
+    # dev.hcri.io alike without hardcoding a hostname). Any host-specific
+    # canonicalization, e.g. redirecting bare hcri.io to www.hcri.io,
+    # belongs outside this shared file -- see README/deploy notes.
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
     # Pass Authorization header through rewrite
     RewriteCond %{HTTP:Authorization} .
     RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
