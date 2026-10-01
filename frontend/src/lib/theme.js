@@ -61,6 +61,9 @@ export const themes = {
   }
 };
 
+// Looks up a theme object by name ('dark' | 'light'), falling back to dark
+// for any unrecognized name (including undefined, e.g. before the stored
+// preference loads).
 export function getTheme(name) {
   return themes[name] || themes.dark;
 }

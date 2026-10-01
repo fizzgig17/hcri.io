@@ -10,6 +10,9 @@ import { getTheme } from './theme';
 
 const ThemeContext = createContext(null);
 
+// Wraps the app (see main.jsx) and provides the current theme object, its
+// name, and a toggle function via useTheme(). The chosen theme name
+// persists to localStorage ("hcri_theme") so it survives a reload.
 export function ThemeProvider({ children }) {
   const [themeName, setThemeName] = useState(() => localStorage.getItem('hcri_theme') || 'dark');
   const theme = getTheme(themeName);
@@ -32,6 +35,7 @@ export function ThemeProvider({ children }) {
   );
 }
 
+// Reads { theme, themeName, toggleTheme } from the nearest ThemeProvider.
 export function useTheme() {
   return useContext(ThemeContext);
 }

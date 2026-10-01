@@ -18,8 +18,10 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { getToken } from '../lib/api.js';
 import { fmtTZ } from '../lib/tz.js';
-import { xTicks, cvgPolygonPoints } from '../lib/colorimetry.js';
+import { xTicks, cvgPolygonPoints, referenceSpectrum } from '../lib/colorimetry.js';
 
+// Approximate color for a hue angle (degrees), used to tint the
+// chroma/hue/fidelity bars, CVG wheel sectors, and CES-99 bars.
 function hueToRGB(h) {
   return [
     Math.max(30, Math.min(240, Math.round(128 + 127 * Math.cos((h * Math.PI) / 180)))),
@@ -165,8 +167,27 @@ export default function AnnexEModal({ report, onClose }) {
       c.restore();
 
       if (wls.length > 1) {
-        // (Reference curve omitted from the Annex E render -- the bundle's
-        // own version draws test + a flat-normalized reference, see below.)
+        // Reference illuminant (blackbody/daylight at the report's own CCT),
+        // sampled every 5nm and normalized to its own peak -- drawn as a
+        // dashed curve behind the solid test-SPD curve below.
+        const refCct = cct || 4000;
+        const refWl = [], refRaw = [];
+        for (let w = 380; w <= 780; w += 5) { refWl.push(w); refRaw.push(referenceSpectrum(w, refCct)); }
+        const refPeak = Math.max(...refRaw);
+        const refNorm = refRaw.map((v) => v / refPeak);
+        // Linear interpolation of the (xs,ys) reference curve at an
+        // arbitrary wavelength, clamped at the ends.
+        const interp = (xs, ys, wl) => {
+          if (wl <= xs[0]) return ys[0];
+          if (wl >= xs[xs.length - 1]) return ys[ys.length - 1];
+          for (let k = 0; k < xs.length - 1; k++) {
+            if (xs[k] <= wl && xs[k + 1] >= wl) {
+              const frac = (wl - xs[k]) / (xs[k + 1] - xs[k]);
+              return ys[k] + frac * (ys[k + 1] - ys[k]);
+            }
+          }
+          return 0;
+        };
         const minWl = Math.min(...wls), maxWl = Math.max(...wls), maxV = Math.max(...vals);
         const xOf = (w) => 336 + ((w - minWl) / (maxWl - minWl)) * 471;
         const yOf = (v) => 273 - v * 112 * 0.9;
@@ -185,6 +206,16 @@ export default function AnnexEModal({ report, onClose }) {
           c.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.55)`;
           c.fillRect(x1, yOf(frac), Math.max(0.5, x2 - x1), 273 - yOf(frac));
         });
+        // Dashed reference curve, interpolated onto the test wavelengths.
+        c.beginPath(); c.setLineDash([3, 3]);
+        c.strokeStyle = dark ? 'rgba(170,185,205,0.55)' : 'rgba(80,80,80,0.5)'; c.lineWidth = 1;
+        wls.forEach((w, i) => {
+          const y = yOf(interp(refWl, refNorm, w));
+          i === 0 ? c.moveTo(xOf(w), y) : c.lineTo(xOf(w), y);
+        });
+        c.stroke();
+        c.setLineDash([]);
+        // Solid test-SPD curve, drawn on top of the reference.
         c.beginPath(); c.strokeStyle = dark ? 'rgba(255,98,86,0.95)' : 'rgba(160,15,15,0.85)'; c.lineWidth = 1.6;
         wls.forEach((w, i) => {
           const y = yOf(vals[i] / maxV);
@@ -200,8 +231,14 @@ export default function AnnexEModal({ report, onClose }) {
         c.textAlign = 'center'; c.fillText('Wavelength (nm)', 571.5, 285);
         c.font = '8px sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle';
         c.strokeStyle = dark ? 'rgba(255,98,86,0.95)' : 'rgba(160,15,15,0.85)'; c.lineWidth = 1.5;
+        c.setLineDash([]);
         c.beginPath(); c.moveTo(717, 168); c.lineTo(731, 168); c.stroke();
         c.fillStyle = dark ? '#9aabc2' : '#666'; c.fillText('Test', 734, 168);
+        c.setLineDash([3, 3]);
+        c.strokeStyle = dark ? 'rgba(170,185,205,0.55)' : 'rgba(80,80,80,0.5)'; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(755, 168); c.lineTo(769, 168); c.stroke();
+        c.setLineDash([]);
+        c.fillText('Ref.', 772, 168);
       } else {
         c.fillStyle = dark ? '#93a4bb' : '#bbb'; c.font = '11px sans-serif';
         c.textAlign = 'center'; c.textBaseline = 'middle';

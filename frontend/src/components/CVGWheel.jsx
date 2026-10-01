@@ -12,6 +12,8 @@ import { useRef, useEffect } from 'react';
 import HelpTip from './HelpTip.jsx';
 import { cvgPolygonPoints } from '../lib/colorimetry.js';
 
+// Approximate color for a hue angle (degrees), used to tint the wheel's
+// 16 sector wedges and bin-number labels.
 function hueToRGB(h) {
   return [
     Math.max(30, Math.min(240, Math.round(128 + 127 * Math.cos((h * Math.PI) / 180)))),
@@ -20,6 +22,13 @@ function hueToRGB(h) {
   ];
 }
 
+// CVGWheel: the TM-30 Color Vector Graphic -- a 16-sector polar chart
+// showing how far the source's chroma/hue shifts push each hue bin from
+// the reference (polygon from cvgPolygonPoints), with Rf/Rg/CCT/Duv drawn
+// directly on the canvas so they stay pixel-aligned with the wheel.
+// `report` supplies the actual vectors (via cvgPolygonPoints); `rfBins`/
+// `Rf`/`Rg`/`cct`/`duv` are the already-computed summary values to label it
+// with; `size` is the wheel's diameter in CSS px (padding is added around it).
 export default function CVGWheel({ report, rfBins, Rg, Rf, cct, duv, size = 280, theme: T = {}, noHelp }) {
   const ref = useRef();
   const pad = Math.round(size * 0.14);

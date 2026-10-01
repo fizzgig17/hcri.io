@@ -15,21 +15,28 @@ export default function RangeSlider({ label, min, max, value, onChange, step = 1
   const trackRef = useRef(null);
   const [drag, setDrag] = useState(null); // 'low' | 'high' | null
 
+  // Convert a value in [min, max] to a left-offset percentage along the track.
   const pct = v => (max === min ? 0 : Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)));
 
+  // Convert a pointer event's clientX to a value on the track, snapped to `step`.
   const valFromClientX = cx => {
     const rc = trackRef.current.getBoundingClientRect();
-    const p = Math.max(0, Math.min(1, (cx - rc.left) / (rc.width || 1)));
+    const p = Math.max(0, Math.min(1, (cx - rc.left) / (rc.width || 1))); // 0..1 across the track
     const raw = min + p * (max - min);
     const stepped = Math.round(raw / step) * step;
     return Math.max(min, Math.min(max, stepped));
   };
 
+  // Begin dragging a specific handle ('low' or 'high'); captures the pointer
+  // so move/up events keep firing even if the cursor leaves the handle.
   const down = (which, ev) => {
     ev.preventDefault();
     try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
     setDrag(which);
   };
+  // While a handle is captured, recompute its value from the pointer position
+  // and clamp it so the two handles can't cross (each stays `step` away from
+  // the other).
   const move = ev => {
     if (!drag || !trackRef.current) return;
     ev.preventDefault();
@@ -43,6 +50,8 @@ export default function RangeSlider({ label, min, max, value, onChange, step = 1
     }
     setDrag(null);
   };
+  // Clicking the bare track (not a handle) jumps whichever handle is closer
+  // to the click, then starts dragging it from there.
   const onTrackDown = ev => {
     if (!trackRef.current) return;
     const v = valFromClientX(ev.clientX);

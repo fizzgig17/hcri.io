@@ -6,12 +6,16 @@
 
 let token = localStorage.getItem('spd_token') || '';
 
+// Stores the bearer token used by every request() call below, persisting it
+// to localStorage so a page reload stays logged in. Pass '' (or any falsy
+// value) to clear it on logout.
 export function setToken(t) {
   token = t;
   if (t) localStorage.setItem('spd_token', t);
   else localStorage.removeItem('spd_token');
 }
 
+// Current in-memory bearer token (mirrors localStorage's "spd_token").
 export function getToken() {
   return token;
 }
@@ -26,6 +30,11 @@ export function basePath() {
   return p.substring(0, p.lastIndexOf('/') + 1);
 }
 
+// Core fetch wrapper used by every api.* helper below. Builds the URL from
+// basePath() + the PHP backend's /index.php/api prefix, attaches the bearer
+// token, JSON-encodes a plain body (or sends it as-is for an upload's
+// FormData), and throws an Error with the server's `error` field (falling
+// back to the HTTP status text) on a non-OK response.
 async function request(method, path, body, isUpload) {
   const url = basePath() + 'index.php/api' + path;
   const opts = { method, headers: { Authorization: `Bearer ${token}` } };
@@ -41,6 +50,8 @@ async function request(method, path, body, isUpload) {
   return data;
 }
 
+// Thin REST client for the backend's /index.php/api/* endpoints. Every
+// method returns the parsed JSON response, or throws on a non-2xx status.
 export const api = {
   get:    (path)       => request('GET', path),
   post:   (path, body)  => request('POST', path, body),

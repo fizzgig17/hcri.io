@@ -410,7 +410,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
             <>
               <label style={S.label}>Default list view</label>
               <div style={{ fontSize:12.5, color:T.dim, marginTop:-2, marginBottom:12, lineHeight:1.5 }}>
-                Choose how each report list opens. "Paginate" shows a screenful at a time with page controls. "View All" shows every matching report in the same card grid, with no paging. Sorting works the same in both.
+                Choose how each report list opens. &ldquo;Paginate&rdquo; shows a screenful at a time with page controls. &ldquo;View All&rdquo; shows every matching report in the same card grid, with no paging. Sorting works the same in both.
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:14 }}>
                 <span style={{ fontSize:13, color:T.text, fontWeight:600 }}>Explore page</span>

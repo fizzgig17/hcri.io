@@ -17,6 +17,8 @@
 import { useRef, useEffect, useState } from 'react';
 import HelpTip from './HelpTip.jsx';
 
+// Approximate color for a hue angle (degrees), used to tint each of the
+// 16 hue-bin bars / 99 CES-sample bars by its own hue.
 function hueToRGB(h) {
   return [
     Math.max(30, Math.min(240, Math.round(128 + 127 * Math.cos((h * Math.PI) / 180)))),
@@ -42,6 +44,11 @@ function useElementSize(ref) {
   return size;
 }
 
+// BinBarChart: one of the three 16-hue-bin bar charts (chroma shift, hue
+// shift, or fidelity). `mode` picks the layout: 'fidelity' draws plain
+// 0-100 bars against rfBins; any other mode draws signed bars centered on
+// a zero line against `data`, scaled to whichever of chroma(±%)/hue(±°)
+// fits the largest real bin (rounded up to the next 0.05/5°).
 export function BinBarChart({ title, rfBins, mode, theme: T = {}, tip, data, noHelp }) {
   const ref = useRef();
   const size = useElementSize(ref);
@@ -116,7 +123,11 @@ export function BinBarChart({ title, rfBins, mode, theme: T = {}, tip, data, noH
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ fontSize: 12, color: T.dim, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 6, fontWeight: 700, fontFamily: 'monospace' }}>
+      {/* The bundle colors this label from an always-empty module-level
+          theme stand-in (so `.dim` is undefined there too) -- the title
+          renders in whatever color it inherits, not the theme's dim gray.
+          Reproduced here by leaving `color` unset rather than using T.dim. */}
+      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 6, fontWeight: 700, fontFamily: 'monospace' }}>
         {title}
       </div>
       <canvas ref={ref} style={{ width: '100%', height: 150, display: 'block' }} />
@@ -129,6 +140,10 @@ export function BinBarChart({ title, rfBins, mode, theme: T = {}, tip, data, noH
   );
 }
 
+// CESBars: fidelity for each of the 99 individual CIE test-color samples.
+// Uses the report's own per-sample rfSamples/sampleHues when present
+// (`real`); otherwise interpolates the 16 hue-bin averages (rfBins) onto
+// 99 evenly-spaced hue positions as a fallback.
 export function CESBars({ rfBins, rfSamples, sampleHues, theme: T = {}, noHelp }) {
   const ref = useRef();
   const size = useElementSize(ref);
@@ -177,7 +192,8 @@ export function CESBars({ rfBins, rfSamples, sampleHues, theme: T = {}, noHelp }
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ fontSize: 12, color: T.dim, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 6, fontWeight: 700, fontFamily: 'monospace' }}>
+      {/* Same unset-color quirk as BinBarChart's title -- see comment there. */}
+      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 6, fontWeight: 700, fontFamily: 'monospace' }}>
         Color Sample Fidelity, R<sub>f,CES</sub>
       </div>
       <canvas ref={ref} style={{ width: '100%', height: 80, display: 'block' }} />
@@ -190,6 +206,9 @@ export function CESBars({ rfBins, rfSamples, sampleHues, theme: T = {}, noHelp }
   );
 }
 
+// RawDataPanel: a collapsible section listing the instrument's raw header
+// key/value pairs and the full wavelength/intensity table, with a button
+// to download both as a CSV. Renders nothing if there's neither.
 export function RawDataPanel({ headers, wls, vals, label, C: T, isMobile }) {
   const [open, setOpen] = useState(false);
   const entries = headers && typeof headers === 'object' ? Object.entries(headers) : [];

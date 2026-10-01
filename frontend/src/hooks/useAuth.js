@@ -13,6 +13,10 @@ export function useAuth() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
 
+  // Called once on mount (see App.jsx). If a token is already stored,
+  // validates it against /auth/me and populates `user`; otherwise leaves
+  // `user` null. Either way it clears `checking` so the caller can stop
+  // showing a loading state. Returns whether auto-login succeeded.
   const tryAutoLogin = useCallback(async () => {
     if (!getToken()) { setChecking(false); return false; }
     try {
@@ -27,6 +31,9 @@ export function useAuth() {
     }
   }, []);
 
+  // Logs in with email/password (plus an optional "remember me" flag the
+  // backend uses to vary token lifetime), stores the returned token, and
+  // sets `user`. Throws if the backend didn't return a user.
   const login = useCallback(async (email, password, remember) => {
     const r = await api.post('/auth/login', { email, password, remember: !!remember });
     if (!r || !r.user) throw new Error(r?.error || r?.message || 'Login failed: ' + JSON.stringify(r));
@@ -36,6 +43,9 @@ export function useAuth() {
     return u;
   }, []);
 
+  // Registers a new account. `consent: true` is sent unconditionally since
+  // the signup form requires checking a terms/consent box before this is
+  // ever called. Stores the returned token and sets `user` on success.
   const register = useCallback(async (name, email, password) => {
     const r = await api.post('/auth/register', { name, email, password, consent: true });
     if (!r.user) throw new Error(r.error || 'Registration failed');
@@ -45,6 +55,10 @@ export function useAuth() {
     return u;
   }, []);
 
+  // Clears the local session immediately (token + user state) and fires a
+  // best-effort call to the server logout endpoint in the background --
+  // the UI doesn't wait on it, so a slow/failed network call never blocks
+  // sign-out.
   const logout = useCallback(() => {
     try {
       fetch('./index.php/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});

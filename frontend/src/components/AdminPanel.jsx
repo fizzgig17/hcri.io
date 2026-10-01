@@ -108,6 +108,11 @@ export default function AdminPanel({ onClose, me }) {
       .catch((e) => { notify(e.message, 'err'); console.error('Admin load error:', e); })
       .finally(() => setLoading(false));
   }, []);
+  // Stray debug log left in the original bundle: NOT inside the effect
+  // above (it's a comma-expression sibling of the useEffect() call in the
+  // component body), so it fires on every render, not just on mount --
+  // kept for fidelity.
+  console.log('AdminPanel: loading=', loading, 'users=', users.length);
 
   async function openQuickView(id) {
     try {
@@ -201,15 +206,22 @@ export default function AdminPanel({ onClose, me }) {
     } catch (e) { notify(e.message, 'err'); }
   }
 
+  // NOTE: both toggles below re-select the (optimistically patched) user via
+  // selectUser() rather than calling setSelectedUser() directly -- verified
+  // against the bundle (it calls `P({...u, disabled: nv})`, the same
+  // function used by the sidebar's row click). That means every
+  // disable/enable or hide/unhide toggle also re-triggers a reportsLoading
+  // flicker and a redundant GET of that user's reports; kept as-is for
+  // fidelity even though it looks like an inefficiency in the original app.
   async function toggleDisabled(u) {
     const nv = !u.disabled;
-    setSelectedUser({ ...u, disabled: nv });
+    selectUser({ ...u, disabled: nv });
     setUsers((arr) => arr.map((x) => (x.id === u.id ? { ...x, disabled: nv } : x)));
     notify(nv ? 'Account disabled' : 'Account enabled');
     try {
       await adminFetch(`/users/${u.id}`, { method: 'PATCH', body: JSON.stringify({ disabled: nv }) });
     } catch (e) {
-      setSelectedUser({ ...u, disabled: !nv });
+      selectUser({ ...u, disabled: !nv });
       setUsers((arr) => arr.map((x) => (x.id === u.id ? { ...x, disabled: !nv } : x)));
       notify(e.message, 'err');
     }
@@ -217,13 +229,13 @@ export default function AdminPanel({ onClose, me }) {
 
   async function toggleNameMasked(u) {
     const nv = !u.nameMasked;
-    setSelectedUser({ ...u, nameMasked: nv });
+    selectUser({ ...u, nameMasked: nv });
     setUsers((arr) => arr.map((x) => (x.id === u.id ? { ...x, nameMasked: nv } : x)));
     notify(nv ? 'Name hidden' : 'Name shown');
     try {
       await adminFetch(`/users/${u.id}`, { method: 'PATCH', body: JSON.stringify({ nameMasked: nv }) });
     } catch (e) {
-      setSelectedUser({ ...u, nameMasked: !nv });
+      selectUser({ ...u, nameMasked: !nv });
       setUsers((arr) => arr.map((x) => (x.id === u.id ? { ...x, nameMasked: !nv } : x)));
       notify(e.message, 'err');
     }

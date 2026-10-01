@@ -21,30 +21,41 @@ export default function CompareCard({ r, T: t, color, onOpen }) {
   const label = r.label || 'Untitled';
   let wls = r.wls || [], vals = r.vals || [];
   let n = Math.min(wls.length, vals.length);
-  const W = 320, H = 120;
+  const W = 320, H = 120; // mini-plot's internal SVG coordinate space (viewBox units)
   let pts = [], grad = [], area = '', line = '', peakWl = null, peakXn = 0;
 
+  // Stop at the first non-monotonic wavelength -- defends against
+  // malformed/concatenated SPD data the same way OverlaySPD does.
   for (let j = 1; j < n; j++) {
     if (wls[j] < wls[j - 1]) { n = j; break; }
   }
 
   if (n >= 2) {
-    const st = wls[0], en = wls[n - 1], sp = Math.max(1e-9, en - st);
+    const st = wls[0], en = wls[n - 1], sp = Math.max(1e-9, en - st); // sp: wavelength span, floored to avoid /0
     const vmax = Math.max.apply(null, vals) || 1;
     let pk = 0;
     for (let i = 1; i < n; i++) if (vals[i] > vals[pk]) pk = i;
     peakWl = wls[pk];
-    peakXn = (wls[pk] - st) / sp;
+    peakXn = (wls[pk] - st) / sp; // peak's x position as a 0..1 fraction of the plot width, for the dashed marker line
     for (let i = 0; i < n; i++) {
+      // Map each (wavelength, value) sample onto the W×H SVG box: x by
+      // position in the wavelength range, y inverted (SVG y grows downward,
+      // but a taller bar means more power) and normalized to the peak value.
       const x = ((wls[i] - st) / sp) * W;
       const y = H - (Math.max(0, vals[i]) / vmax) * H;
       pts.push([x, y]);
     }
+    // Sample 20 evenly-spaced wavelengths across the plotted range and turn
+    // each into a visible-spectrum color, feeding the <linearGradient> that
+    // fills the area under the curve (so the fill looks like the rainbow of
+    // the light itself rather than a flat color).
     const steps = 20;
     for (let i = 0; i <= steps; i++) {
       const wl = st + (sp * i) / steps;
       grad.push({ o: i / steps, c: wlRGB(wl) });
     }
+    // `area`: closed path from the x-axis up along the curve and back down,
+    // for the gradient fill. `line`: the open curve itself, stroked on top.
     area = `M0,${H} ` + pts.map(p => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ` L${W},${H} Z`;
     line = 'M' + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L');
   }

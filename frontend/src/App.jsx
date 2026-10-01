@@ -270,11 +270,18 @@ export default function App() {
     } catch (e) {}
   }, [user]);
 
+  // Shows the small toast at the bottom of the logged-in dashboard for
+  // ~3.2s. type is 'ok' (green) or 'err' (red).
   function showNotif(msg, type = 'ok') {
     setNotif({ msg, type });
     setTimeout(() => setNotif(null), 3200);
   }
 
+  // Handler for AuthScreen's guest (logged-out) upload box. Note: this sets
+  // guestReport, but nothing in this component's render output ever reads
+  // that state back -- AuthScreen renders the guest result itself inline
+  // (see its own `analyzed`/`guestResult` state), so this is dead state
+  // kept only because the deployed bundle has it too.
   function handleGuestUpload(result) {
     setGuestReport(result);
   }
@@ -366,6 +373,10 @@ export default function App() {
     }
   }
 
+  // Applied after ReportDetail's metadata editor saves (label/notes/etc. --
+  // the actual PATCH happens inside ReportDetail/MetaEditor); just merges
+  // the updated fields into both the sidebar's report list and the open
+  // detail pane so both stay in sync without a refetch.
   async function handleMetaSave(updated) {
     setReports(prev => prev.map(r => (r.id === updated.id ? { ...r, ...updated } : r)));
     setDetail(prev => prev && { ...prev, ...updated });
@@ -393,6 +404,8 @@ export default function App() {
     }
   }
 
+  // Deletes a report after a confirm() prompt, removes it from the sidebar
+  // list, and clears the detail pane if it was the one open.
   async function handleDelete(id) {
     if (!confirm('Delete this report?')) return;
     try {
@@ -408,6 +421,9 @@ export default function App() {
     }
   }
 
+  // Re-runs the TM-30 Rf/Rg calculation for a report server-side (used when
+  // the calculation method changes) and patches the new values into both
+  // the sidebar list and the open detail pane.
   async function handleRecalc(id) {
     try {
       const r = await api.post(`/reports/${id}/recalc`);
@@ -723,7 +739,7 @@ export default function App() {
                       <button
                         onClick={toggleTheme}
                         title={themeName === 'dark' ? 'Light mode' : 'Dark mode'}
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', color: T.dim, cursor: 'pointer', padding: '8px 5px', fontSize: 14, lineHeight: 1 }}
+                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 0 0', color: T.dim, cursor: 'pointer', padding: '8px 5px', fontSize: 14, lineHeight: 1 }}
                       >
                         {themeName === 'dark' ? '☀' : '🌙'}
                       </button>

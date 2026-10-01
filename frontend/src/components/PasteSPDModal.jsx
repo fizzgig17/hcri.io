@@ -13,19 +13,23 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { getToken, basePath } from '../lib/api';
 
 // Example snippets shown in the sidebar of the modal, in the exact order
-// the deployed bundle lists them (var `Ie`). Each is real sample data --
-// the x/y pairs are from the bundle's own "350,x" through "500,266.48"
-// LED spectrum sample (var `Fe`), trimmed to a couple of representative
-// rows per format rather than reproducing the entire 380-780nm table.
+// the deployed bundle lists them (var `Ie`), content copied verbatim from
+// the bundle (two data rows for the plain comma/tab/space formats, one
+// data row for the header-row and comment-line formats, matching what the
+// deployed app actually shows).
 const FORMATS = [
   { label: 'Two columns (comma)', example: '450, 390.61\n460, 347.39' },
   { label: 'Two columns (tab)', example: '450\t390.61\n460\t347.39' },
   { label: 'Two columns (space)', example: '450 390.61\n460 347.39' },
-  { label: 'Header rows OK', example: 'wavelength,power\n450,390.61\n460,347.39' },
-  { label: 'Comment lines OK', example: '# My LED\n450,390.61\n460,347.39' },
+  { label: 'Header rows OK', example: 'wavelength,power\n450,390.61' },
+  { label: 'Comment lines OK', example: '# My LED\n450,390.61' },
 ];
 
-const PLACEHOLDER_EXAMPLE = '380,3.11\n390,3.78\n400,4.73\n410,8.85\n420,20.96\n...\n500,266.48';
+// The textarea's own placeholder sample (bundle var `Fe`) -- the same LED
+// spectrum sample FORMATS draws its 450/460 rows from, given here in full
+// (380-500nm at 10nm steps; the bundle's sample itself stops at 500nm, it
+// isn't abbreviated from a longer 380-780nm table).
+const PLACEHOLDER_EXAMPLE = '380,3.11\n390,3.78\n400,4.73\n410,8.85\n420,20.96\n430,69.72\n440,199.95\n450,390.61\n460,347.39\n470,245.68\n480,208.06\n490,242.17\n500,266.48';
 
 function countValidPoints(text) {
   return text.split(/[\r\n]+/).filter(line => {

@@ -22,12 +22,19 @@ import {
 
 // Low-level horseshoe-diagram renderer shared by all three xy/uv/u'v'
 // panels: grid + axis labels, gamut fill (clipped to the locus, painted
-// pixel-by-pixel via xyToSrgb), isotherm ticks, locus + Planckian-locus
-// strokes, wavelength tick labels, and the report's own point.
+// pixel-by-pixel via xyToSrgb), isotherm ticks, the Planckian-locus curve,
+// the spectral/horseshoe-locus boundary, wavelength tick labels, and the
+// report's own point.
+//
+// `hsSX`/`hsSY` and `sx`/`sy` are always the same arrays at every call site
+// below (both are "the locus to test gamut membership and draw as the
+// horseshoe boundary") -- kept as separate props only because the bundle's
+// own version does. `dotLabel` and `isDark` are accepted but never read,
+// matching dead parameters present in the bundle's own function.
 function drawDiagram(canvas, {
   hsSX, hsSY, sx, sy, px, py, pixToXY,
   xmin, xmax, ymin, ymax, title, xlabel, ylabel,
-  dotX, dotY, isotherms, wlLabels,
+  dotX, dotY, dotLabel, isotherms, wlLabels, isDark,
 }) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = canvas.clientWidth, H = canvas.clientHeight;
@@ -116,12 +123,16 @@ function drawDiagram(canvas, {
     }
   }
 
-  // Spectral locus (horseshoe) stroke
+  // Planckian (blackbody) locus stroke -- the reference curve of white
+  // points by temperature. Drawn as an open polyline (not closed): it's a
+  // curve, not a boundary.
   ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.lineWidth = dpr * 1.2;
-  ctx.beginPath(); ctx.moveTo(X(hsSX[0]), Y(hsSY[0]));
-  for (let i = 1; i < hsSX.length; i++) ctx.lineTo(X(hsSX[i]), Y(hsSY[i]));
+  ctx.beginPath(); ctx.moveTo(X(px[0]), Y(py[0]));
+  for (let i = 1; i < px.length; i++) ctx.lineTo(X(px[i]), Y(py[i]));
   ctx.stroke();
-  // Planckian locus stroke
+  // Spectral/horseshoe locus stroke (the gamut boundary used for the
+  // inside-test above) -- closed back to its start since it's a full
+  // boundary, not just a curve.
   ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = dpr * 1.2;
   ctx.beginPath(); ctx.moveTo(X(sx[0]), Y(sy[0]));
   for (let i = 1; i < sx.length; i++) ctx.lineTo(X(sx[i]), Y(sy[i]));
@@ -159,6 +170,11 @@ function drawDiagram(canvas, {
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = dpr * 1.2; ctx.stroke();
   }
 
+  // Release the plot-area clip set above before drawing the right-margin
+  // CCT labels and the axis-title text below, both of which fall outside
+  // that clipped rect and would otherwise never render.
+  ctx.restore();
+
   // Isotherm CCT labels, right margin
   if (isotherms) {
     const fs2 = Math.round(W * 0.024) * dpr;
@@ -190,10 +206,12 @@ function drawDiagram(canvas, {
   ctx.restore();
 }
 
-// SDCM (MacAdam ellipse) panel renderer. Draws a 5- and 10-step ellipse
-// around whichever reference CCT point is closest to the report, plus the
-// report's own (x,y). No-ops (blank) while SDCM_ELLIPSES is empty -- see
-// the TODO in lib/colorimetry.js.
+// SDCM (MacAdam ellipse) panel renderer. Finds whichever of the 25
+// SDCM_ELLIPSES entries is nearest the report's (x,y), zooms the plot area
+// to that ellipse's own span, and draws its 5-step (gold) and 10-step
+// (blue) rings plus every other nearby ellipse that falls in view, a small
+// dot at the nearest ellipse's own center, and the report's point as a red
+// crosshair+dot. No-ops (blank) if the report has no (x,y) yet.
 function drawSDCM(canvas, report) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = canvas.clientWidth, H = canvas.clientHeight;
@@ -238,7 +256,7 @@ function drawSDCM(canvas, report) {
     ctx.beginPath(); e.xb.forEach((vx, i) => (i === 0 ? ctx.moveTo(X(vx), Y(e.yb[i])) : ctx.lineTo(X(vx), Y(e.yb[i]))));
     ctx.closePath(); ctx.stroke();
   }
-  ctx.restore();
+  // Report's point: dashed crosshair + red dot (still inside the clip above).
   if (x >= xmin && x <= xmax && y >= ymin && y <= ymax) {
     ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = dpr * 0.5; ctx.setLineDash([3 * dpr, 3 * dpr]);
     ctx.beginPath(); ctx.moveTo(X(x), Y(ymin)); ctx.lineTo(X(x), Y(ymax)); ctx.stroke();
@@ -248,9 +266,34 @@ function drawSDCM(canvas, report) {
     ctx.fillStyle = 'rgba(220,0,0,0.9)'; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = dpr; ctx.stroke();
   }
+  // Small dot marking the nearest ellipse's own center (cx,cy), distinct
+  // from the report's point above.
+  ctx.beginPath(); ctx.arc(X(nearest.cx), Y(nearest.cy), 3 * dpr, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+  ctx.restore();
+
+  // Color-key legend for the gold (5 SDCM) / blue (10 SDCM) ellipse rings.
+  const legendFs = Math.round(W * 0.028) * dpr;
+  ctx.font = `${legendFs}px monospace`; ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(200,150,0,1)';
+  ctx.fillText('5 SDCM', 50 * dpr, (padT + legendFs + 2) * dpr);
+  ctx.fillStyle = 'rgba(30,80,200,0.9)';
+  ctx.fillText('10 SDCM', 50 * dpr, (padT + legendFs * 2.4) * dpr);
+
   ctx.font = `${Math.round(W * 0.024) * dpr}px monospace`; ctx.textAlign = 'right';
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillText(`x=${x.toFixed(4)}  y=${y.toFixed(4)}`, (padL + cW - 4) * dpr, (padT + cH - 6) * dpr);
+
+  // Axis titles: "x" centered below the plot, "y" rotated along the left edge.
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.font = `bold ${Math.round(W * 0.03) * dpr}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('x', X((xmin + xmax) / 2), (H - 2) * dpr);
+  ctx.save();
+  ctx.translate(11 * dpr, Y((ymin + ymax) / 2));
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('y', 0, 0);
+  ctx.restore();
 }
 
 // Single CIE1931-only diagram (e.g. for a compact card or share preview).

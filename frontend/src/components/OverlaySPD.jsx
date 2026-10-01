@@ -47,17 +47,24 @@ export default function OverlaySPD({ data, T: t }) {
 
   const path = s => (s.pts.length ? 'M' + s.pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' L') : '');
 
+  // Linear-interpolate a series' normalized value at an arbitrary
+  // wavelength (the hovered one, which rarely lands exactly on a sample),
+  // clamping to the series' end values outside its own measured range.
   const valAt = (s, wl) => {
     if (!s.pts || s.pts.length < 2) return null;
     const ws = s.wls, vs = s.vals, n = ws.length;
     if (wl <= ws[0]) return s.pts[0][1];
     if (wl >= ws[n - 1]) return s.pts[n - 1][1];
     let j = 0;
-    while (j < n - 1 && ws[j + 1] < wl) j++;
-    const fr = (wl - ws[j]) / (ws[j + 1] - ws[j] || 1);
+    while (j < n - 1 && ws[j + 1] < wl) j++; // find the bracketing sample pair
+    const fr = (wl - ws[j]) / (ws[j + 1] - ws[j] || 1); // 0..1 fraction between them
     return (Math.max(0, vs[j]) + (Math.max(0, vs[j + 1]) - Math.max(0, vs[j])) * fr) / s.vmax;
   };
 
+  // Convert the pointer's pixel position (relative to the SVG's own
+  // rendered size, which can differ from the W×H viewBox) into a
+  // wavelength, and clear the crosshair once the cursor leaves the plot
+  // area on either side.
   const onMove = ev => {
     const rc = ev.currentTarget.getBoundingClientRect();
     const px = ((ev.clientX - rc.left) / rc.width) * W;

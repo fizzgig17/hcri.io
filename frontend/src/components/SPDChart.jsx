@@ -10,6 +10,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { xTicks, referenceSpectrum } from '../lib/colorimetry.js';
 
+// Tracks an element's content-box size via ResizeObserver. SPDChart uses
+// this purely to force its draw effect to re-run when the canvas's
+// container is resized (the canvas reads its own offsetWidth/Height each
+// draw, so the returned size value itself isn't otherwise needed).
+function useElementSize(ref) {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) setSize({ w: Math.round(width), h: Math.round(height) });
+    });
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [ref]);
+  return size;
+}
+
+// Approximate visible-spectrum color for a wavelength (nm), used to tint
+// the filled area under the test curve by its own physical color.
 function wlToRGB(wl) {
   if (wl < 380) return [80, 0, 130];
   if (wl < 440) { const t = (wl - 380) / 60; return [0, 0, Math.min(255, Math.round(130 + 125 * t))]; }
@@ -38,8 +58,16 @@ function vLambda(wl) {
   return V_LAMBDA[k] * (1 - q) + (V_LAMBDA[k + 1] ?? V_LAMBDA[k]) * q;
 }
 
+// SPDChart: the report's spectral power distribution. Draws the test
+// curve (solid, color-filled underneath by wavelength) and, when a CCT is
+// known, a dashed reference-illuminant curve scaled to match the test
+// curve's own visually-weighted power -- plus a hover crosshair/tooltip
+// reporting the nearest sample's wavelength and value.
+// Props: wls/vals (parallel wavelength/intensity arrays), cct (reference
+// illuminant temperature, omits the reference curve if falsy), theme.
 export default function SPDChart({ wls, vals, cct, theme: T = {} }) {
   const ref = useRef();
+  const size = useElementSize(ref);
   const geomRef = useRef(null);
   const [hover, setHover] = useState(null);
 
@@ -141,7 +169,7 @@ export default function SPDChart({ wls, vals, cct, theme: T = {} }) {
     ctx.strokeStyle = 'rgba(180,180,180,0.6)'; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(pL + 55, pT + 8); ctx.lineTo(pL + 69, pT + 8); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = T.spdDimText || '#7aaccc'; ctx.fillText('Reference', pL + 73, pT + 12);
-  }, [wls, vals, cct, T?.name]);
+  }, [wls, vals, cct, T?.name, size]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: 160 }}>

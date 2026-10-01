@@ -23,35 +23,40 @@
 //   _e       -> ReportDetail (default export of this file)
 //   ye       -> CRIBars                (canvas bar chart of R1-R15)
 //   Se       -> MetricGrid             (user-customizable draggable metric tiles)
-//   Ce       -> KeyMetric              (single metric tile, used outside MetricGrid too)
+//   Ce       -> KeyMetric              (single metric tile, used only by the mobile layout below -- NOT by MetricGrid, which renders its own tiles inline)
 //   we/Te/Ee -> interpretFidelity/interpretGamut/interpretDuv (plain-language blurbs)
 //   Oe       -> ShareCardModal (split into its own file, see ShareCardModal.jsx)
-//   Cat      -> CategoryEditor.jsx (another agent's placeholder for this
-//               same minified `Cat` function; this batch filled it in for
-//               real -- see that file's own header comment)
+//   Cat      -> CategoryEditor.jsx (reconstructed by this batch; rendered
+//               indirectly here, nested inside MetaEditor/`ge` -- see below)
 //
 // Dependencies reconstructed by OTHER batches, already landed and wired
 // up here by their real names/paths:
 //   ce -> SPDChart.jsx (default)                  {wls, vals, cct, theme}
 //   le -> ReportCharts.jsx: BinBarChart            {title, tip, rfBins, mode, data, theme, noHelp}
 //   ue -> ReportCharts.jsx: CESBars                {rfBins, rfSamples, sampleHues, theme, noHelp}
-//   de -> ReportCharts.jsx: RawDataPanel           {headers, wls, vals, label, C, isMobile}
+//   de -> ReportCharts.jsx: RawDataPanel           {headers, wls, vals, label, C}
 //   fe -> CVGWheel.jsx (default)                   {report, rfBins, Rg, Rf, cct, duv, size, theme, noHelp}
 //   Q1 -> Chromaticity.jsx: ChromaticityMini        {report, noHelp}
 //   H  -> Chromaticity.jsx: ChromaticityPanel (default) {report} -- the "cie" tab's 3D/4-panel plot
 //   re -> HelpTip.jsx (default)                    {text, children}
 //   O  -> HelpModal.jsx (default)                  {onClose}
-//   me -> MetaEditor.jsx: RenameField               {value, onSave, disabled}
+//   me -> MetaEditor.jsx: RenameField               {value, onSave, disabled} -- used
+//         directly in the header bar, for the report title
+//   ge -> MetaEditor.jsx (default export)           {report, isGuest, onSave} -- the
+//         "Source Details" block (Title + Notes click-to-edit fields, plus a
+//         nested CategoryEditor). NOTE: a prior pass in this file rendered
+//         CategoryEditor directly here and dropped the Notes field and the
+//         "Source Details" wrapper entirely -- fixed in this pass to render
+//         MetaEditor (which renders CategoryEditor itself), matching the bundle.
 //
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { getToken } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { fmtTZ } from '../lib/tz';
 import { ReportNotices } from './Notices.jsx';
 import Votes from './Votes.jsx';
-import CategoryEditor from './CategoryEditor.jsx';
 import ShareCardModal from './ShareCardModal.jsx';
 
 import SPDChart from './SPDChart.jsx';
@@ -60,7 +65,7 @@ import CVGWheel from './CVGWheel.jsx';
 import ChromaticityPanel, { ChromaticityMini } from './Chromaticity.jsx';
 import HelpTip from './HelpTip.jsx';
 import HelpModal from './HelpModal.jsx';
-import { RenameField } from './MetaEditor.jsx';
+import MetaEditor, { RenameField } from './MetaEditor.jsx';
 // TM30Modal (minified `ie`, app.js ~line 19676) is a full canvas-rendered
 // TM-30 report modal -- reconstructed by the Batch C1 pass as AnnexEModal.jsx
 // (the "TM-30 Report" action); imported here under that real name.
@@ -68,11 +73,9 @@ import AnnexEModal from './AnnexEModal.jsx';
 
 const sHead = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10, fontWeight: 700 };
 
-// Holds the "current theme colors" object for helper components below
-// (KeyMetric) that -- in the original bundle -- read it from a module-level
-// variable set by ReportDetail on every render, rather than taking it as a
-// prop. Preserved here for fidelity; KeyMetric still accepts a `theme` prop
-// directly when used standalone (e.g. from MetricGrid).
+// Holds the "current theme colors" object for KeyMetric below, which --
+// in the original bundle -- reads it from this module-level variable (set
+// by ReportDetail on every render) instead of taking it as a prop at all.
 let _lastTheme = {};
 
 // ── normalizeRi ──────────────────────────────────────────────────────────
@@ -420,11 +423,15 @@ export function DraggableTopRow({ report, theme }) {
 }
 
 // ── KeyMetric (Ce) ────────────────────────────────────────────────────────
-// A single labeled metric tile. Reads `theme`/`U` from the module-level
-// _lastTheme set by ReportDetail when no `theme` prop is given directly
-// (fidelity to the original, which used a shared module variable `U`).
-export function KeyMetric({ label, value, color, tip, theme }) {
-  const U = theme || _lastTheme;
+// A single labeled metric tile, used by ReportDetail's mobile layout.
+// Verified against the bundle: this component takes NO `theme` prop at
+// all -- it always reads colors off the module-level `_lastTheme`, which
+// ReportDetail reassigns to the current theme on every render before
+// rendering any KeyMetric. Kept that way for fidelity (every call site
+// below used to also pass `theme={U}`, which the original silently
+// ignored since `Ce` never destructured it).
+export function KeyMetric({ label, value, color, tip }) {
+  const U = _lastTheme;
   return (
     <div style={{ background: U.surface, border: `1px solid ${U.border}`, borderRadius: 6, padding: '10px 12px', position: 'relative' }}>
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: U.dim, marginBottom: 5, fontWeight: 700 }}>{label}</div>
@@ -505,11 +512,15 @@ export function MetricGrid({ report, C: t }) {
   useEffect(() => { try { localStorage.setItem(key + '_order', JSON.stringify(order)); } catch {} }, [order]);
   useEffect(() => { try { localStorage.setItem(key + '_custom', JSON.stringify(custom)); } catch {} }, [custom]);
 
-  const rawMetrics = report.rawHeaders
-    ? Object.entries(report.rawHeaders)
-        .filter(([, v]) => v !== '' && v != null && !isNaN(Number(v)))
-        .map(([k, v]) => ({ id: 'raw_' + k, label: k, getValue: () => v, getColor: (e, t) => t.text, condition: () => true, isRaw: true }))
-    : [];
+  const rawMetrics = useMemo(
+    () =>
+      report.rawHeaders
+        ? Object.entries(report.rawHeaders)
+            .filter(([, v]) => v !== '' && v != null && !isNaN(Number(v)))
+            .map(([k, v]) => ({ id: 'raw_' + k, label: k, getValue: () => v, getColor: (e, t) => t.text, condition: () => true, isRaw: true }))
+        : [],
+    [report.rawHeaders]
+  );
 
   const all = [...BASE_METRICS, ...rawMetrics, ...custom];
   const byId = Object.fromEntries(all.map((m) => [m.id, m]));
@@ -622,6 +633,12 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [tm30Open, setTm30Open] = useState(false);
   const isMobile = useIsMobile(768);
   const [shareCardOpen, setShareCardOpen] = useState(false);
+  // Verified against the bundle: setShareRowOpen is never called anywhere in
+  // the original minified source either, so the detailed "Share Link" row
+  // below is dead/unreachable there too (the header's "Copy Share Link" /
+  // "Revoke Share Link" buttons are the only working share-link UI). Kept
+  // as-is for fidelity rather than wired up, since this isn't a
+  // reconstruction bug -- it matches the deployed app's actual behavior.
   const [shareRowOpen, setShareRowOpen] = useState(false);
   const [shareToken, setShareToken] = useState(report?.shareToken || null);
   const [isPublic, setIsPublic] = useState(report?.isPublic || false);
@@ -925,7 +942,9 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
 
         {tab === 'report' ? (
           <div style={{ flex: isMobile ? 'none' : 1, overflowY: isMobile ? 'visible' : 'auto', display: isMobile ? 'block' : 'flex', flexDirection: 'column' }}>
-            <CategoryEditor report={report} isGuest={isGuest} />
+            {/* "Source Details" block: Title + Notes (click-to-edit) plus the
+                structured category tags (CategoryEditor is nested inside it). */}
+            <MetaEditor report={report} isGuest={isGuest} onSave={saveMeta} />
 
             {report?.id && (
               <div style={{ padding: '10px 22px', borderBottom: `1px solid ${U.border}`, display: 'flex', alignItems: 'center', gap: 12, background: U.surface }}>
@@ -967,17 +986,16 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
             {isMobile ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '12px 14px', borderBottom: `1px solid ${U.border}`, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                  <KeyMetric label="CCT" value={report.cct ? report.cct + 'K' : null} color={U.accent} theme={U} />
+                  <KeyMetric label="CCT" value={report.cct ? report.cct + 'K' : null} color={U.accent} />
                   <KeyMetric
                     label="Duv"
                     value={report.duv == null ? null : (report.duv >= 0 ? '+' : '') + report.duv.toFixed(4)}
                     color={Math.abs(report.duv ?? 1) < 0.006 ? U.good : Math.abs(report.duv ?? 1) < 0.012 ? U.warn : U.bad}
-                    theme={U}
                   />
-                  <KeyMetric label="Ra" value={report.ra == null ? null : Math.round(report.ra)} theme={U} />
-                  <KeyMetric label="CIE x" value={report.x?.toFixed(4)} theme={U} />
-                  <KeyMetric label="CIE y" value={report.y?.toFixed(4)} theme={U} />
-                  <KeyMetric label="R9" value={report.r9 == null ? null : Math.round(report.r9)} theme={U} />
+                  <KeyMetric label="Ra" value={report.ra == null ? null : Math.round(report.ra)} />
+                  <KeyMetric label="CIE x" value={report.x?.toFixed(4)} />
+                  <KeyMetric label="CIE y" value={report.y?.toFixed(4)} />
+                  <KeyMetric label="R9" value={report.r9 == null ? null : Math.round(report.r9)} />
                 </div>
 
                 <div style={{ padding: 16, borderBottom: `1px solid ${U.border}`, display: 'flex', justifyContent: 'center' }}>
@@ -1070,7 +1088,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
 
                 {report.rawHeaders && Object.keys(report.rawHeaders).length > 0 && (
                   <div style={{ padding: '0 14px 40px' }}>
-                    <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} isMobile={isMobile} />
+                    <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                   </div>
                 )}
               </div>
@@ -1123,7 +1141,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
 
                 <div style={{ padding: '16px 22px 32px' }}>
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
-                  <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} isMobile={isMobile} />
+                  <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                 </div>
               </>
             )}

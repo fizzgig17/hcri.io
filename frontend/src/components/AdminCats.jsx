@@ -293,7 +293,9 @@ export default function AdminCats({ theme: o }) {
     try {
       const d = await fetch(`${basePath()}index.php/api/admin/categories/dupes`, { headers: auth() }).then((r) => r.json());
       const groups = (d && d.groups) || [];
-      setDupInfo(groups);
+      // Note: the deployed bundle declares dupInfo/setDupInfo but never calls
+      // setDupInfo anywhere (not here, not elsewhere) -- dupes are only ever
+      // surfaced via the alert() below. Kept as dead state for fidelity.
       if (!groups.length) {
         window.alert('No duplicate values found.');
         setBusy(false);

@@ -17,12 +17,9 @@ import { basePath } from '../lib/api';
 // largest count in the set.
 export function HBarChart({ items, color, theme: t }) {
   const max = Math.max(1, ...items.map(i => i.count));
-  if (!items.length) {
-    return <div style={{ fontSize: 12, color: t.dim, fontFamily: 'monospace', padding: '8px 0' }}>No data yet</div>;
-  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      {items.map((it, idx) => (
+      {items.length ? items.map((it, idx) => (
         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 104, flexShrink: 0, fontSize: 11, color: t.dim, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {it.label}
@@ -34,7 +31,9 @@ export function HBarChart({ items, color, theme: t }) {
             {it.count}
           </div>
         </div>
-      ))}
+      )) : (
+        <div style={{ fontSize: 12, color: t.dim, fontFamily: 'monospace', padding: '8px 0' }}>No data yet</div>
+      )}
     </div>
   );
 }

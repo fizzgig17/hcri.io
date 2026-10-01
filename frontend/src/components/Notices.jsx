@@ -61,12 +61,16 @@ function NoticeBar({ notice, theme: t, variant }) {
   );
 }
 
+// Site-wide notice banner(s), stacked at the very top of the page above
+// everything else. Renders nothing while there are no 'top'/'both' notices.
 export function TopNotices({ theme }) {
   const ns = useNotices('top');
   if (!ns.length) return null;
   return <div>{ns.map(n => <NoticeBar key={n.id} notice={n} theme={theme} variant="top" />)}</div>;
 }
 
+// Notice banner(s) shown inline on a report detail page. Renders nothing
+// while there are no 'report'/'both' notices.
 export function ReportNotices({ theme }) {
   const ns = useNotices('report');
   if (!ns.length) return null;

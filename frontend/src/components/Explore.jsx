@@ -50,23 +50,41 @@
 //          POST /api/reports (+ /guest_analyze), DELETE /api/reports/{id},
 //          PATCH /api/reports/{id}            -> upload / delete / share
 //
-// Components reused from parallel reconstruction batches:
-//   Votes, CatFilter                 -- components/Votes.jsx, CatFilter.jsx (present)
-//   CompareCard, OverlaySPD, ExploreStats -- "Explore charts" batch; CompareCard
-//     and OverlaySPD are stubbed locally (with a TODO) until that batch lands,
-//     since they aren't in components/ yet; ExploreStats *is* present and used
-//     directly.
-//   HelpModal                        -- components/HelpModal.jsx (present)
-//   PasteSPDModal                    -- components/PasteSPDModal.jsx (present),
-//     this is the bundle's `Le` ("📋 Paste" button in the My Reports uploader).
-// Not yet reconstructed anywhere (stubbed locally below with a TODO):
-//   AdminPanel (bundle's `Ae`, the ⚙ admin modal), FeedbackModal (`__fbModal`),
-//   ProfileModal (`__profileModal`), and the global window.HCRIPhoto /
-//   window.HCRIPlayground / window.HCRIAnalysis hooks the bundle calls into
-//   (photo-mode compare, the CRI 3D playground button, and the Compare view's
-//   "Analysis" expander) -- these are optional, best-effort integrations in
-//   the original too (always guarded with `window.X &&`), so they're left as
-//   the same no-op-if-absent calls rather than invented here.
+// Components reused from parallel reconstruction batches (all now landed
+// and wired up directly -- no local stand-ins remain):
+//   Votes, CatFilter   -- components/Votes.jsx, CatFilter.jsx
+//   RangeSlider        -- components/RangeSlider.jsx, the CCT/Duv/Ra/Rg/R9
+//     dual-thumb filter slider (previously duplicated locally here -- now
+//     imported, like everything else below)
+//   CompareCard, OverlaySPD -- the Compare view's per-report card and SPD
+//     overlay chart (components/CompareCard.jsx, OverlaySPD.jsx)
+//   ExploreStats       -- sitewide aggregate dashboard (`insights` tab)
+//   HelpModal          -- components/HelpModal.jsx
+//   PasteSPDModal      -- components/PasteSPDModal.jsx, the bundle's `Le`
+//     ("📋 Paste" button in the My Reports uploader)
+//   ReportDetail       -- components/ReportDetail.jsx, the bundle's `_e`:
+//     the public-facing report pane used for both the normal report-detail
+//     view and the Compare view's full-report modal. This is a different
+//     component from (and not interchangeable with) ReportView.jsx, which
+//     is the signed-in app's main dashboard report pane -- see the header
+//     comments on both files.
+//   AdminPanel         -- components/AdminPanel.jsx, the bundle's `Ae`
+//     (⚙ admin modal), opened with `{ onClose, me: user }`.
+//   FeedbackModal      -- named export of components/AuthScreen.jsx (the
+//     bundle's `__fbModal`), opened with `{ user, onClose }`.
+//   AccountSettings    -- components/AccountSettings.jsx, the bundle's
+//     `__profileModal` (profile/settings modal), opened with
+//     `{ user, onClose, onUserUpdate }`.
+//   SERIES_COLORS, tintInfo, compareShareCard -- lib/compareExport.js;
+//     compareShareCard in particular was also duplicated locally here in
+//     the first pass (it's defined just above `Ue` in the bundle, not
+//     inside it) -- now imported instead, so the Compare view's share-card
+//     rendering can't drift from CompareCard/OverlaySPD's copy.
+// Left as optional, best-effort no-op-if-absent integrations (as in the
+// original, always guarded with `window.X &&`), since they belong to no
+// reconstructed component: window.HCRIPhoto / window.HCRIPlayground /
+// window.HCRIAnalysis (photo-mode compare, the CRI 3D playground button,
+// and the Compare view's "Analysis" expander).
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
@@ -77,40 +95,28 @@ import Votes from './Votes';
 import CatFilter from './CatFilter';
 import HelpModal from './HelpModal';
 import PasteSPDModal from './PasteSPDModal';
-import ReportView from './ReportView';
-
-// TODO: replace with the shared CompareCard/OverlaySPD components once the
-// "Explore charts" batch publishes them -- these are faithful but minimal
-// stand-ins so Compare keeps working in the meantime.
-import __CompareCardMaybe from './CompareCard';
-import __OverlaySPDMaybe from './OverlaySPD';
+import RangeSlider from './RangeSlider';
+import ReportDetail from './ReportDetail';
+import CompareCard from './CompareCard';
+import OverlaySPD from './OverlaySPD';
 import ExploreStats from './ExploreStats';
-
-const CompareCard = __CompareCardMaybe || CompareCardFallback;
-const OverlaySPD = __OverlaySPDMaybe || OverlaySPDFallback;
+import AdminPanel from './AdminPanel';
+import { FeedbackModal } from './AuthScreen';
+import AccountSettings from './AccountSettings';
+import { SERIES_COLORS, tintInfo, compareShareCard } from '../lib/compareExport';
 
 // ── Shared constants ─────────────────────────────────────────────────────────
 
 const EXPLORE_API = './index.php/api/explore';
 
+// Duv tint classification, series palette, and canvas helpers are shared
+// with CompareCard/OverlaySPD -- imported from lib/compareExport rather
+// than duplicated here (see the import list above).
 const TINT = {
   rosy: { label: 'Rosy', color: '#e0719b' },
   neutral: { label: 'Neutral', color: '#8a96a3' },
   green: { label: 'Green', color: '#9bbf3a' },
 };
-
-function tintKey(d) {
-  return d == null ? null : d < -0.002 ? 'rosy' : d > 0.002 ? 'green' : 'neutral';
-}
-function tintInfo(d) {
-  const k = tintKey(d);
-  return k ? { key: k, label: TINT[k].label, color: TINT[k].color } : null;
-}
-
-const SERIES_COLORS = [
-  '#58a6ff', '#3fb978', '#e0719b', '#d29922', '#a371f7', '#2ec4b6',
-  '#f85149', '#ff9f40', '#8ddb5e', '#c97bd6', '#22d3ee', '#818cf8',
-];
 
 const CATEGORY_FIELDS = [
   ['light_brand', 'Light Brand'],
@@ -150,16 +156,6 @@ function computeInitialPerPage() {
   return Math.max(cols, Math.min(cols * rows, 120));
 }
 
-function roundRect(c, x, y, w, h, r) {
-  c.beginPath();
-  c.moveTo(x + r, y);
-  c.arcTo(x + w, y, x + w, y + h, r);
-  c.arcTo(x + w, y + h, x, y + h, r);
-  c.arcTo(x, y + h, x, y, r);
-  c.arcTo(x, y, x + w, y, r);
-  c.closePath();
-}
-
 // ── Small shared pieces ──────────────────────────────────────────────────────
 
 function FilterLabel({ children, T: t }) {
@@ -182,88 +178,6 @@ function MetricBadge({ label, value, color }) {
     }}>
       {label}:{value}
     </span>
-  );
-}
-
-// A dual-thumb range slider (CCT/Duv/Ra/Rg/R9 filters). Pointer-driven so it
-// works the same with mouse and touch; clicking the track jumps whichever
-// thumb is closer.
-function RangeSlider({ label, min: t, max: n, value, onChange, step = 1, fmt = (e) => e, T: s }) {
-  const [c, hi] = value;
-  const dark = s.name === 'dark';
-  const trackRef = useRef(null);
-  const [drag, setDrag] = useState(null);
-
-  const pct = (v) => (n === t ? 0 : Math.max(0, Math.min(100, ((v - t) / (n - t)) * 100)));
-  const valFromClientX = (cx) => {
-    const rc = trackRef.current.getBoundingClientRect();
-    const p = Math.max(0, Math.min(1, (cx - rc.left) / (rc.width || 1)));
-    const raw = t + p * (n - t);
-    const stepped = Math.round(raw / step) * step;
-    return Math.max(t, Math.min(n, stepped));
-  };
-  const down = (which, ev) => {
-    ev.preventDefault();
-    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch {}
-    setDrag(which);
-  };
-  const move = (ev) => {
-    if (!drag || !trackRef.current) return;
-    ev.preventDefault();
-    const v = valFromClientX(ev.clientX);
-    if (drag === 'low') onChange([Math.min(v, hi - step), hi]);
-    else onChange([c, Math.max(v, c + step)]);
-  };
-  const up = (ev) => {
-    if (drag) { try { ev.currentTarget.releasePointerCapture(ev.pointerId); } catch {} }
-    setDrag(null);
-  };
-  const onTrackDown = (ev) => {
-    if (!trackRef.current) return;
-    const v = valFromClientX(ev.clientX);
-    down(Math.abs(v - c) <= Math.abs(v - hi) ? 'low' : 'high', ev);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontFamily: 'monospace' }}>
-        <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: s.text }}>{label}</span>
-        <span style={{ color: s.accent, fontWeight: 700 }}>{fmt(c)} – {fmt(hi)}</span>
-      </div>
-      <div
-        ref={trackRef}
-        onPointerDown={onTrackDown}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        style={{ position: 'relative', height: 24, display: 'flex', alignItems: 'center', touchAction: 'none', cursor: drag ? 'grabbing' : 'pointer' }}
-      >
-        <div style={{
-          position: 'absolute', left: 0, right: 0, height: 4,
-          background: dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)', borderRadius: 2, pointerEvents: 'none',
-        }}>
-          <div style={{ position: 'absolute', left: `${pct(c)}%`, right: `${100 - pct(hi)}%`, height: '100%', background: s.accent, borderRadius: 2 }} />
-        </div>
-        <div
-          onPointerDown={(ev) => down('low', ev)}
-          style={{
-            position: 'absolute', left: `${pct(c)}%`, width: 20, height: 20, borderRadius: '50%', background: s.accent,
-            transform: 'translateX(-50%)',
-            boxShadow: drag === 'low' ? '0 2px 8px rgba(0,0,0,0.45)' : '0 1px 4px rgba(0,0,0,0.3)',
-            cursor: drag === 'low' ? 'grabbing' : 'grab', zIndex: drag === 'low' ? 6 : 3, touchAction: 'none',
-          }}
-        />
-        <div
-          onPointerDown={(ev) => down('high', ev)}
-          style={{
-            position: 'absolute', left: `${pct(hi)}%`, width: 20, height: 20, borderRadius: '50%', background: s.accent,
-            transform: 'translateX(-50%)',
-            boxShadow: drag === 'high' ? '0 2px 8px rgba(0,0,0,0.45)' : '0 1px 4px rgba(0,0,0,0.3)',
-            cursor: drag === 'high' ? 'grabbing' : 'grab', zIndex: drag === 'high' ? 6 : 4, touchAction: 'none',
-          }}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -600,357 +514,6 @@ function FilteredInsights({ q, T, heading, note }) {
       </div>
     </div>
   );
-}
-
-// Minimal stand-ins for the two Compare-view pieces that belong to the
-// "Explore charts" batch, used only until those land for real.
-function CompareCardFallback({ r: e, T: t, color, onOpen }) {
-  return (
-    <div onClick={onOpen} style={{ background: t.surface, border: `2px solid ${color}`, borderRadius: 10, padding: 14, cursor: 'pointer', color: t.text, fontFamily: 'monospace' }}>
-      <div style={{ fontWeight: 700 }}>{e.label || 'Untitled'}</div>
-      <div style={{ color: t.dim, fontSize: 12, marginTop: 6 }}>
-        {e.cct != null ? `${e.cct}K` : '—'} · Ra {e.ra ?? '—'} · Rf {e.Rf ?? '—'} · Rg {e.Rg ?? '—'}
-      </div>
-    </div>
-  );
-}
-function OverlaySPDFallback({ data, T: t }) {
-  return (
-    <div style={{ color: t.dim, fontFamily: 'monospace', textAlign: 'center', padding: 40 }}>
-      SPD overlay unavailable ({(data || []).length} reports).
-    </div>
-  );
-}
-
-// Minimal stand-ins for modals that haven't landed from other batches yet.
-function AdminPanelFallback({ onClose }) {
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', color: '#fff', padding: 20, borderRadius: 10, fontFamily: 'monospace' }}>Admin panel not yet available.</div>
-    </div>
-  );
-}
-function FeedbackModalFallback({ onClose }) {
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', color: '#fff', padding: 20, borderRadius: 10, fontFamily: 'monospace' }}>Feedback form not yet available.</div>
-    </div>
-  );
-}
-function ProfileModalFallback({ onClose }) {
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', color: '#fff', padding: 20, borderRadius: 10, fontFamily: 'monospace' }}>Profile & settings not yet available.</div>
-    </div>
-  );
-}
-
-// ── Canvas-rendered "Share Card" PNG for the Compare view ───────────────────
-// Draws either a single SPD-overlay card (view === 'overlay') or up to 3
-// stacked per-report cards (view === 'cards'); returns the <canvas>, which
-// the caller reads back via toDataURL('image/png').
-function compareShareCard(data, view, r) {
-  const d = (data || []).filter(Boolean);
-  if (!d.length) return null;
-
-  const dark = r && r.name === 'dark';
-  const BG = (r && r.bg) || (dark ? '#0d1117' : '#ffffff');
-  const SF = (r && r.surface) || (dark ? '#161b22' : '#f4f6f8');
-  const BD = (r && r.border) || (dark ? '#303841' : '#d5dce3');
-  const TX = (r && r.text) || (dark ? '#e6edf3' : '#0d1117');
-  const DM = (r && r.dim) || (dark ? '#8a96a3' : '#5a6673');
-  const AC = (r && r.accent) || '#58a6ff';
-  const GD = (r && r.good) || '#3fb978';
-  const WN = '#d29922';
-  const BAD = '#f85149';
-
-  const W = view === 'overlay' ? 820 : 440;
-  const pad = 20;
-  const now = fmtTZ(undefined, undefined, true);
-  const headH = 68;
-
-  const brand = (c) => {
-    c.textBaseline = 'alphabetic';
-    c.textAlign = 'left';
-    c.fillStyle = TX;
-    c.font = '800 26px monospace';
-    c.fillText('hCRI', pad, pad + 22);
-    c.fillStyle = AC;
-    c.fillText('.io', pad + 62, pad + 22);
-    c.fillStyle = DM;
-    c.font = '400 11px monospace';
-    c.fillText('LED  ·  TM-30  ·  COLOR RENDERING', pad, pad + 40);
-    c.textAlign = 'right';
-    c.fillStyle = DM;
-    c.font = '400 12px monospace';
-    c.fillText(now, W - pad, pad + 14);
-    c.fillStyle = TX;
-    c.font = '700 13px monospace';
-    c.fillText(d.length + ' light' + (d.length > 1 ? 's' : '') + ' compared', W - pad, pad + 34);
-    c.textAlign = 'left';
-    c.fillStyle = BD;
-    c.fillRect(pad, pad + 52, W - pad * 2, 1);
-  };
-
-  const mc = (k, v) =>
-    v == null ? DM
-    : k === 'Ra' ? (v >= 90 ? GD : v >= 80 ? WN : BAD)
-    : k === 'R9' ? (v >= 80 ? GD : v >= 50 ? WN : BAD)
-    : k === 'Rf' ? (v >= 90 ? GD : v >= 80 ? WN : BAD)
-    : k === 'Rg' ? (v >= 95 && v <= 105 ? GD : v >= 90 && v <= 110 ? WN : BAD)
-    : TX;
-
-  const foot = (c, H) => {
-    c.textAlign = 'left';
-    c.fillStyle = AC;
-    c.font = '700 13px monospace';
-    c.fillText('hCRI.io', pad, H - 16);
-    c.fillStyle = DM;
-    c.font = '400 11px monospace';
-    c.fillText('High-CRI LED & flashlight spectral analysis', pad + 70, H - 16);
-  };
-
-  const drawPlot = (c, px, py, pw, phh) => {
-    c.fillStyle = SF;
-    roundRect(c, px, py, pw, phh, 10);
-    c.fill();
-    c.strokeStyle = BD;
-    c.lineWidth = 1;
-    roundRect(c, px, py, pw, phh, 10);
-    c.stroke();
-    const mL = 44, mB = 26, ax0 = px + mL, ay0 = py + 14, aw = pw - mL - 16, ah = phh - mB - 14;
-    const x0 = 380, x1 = 780;
-    const X = (wl) => ax0 + ((wl - x0) / (x1 - x0)) * aw;
-    const Y = (v) => ay0 + (1 - v) * ah;
-    c.strokeStyle = BD;
-    c.fillStyle = DM;
-    c.font = '400 10px monospace';
-    [0, 0.5, 1].forEach((v) => {
-      c.globalAlpha = 0.5;
-      c.beginPath(); c.moveTo(ax0, Y(v)); c.lineTo(ax0 + aw, Y(v)); c.stroke();
-      c.globalAlpha = 1;
-      c.textAlign = 'right';
-      c.fillText(String(v), ax0 - 6, Y(v) + 3);
-    });
-    [400, 500, 600, 700].forEach((wl) => {
-      c.globalAlpha = 0.3;
-      c.beginPath(); c.moveTo(X(wl), ay0); c.lineTo(X(wl), ay0 + ah); c.stroke();
-      c.globalAlpha = 1;
-      c.textAlign = 'center';
-      c.fillText(String(wl), X(wl), py + phh - 9);
-    });
-    c.fillStyle = DM;
-    c.textAlign = 'center';
-    c.fillText('wavelength (nm)', ax0 + aw / 2, py + phh + 0);
-    d.forEach((rp, i) => {
-      const wls = rp.wls || [], vals = rp.vals || [], n = Math.min(wls.length, vals.length);
-      if (n < 2) return;
-      const vmax = Math.max.apply(null, vals) || 1;
-      c.strokeStyle = SERIES_COLORS[i % SERIES_COLORS.length];
-      c.lineWidth = 2;
-      c.lineJoin = 'round';
-      c.beginPath();
-      for (let j = 0; j < n; j++) {
-        const xx = X(wls[j]), yy = Y(Math.max(0, vals[j]) / vmax);
-        j ? c.lineTo(xx, yy) : c.moveTo(xx, yy);
-      }
-      c.stroke();
-    });
-    const ly = ay0 + 4;
-    c.textAlign = 'right';
-    c.font = '400 11px monospace';
-    d.forEach((rp, i) => {
-      const yy = ly + i * 16;
-      c.fillStyle = SERIES_COLORS[i % SERIES_COLORS.length];
-      c.fillRect(ax0 + aw - 140, yy - 7, 11, 4);
-      c.fillStyle = TX;
-      let nm = rp.label || 'Untitled';
-      if (nm.length > 16) nm = nm.slice(0, 15) + '…';
-      c.fillText(nm + (rp.cct ? '  ' + rp.cct + 'K' : ''), ax0 + aw - 6, yy);
-    });
-  };
-
-  const drawCard = (c, rp, i, cx, cy, cw, cardH) => {
-    c.fillStyle = SF;
-    roundRect(c, cx, cy, cw, cardH, 12);
-    c.fill();
-    c.strokeStyle = BD;
-    c.lineWidth = 1;
-    roundRect(c, cx, cy, cw, cardH, 12);
-    c.stroke();
-
-    const ix = cx + 16;
-    c.fillStyle = SERIES_COLORS[i % SERIES_COLORS.length];
-    c.beginPath();
-    c.arc(ix + 5, cy + 22, 5, 0, 7);
-    c.fill();
-
-    c.textAlign = 'left';
-    c.textBaseline = 'alphabetic';
-    c.fillStyle = TX;
-    c.font = '700 16px monospace';
-    let nm = rp.label || 'Untitled';
-    if (nm.length > 36) nm = nm.slice(0, 35) + '…';
-    c.fillText(nm, ix + 16, cy + 27);
-
-    const duv = rp.duv;
-    const tint = duv == null ? '' : duv < -0.002 ? 'Rosy' : duv > 0.002 ? 'Green' : 'Neutral';
-    if (tint) {
-      c.font = '700 10px monospace';
-      const tw = c.measureText(tint).width + 14, ty = cy + 37;
-      c.fillStyle = dark ? '#3a2230' : '#fde7f0';
-      roundRect(c, ix, ty, tw, 17, 8);
-      c.fill();
-      c.fillStyle = '#e0719b';
-      c.fillText(tint, ix + 7, ty + 12);
-    }
-
-    const sx = ix, sy = cy + 62, sw = cw - 32, sh = 108;
-    c.fillStyle = (r && r.surface2) || (r && r.bg) || (dark ? '#0d1117' : '#ffffff');
-    roundRect(c, sx, sy, sw, sh, 8);
-    c.fill();
-    c.strokeStyle = BD;
-    c.lineWidth = 1;
-    roundRect(c, sx, sy, sw, sh, 8);
-    c.stroke();
-
-    c.fillStyle = DM;
-    c.font = '700 9px monospace';
-    c.textAlign = 'left';
-    c.fillText('SPECTRAL POWER DISTRIBUTION', sx + 10, sy + 15);
-
-    const wls = rp.wls || [], vals = rp.vals || [], n = Math.min(wls.length, vals.length);
-    const px = sx + 10, pw = sw - 20, py = sy + 22, ph = sh - 42;
-    const x0 = n ? Math.min(350, Math.floor(Math.min.apply(null, wls) / 50) * 50) : 350;
-    const x1 = n ? Math.max(800, Math.ceil(Math.max.apply(null, wls) / 50) * 50) : 800;
-    const X = (wl) => px + ((wl - x0) / (x1 - x0)) * pw;
-    const vmax = n ? Math.max.apply(null, vals) || 1 : 1;
-    const Y = (v) => py + ph - (Math.max(0, v) / vmax) * ph;
-
-    if (n > 1) {
-      const grad = c.createLinearGradient(X(380), 0, X(720), 0);
-      grad.addColorStop(0, '#6a2fb5');
-      grad.addColorStop(0.12, '#2b3bff');
-      grad.addColorStop(0.28, '#00b3ff');
-      grad.addColorStop(0.42, '#00d05a');
-      grad.addColorStop(0.55, '#8ede00');
-      grad.addColorStop(0.66, '#ffe000');
-      grad.addColorStop(0.8, '#ff7a00');
-      grad.addColorStop(1, '#e0203a');
-
-      c.save();
-      c.beginPath();
-      c.moveTo(X(wls[0]), py + ph);
-      for (let j = 0; j < n; j++) c.lineTo(X(wls[j]), Y(vals[j]));
-      c.lineTo(X(wls[n - 1]), py + ph);
-      c.closePath();
-      c.clip();
-      c.globalAlpha = 0.62;
-      c.fillStyle = grad;
-      c.fillRect(px, py, pw, ph);
-      c.globalAlpha = 1;
-      c.restore();
-
-      c.save();
-      c.beginPath();
-      c.rect(px, py - 1, pw, ph + 2);
-      c.clip();
-      c.strokeStyle = TX;
-      c.lineWidth = 1.3;
-      c.lineJoin = 'round';
-      c.beginPath();
-      for (let j = 0; j < n; j++) {
-        const xx = X(wls[j]), yy = Y(vals[j]);
-        j ? c.lineTo(xx, yy) : c.moveTo(xx, yy);
-      }
-      c.stroke();
-      c.restore();
-
-      let pk = wls[0], pv = -1;
-      for (let j = 0; j < n; j++) if (vals[j] > pv) { pv = vals[j]; pk = wls[j]; }
-
-      c.strokeStyle = AC;
-      c.setLineDash([3, 3]);
-      c.beginPath();
-      c.moveTo(X(pk), py);
-      c.lineTo(X(pk), py + ph);
-      c.stroke();
-      c.setLineDash([]);
-
-      c.fillStyle = AC;
-      c.font = '700 9px monospace';
-      c.textAlign = 'center';
-      c.fillText('peak ' + Math.round(pk) + 'nm', sx + sw / 2, sy + sh - 5);
-    }
-
-    c.fillStyle = DM;
-    c.font = '400 9px monospace';
-    c.textAlign = 'left';
-    c.fillText(x0 + 'nm', sx + 10, sy + sh - 5);
-    c.textAlign = 'right';
-    c.fillText(x1 + 'nm', sx + sw - 10, sy + sh - 5);
-
-    const mg = 8, my0 = sy + sh + 16, colW = (cw - 32 - mg * 2) / 3, boxH = 48;
-    const rows = [
-      [['CCT', rp.cct, 'K'], ['Duv', rp.duv, ''], ['Ra', rp.ra, '']],
-      [['R9', rp.r9, ''], ['Rf', rp.Rf, ''], ['Rg', rp.Rg, '']],
-    ];
-    rows.forEach((row, ri) => {
-      row.forEach((m, ci) => {
-        const [k, v, u] = m;
-        const bx = ix + ci * (colW + mg), by = my0 + ri * (boxH + mg);
-        c.strokeStyle = BD;
-        c.lineWidth = 1;
-        roundRect(c, bx, by, colW, boxH, 8);
-        c.stroke();
-        c.textAlign = 'left';
-        c.fillStyle = DM;
-        c.font = '700 10px monospace';
-        c.fillText(k, bx + 10, by + 17);
-        c.fillStyle = k === 'CCT' ? AC : k === 'Duv' ? TX : mc(k, v);
-        c.font = '800 18px monospace';
-        const vs = v == null ? '—' : k === 'Duv' ? (v > 0 ? '+' : '') + Number(v).toFixed(4) : String(Math.round(v));
-        c.fillText(vs, bx + 10, by + 39);
-        if (u && v != null) {
-          const vw = c.measureText(vs).width;
-          c.fillStyle = DM;
-          c.font = '400 9px monospace';
-          c.fillText(u, bx + 10 + vw + 3, by + 39);
-        }
-      });
-    });
-  };
-
-  if (view === 'overlay') {
-    const plotH = 380, H = headH + plotH + 54;
-    const cv = document.createElement('canvas');
-    cv.width = W * 2;
-    cv.height = H * 2;
-    const c = cv.getContext('2d');
-    c.scale(2, 2);
-    c.fillStyle = BG;
-    c.fillRect(0, 0, W, H);
-    brand(c);
-    drawPlot(c, pad, headH + 6, W - pad * 2, plotH);
-    foot(c, H);
-    return cv;
-  }
-
-  const cards = d.slice(0, 3), cardH = 304, gap = 14;
-  const cardsBlock = cards.length * (cardH + gap);
-  const H = headH + 6 + cardsBlock + 34;
-  const cv = document.createElement('canvas');
-  cv.width = W * 2;
-  cv.height = H * 2;
-  const c = cv.getContext('2d');
-  c.scale(2, 2);
-  c.fillStyle = BG;
-  c.fillRect(0, 0, W, H);
-  brand(c);
-  const cy0 = headH + 10;
-  cards.forEach((rp, i) => drawCard(c, rp, i, pad, cy0 + i * (cardH + gap), W - pad * 2, cardH));
-  foot(c, H);
-  return cv;
 }
 
 // ── Shared filter panel + results grid ──────────────────────────────────────
@@ -1315,7 +878,6 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const [__relOpen, __setRelOpen] = useState(false);
   const __hcriRelated = (typeof window !== 'undefined' && window.__hcriRelated) || [];
 
-  const h_ = h; // Duv range alias to keep handlers short below
   const setDuv = _setDuv;
 
   // ── Data fetch ───────────────────────────────────────────────────────────
@@ -2199,7 +1761,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   );
 
   const reportDetailView = ee && (
-    <ReportView
+    <ReportDetail
       report={ee}
       allReports={[ee]}
       preview={!n}
@@ -2250,7 +1812,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
                 ✕
               </button>
             </div>
-            <ReportView report={cmpFull} allReports={[cmpFull]} preview={!n} isGuest={!n || Number(cmpFull.userId) !== Number(n.id)} isShared />
+            <ReportDetail report={cmpFull} allReports={[cmpFull]} preview={!n} isGuest={!n || Number(cmpFull.userId) !== Number(n.id)} isShared />
           </div>
         </div>
       )}
@@ -2812,15 +2374,19 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   return (
     <Fragment>
-      {adminOpen && <AdminPanelFallback onClose={() => setAdminOpen(false)} />}
+      {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} me={n} />}
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
-      {fbOpen && <FeedbackModalFallback user={n} onClose={() => setFbOpen(false)} />}
-      {profileOpen && <ProfileModalFallback user={n} onClose={() => setProfileOpen(false)} onUserUpdate={() => {}} />}
+      {fbOpen && <FeedbackModal user={n} onClose={() => setFbOpen(false)} />}
+      {profileOpen && <AccountSettings user={n} onClose={() => setProfileOpen(false)} onUserUpdate={() => {}} />}
 
       {compareBar}
       {categorizeModal}
       {compareView}
 
+      {/* The three top-level layouts, picked in order: desktop split view
+          (a report is open AND the results list is pinned/opened) >
+          full-screen single-pane report view (a report is open, otherwise)
+          > the default full listing page (browse/myreports/insights). */}
       {ee && !o && (ePin || eOpen)
         ? splitView
         : ee

@@ -208,11 +208,17 @@ export function compareShareCard(data, view, theme) {
     const Y = v => py + ph - (Math.max(0, v) / vmax) * ph;
 
     if (n > 1) {
+      // A fixed rainbow gradient (not wlRGB-sampled like CompareCard's SVG
+      // version) spanning roughly violet->red across the visible range,
+      // used only as a canvas fillRect clipped to the area under the curve.
       const grad = c.createLinearGradient(X(380), 0, X(720), 0);
       grad.addColorStop(0, '#6a2fb5'); grad.addColorStop(0.12, '#2b3bff'); grad.addColorStop(0.28, '#00b3ff');
       grad.addColorStop(0.42, '#00d05a'); grad.addColorStop(0.55, '#8ede00'); grad.addColorStop(0.66, '#ffe000');
       grad.addColorStop(0.8, '#ff7a00'); grad.addColorStop(1, '#e0203a');
 
+      // Clip to the closed curve-and-baseline path, then flood-fill that
+      // clipped region with the gradient -- canvas has no "fill under a
+      // path" primitive, so clip+fillRect stands in for it.
       c.save();
       c.beginPath(); c.moveTo(X(wls[0]), py + ph);
       for (let j = 0; j < n; j++) c.lineTo(X(wls[j]), Y(vals[j]));
@@ -220,6 +226,8 @@ export function compareShareCard(data, view, theme) {
       c.globalAlpha = 0.62; c.fillStyle = grad; c.fillRect(px, py, pw, ph); c.globalAlpha = 1;
       c.restore();
 
+      // Stroke the curve itself on top, clipped to a 1px-padded plot
+      // rectangle so the line doesn't bleed past the card's edges.
       c.save();
       c.beginPath(); c.rect(px, py - 1, pw, ph + 2); c.clip();
       c.strokeStyle = TX; c.lineWidth = 1.3; c.lineJoin = 'round';
