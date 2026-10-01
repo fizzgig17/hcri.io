@@ -9,13 +9,17 @@ function rfColor(rf, T) {
   return T.good;
 }
 
-export default function Sidebar({ user, reports, activeId, uploading, uploadProgress, uploadLabel, onUpload, onSelect, onDelete, onLogout, minRf, onMinRfChange }) {
+export default function Sidebar({ user, reports, activeId, isMobile=false, uploading, uploadProgress, uploadLabel, onUpload, onSelect, onDelete, onLogout, minRf, onMinRfChange }) {
   const { theme: T, themeName, toggleTheme } = useTheme();
   const fileRef = useRef();
   const [over, setOver] = useState(false);
 
   const S = {
-    sidebar:   { width:290, flexShrink:0, background:T.surface2, borderRight:`1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden' },
+    // Desktop: a fixed-width docked pane next to the report view. Mobile:
+    // this IS the full screen (App only renders one of Sidebar/ReportView
+    // at a time there), so it fills the viewport instead of being squeezed
+    // into a 290px sliver.
+    sidebar:   { width: isMobile ? '100%' : 290, flexShrink:0, background:T.surface2, borderRight: isMobile ? 'none' : `1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden' },
     head:      { padding:'18px 16px 14px', borderBottom:`1px solid ${T.border}`, background:T.surface3 },
     logoutBtn: { fontSize:12, color:T.dim, background:'none', border:`1px solid ${T.border}`, borderRadius:4, padding:'4px 10px', cursor:'pointer' },
     body:      { flex:1, overflow:'hidden', display:'flex', flexDirection:'column' },

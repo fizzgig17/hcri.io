@@ -5,3 +5,7 @@ error_log
 # on the server and fill in real values. Never commit this file.
 api/_core/secrets.local.php
 companion/hCRICompanion.apk
+
+# Vite always emits this alongside app.js/app.css, but nothing serves it --
+# index.php links directly to assets/app.js and assets/app.css instead.
+assets/index.html

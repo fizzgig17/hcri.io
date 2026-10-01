@@ -385,6 +385,34 @@ function ThreeViewer({ reports, activeId, minRf, viewCmd }) {
     const onMove=e=>{if(!drag)return;const dx=(e.clientX-prev.x)*.007,dy=(e.clientY-prev.y)*.007;prev={x:e.clientX,y:e.clientY};if(right){const r=new THREE.Vector3();camera.getWorldDirection(r);r.cross(camera.up).normalize();pan.addScaledVector(r,-dx*.4);pan.addScaledVector(camera.up,dy*.4);}else{sph.theta-=dx;sph.phi=Math.max(.05,Math.min(Math.PI-.05,sph.phi+dy));}camUpdate();};
     window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',()=>drag=false);
     canvas.addEventListener('wheel',e=>{sph.r=Math.max(.5,Math.min(12,sph.r+e.deltaY*.003));camUpdate();});
+    // Touch: one finger rotates (same math as a plain mouse drag), two
+    // fingers pinch to zoom -- without this the 3D tab is completely dead
+    // on a phone/tablet, since touch never fires mouse events on its own.
+    let pinchDist=null;
+    const touchDist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+    canvas.addEventListener('touchstart',e=>{
+      if(e.touches.length===1){drag=true;right=false;prev={x:e.touches[0].clientX,y:e.touches[0].clientY};}
+      else if(e.touches.length===2){drag=false;pinchDist=touchDist(e.touches);}
+    },{passive:true});
+    canvas.addEventListener('touchmove',e=>{
+      if(e.touches.length===1&&drag){
+        e.preventDefault();
+        const t=e.touches[0];
+        const dx=(t.clientX-prev.x)*.007,dy=(t.clientY-prev.y)*.007;
+        prev={x:t.clientX,y:t.clientY};
+        sph.theta-=dx;sph.phi=Math.max(.05,Math.min(Math.PI-.05,sph.phi+dy));
+        camUpdate();
+      } else if(e.touches.length===2&&pinchDist!=null){
+        e.preventDefault();
+        const d=touchDist(e.touches);
+        sph.r=Math.max(.5,Math.min(12,sph.r-(d-pinchDist)*.01));
+        pinchDist=d;
+        camUpdate();
+      }
+    },{passive:false});
+    const touchEnd=e=>{if(e.touches.length<1)drag=false;if(e.touches.length<2)pinchDist=null;};
+    canvas.addEventListener('touchend',touchEnd);
+    canvas.addEventListener('touchcancel',touchEnd);
     // Static
     const grid=new THREE.GridHelper(1.3,13,0x0e2838,0x091820);grid.position.set(.5,0,.5);scene.add(grid);
     [[new THREE.Vector3(0,0,0),new THREE.Vector3(1.15,0,0),0xff5555],[new THREE.Vector3(0,0,0),new THREE.Vector3(0,1.15,0),0x55aaff],[new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,1.15),0x55ff99]].forEach(([a,b,c])=>scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:c,transparent:true,opacity:.55}))));
@@ -436,7 +464,7 @@ const iStyle = {background:'rgba(0,0,0,0.3)',border:`1px solid rgba(80,160,220,0
 const lStyle = {fontSize:11,textTransform:'uppercase',letterSpacing:1,color:'#7aaccc',fontWeight:700,display:'block',marginBottom:4};
 
 // ── Metadata editor ───────────────────────────────────────────────────────────
-function MetaEditor({ report, isGuest, onSave }) {
+function MetaEditor({ report, isGuest, onSave, isMobile=false }) {
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [label,   setLabel]   = useState(report.label        || '');
@@ -467,7 +495,7 @@ function MetaEditor({ report, isGuest, onSave }) {
   }
 
   return (
-    <div style={{padding:'14px 22px',borderBottom:`1px solid rgba(80,160,220,0.25)`}}>
+    <div style={{padding: isMobile?'12px 14px':'14px 22px', borderBottom:`1px solid rgba(80,160,220,0.25)`}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:editing?14:0}}>
         <div style={{fontSize:12,textTransform:'uppercase',letterSpacing:1.5,color:'#7aaccc',fontWeight:700}}>Source Details</div>
         {!isGuest && (editing
@@ -481,7 +509,7 @@ function MetaEditor({ report, isGuest, onSave }) {
       </div>
 
       {editing ? (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns: isMobile?'1fr':'1fr 1fr',gap:12}}>
           <div><label style={lStyle}>Label / Source</label><input style={iStyle} value={label} onChange={e=>setLabel(e.target.value)} placeholder="Source name"/></div>
           <div><label style={lStyle}>Model</label><input style={iStyle} value={model} onChange={e=>setModel(e.target.value)} placeholder="e.g. Sc13C"/></div>
           <div><label style={lStyle}>Manufacturer</label><input style={iStyle} value={mfr} onChange={e=>setMfr(e.target.value)} placeholder="e.g. Sofirn"/></div>
@@ -492,7 +520,7 @@ function MetaEditor({ report, isGuest, onSave }) {
           </div>
         </div>
       ) : (
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginTop:8}}>
+        <div style={{display:'grid',gridTemplateColumns: isMobile?'1fr 1fr':'repeat(4,1fr)',gap:8,marginTop:8}}>
           {[['Source',label],['Model',model||'-'],['Manufacturer',mfr||'-'],['LED',led||'-']].map(([k,v])=>(
             <div key={k} style={{background:'#0a1628',border:'1px solid rgba(80,160,220,0.2)',borderRadius:4,padding:'6px 10px'}}>
               <div style={{fontSize:10,color:'#7aaccc',textTransform:'uppercase',letterSpacing:1,marginBottom:2,fontWeight:700}}>{k}</div>
@@ -637,7 +665,7 @@ function CRIBars({ ri, C }) {
 }
 
 // ── Main ReportView ───────────────────────────────────────────────────────────
-export default function ReportView({ report, allReports=[], isGuest=false, onMetaSave }) {
+export default function ReportView({ report, allReports=[], isGuest=false, onMetaSave, isMobile=false, onBack }) {
   const { theme: T, themeName, toggleTheme } = useTheme();
   // Rebuild C from theme on every render
   C = {
@@ -711,16 +739,25 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg,fontFamily:'monospace',overflow:'hidden'}}>
 
-      {/* Header */}
-      <div style={{padding:'14px 22px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexShrink:0,background:C.surface2}}>
-        <div>
-          <div style={{fontSize:18,fontWeight:700,color:'#ffffff',marginBottom:4}}>{report.label}</div>
-          <div style={{fontSize:13,color:C.dim,fontWeight:500}}>{report.sourceType?.toUpperCase()} · {new Date(report.createdAt.replace(' ','T')).toLocaleString()}</div>
+      {/* Header -- stacks (title row, then controls row) on mobile instead
+          of squeezing everything into one row that overflows. */}
+      <div style={{padding: isMobile?'10px 14px':'14px 22px', borderBottom:`1px solid ${C.border}`, display:'flex', flexDirection: isMobile?'column':'row', alignItems: isMobile?'stretch':'flex-start', justifyContent:'space-between', gap:10, flexShrink:0, background:C.surface2}}>
+        <div style={{display:'flex', alignItems:'center', gap:10, minWidth:0}}>
+          {isMobile && onBack && (
+            <button onClick={onBack} aria-label="Back to reports list"
+              style={{background:'none', border:`1px solid ${C.border}`, color:C.text, borderRadius:6, padding:'7px 10px', fontSize:15, cursor:'pointer', flexShrink:0}}>
+              ←
+            </button>
+          )}
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:18,fontWeight:700,color:'#ffffff',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{report.label}</div>
+            <div style={{fontSize:13,color:C.dim,fontWeight:500}}>{report.sourceType?.toUpperCase()} · {new Date(report.createdAt.replace(' ','T')).toLocaleString()}</div>
+          </div>
         </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <div style={{display:'flex',gap:8,alignItems:'center',justifyContent: isMobile?'space-between':'flex-start'}}>
           <div style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:6,overflow:'hidden'}}>
             {['report','3d'].map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,212,255,0.14)':'none',border:'none',padding:'8px 16px',fontSize:13,textTransform:'uppercase',letterSpacing:1,color:tab===t?C.accent:C.dim,cursor:'pointer',fontFamily:'monospace',fontWeight:tab===t?700:400}}>
+              <button key={t} onClick={()=>setTab(t)} style={{background:tab===t?'rgba(0,212,255,0.14)':'none',border:'none',padding: isMobile?'8px 12px':'8px 16px',fontSize:13,textTransform:'uppercase',letterSpacing:1,color:tab===t?C.accent:C.dim,cursor:'pointer',fontFamily:'monospace',fontWeight:tab===t?700:400}}>
                 {t==='report'?'Report':'3D Plot'}
               </button>
             ))}
@@ -737,10 +774,12 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
         <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column'}}>
 
           {/* Row 1: Source metadata editor */}
-          <MetaEditor report={report} isGuest={isGuest} onSave={saveMetadata}/>
+          <MetaEditor report={report} isGuest={isGuest} onSave={saveMetadata} isMobile={isMobile}/>
 
-          {/* Row 2: SPD (left) + 3 bar charts (right) */}
-          <div style={{padding:'16px 22px',borderBottom:`1px solid ${C.border}`,display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+          {/* Row 2: SPD + 3 bar charts -- side by side on desktop, stacked
+              on mobile (the two-column grid is what read as "floating" on
+              a phone: each column was squeezed below any usable width). */}
+          <div style={{padding: isMobile?'14px':'16px 22px', borderBottom:`1px solid ${C.border}`, display:'grid', gridTemplateColumns: isMobile?'1fr':'1fr 1fr', gap: isMobile?16:20}}>
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
               <div style={S.sHead}>Spectral Power Distribution</div>
               {report.wls&&report.vals
@@ -754,11 +793,16 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
             </div>
           </div>
 
-          {/* Row 3: CVG (left) + Metrics + Interpretation (right) */}
-          <div style={{padding:'16px 22px',borderBottom:`1px solid ${C.border}`,display:'grid',gridTemplateColumns:'auto 1fr',gap:24}}>
-            <CVGWheel rfBins={rfBins} Rg={report.Rg||100} Rf={report.Rf||80} cct={report.cct} duv={report.duv} size={260} theme={T}/>
+          {/* Row 3: CVG + Metrics/Interpretation -- side by side on desktop,
+              stacked on mobile, with the wheel sized down so it (and its
+              label padding) actually fits inside a phone's width instead of
+              overflowing it. */}
+          <div style={{padding: isMobile?'14px':'16px 22px', borderBottom:`1px solid ${C.border}`, display:'grid', gridTemplateColumns: isMobile?'1fr':'auto 1fr', gap: isMobile?16:24}}>
+            <div style={{display:'flex',justifyContent:'center'}}>
+              <CVGWheel rfBins={rfBins} Rg={report.Rg||100} Rf={report.Rf||80} cct={report.cct} duv={report.duv} size={isMobile?190:260} theme={T}/>
+            </div>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+              <div style={{display:'grid',gridTemplateColumns: isMobile?'1fr 1fr':'1fr 1fr 1fr',gap:8}}>
                 <Metric label="CIE x"    value={report.x?.toFixed(4)} />
                 <Metric label="CIE y"    value={report.y?.toFixed(4)} />
                 <Metric label="CCT"      value={report.cct?report.cct+'K':null} color={C.accent} />
@@ -774,8 +818,8 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
                   [report.Rg!=null?`Rg ${report.Rg}`:'Rg -', interpRg(report.Rg)],
                   [report.duv!=null?`Duv ${(report.duv>=0?'+':'')+report.duv.toFixed(4)}`:'Duv -', interpDuv(report.duv)],
                 ].map(([k,v])=>(
-                  <div key={k} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{fontSize:13,fontWeight:700,color:C.accent,minWidth:90,flexShrink:0}}>{k}</div>
+                  <div key={k} style={{display:'flex',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.border}`, flexDirection: isMobile?'column':'row'}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.accent,minWidth: isMobile?0:90,flexShrink:0}}>{k}</div>
                     <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{v}</div>
                   </div>
                 ))}
@@ -787,7 +831,7 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
           </div>
 
           {/* Row 4: CES 99 color bars */}
-          <div style={{padding:'16px 22px 32px'}}>
+          <div style={{padding: isMobile?'14px 14px 24px':'16px 22px 32px'}}>
             <CESBars rfBins={rfBins} theme={T}/>
           </div>
 
@@ -797,7 +841,7 @@ export default function ReportView({ report, allReports=[], isGuest=false, onMet
           <ThreeViewer reports={allReports.filter(r=>r.x&&r.y)} activeId={report.id} minRf={0}
             viewCmd={`focus:${report.x||.33}:${report.y||.33}:${report.Rf||50}`}/>
           <div style={{position:'absolute',bottom:12,left:14,fontSize:11,color:C.dim,pointerEvents:'none',lineHeight:2}}>
-            drag rotate · scroll zoom · right-drag pan
+            {isMobile ? 'drag rotate · pinch zoom' : 'drag rotate · scroll zoom · right-drag pan'}
           </div>
         </div>
       )}

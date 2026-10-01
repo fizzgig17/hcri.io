@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
+import { useIsMobile } from './hooks/useIsMobile';
 import { useTheme } from './lib/ThemeContext';
 import { api } from './lib/api';
 import AuthScreen  from './components/AuthScreen';
@@ -9,6 +10,7 @@ import ReportView  from './components/ReportView';
 export default function App() {
   const { theme: T, themeName, toggleTheme } = useTheme();
   const { user, checking, tryAutoLogin, login, register, logout } = useAuth();
+  const isMobile = useIsMobile();
   const [reports,    setReports]   = useState([]);
   const [detail,     setDetail]    = useState(null);
   const [activeId,   setActiveId]  = useState(null);
@@ -18,10 +20,13 @@ export default function App() {
   const [progLabel,  setProgLabel] = useState('');
   const [notif,      setNotif]     = useState(null);
   const [guestReport,setGuestReport] = useState(null); // one-off guest result
+  // Mobile-only: which single pane is showing. Desktop always docks both
+  // the reports list and the report detail side by side and ignores this.
+  const [mobileView, setMobileView] = useState('list'); // 'list' | 'detail'
 
   useEffect(() => { tryAutoLogin(); }, []);
   useEffect(() => {
-    if (!user) { setReports([]); setDetail(null); return; }
+    if (!user) { setReports([]); setDetail(null); setMobileView('list'); return; }
     setGuestReport(null); // clear guest report on login
     api.get('/reports').then(setReports).catch(e => showNotif(e.message, 'err'));
   }, [user]);
@@ -56,6 +61,7 @@ export default function App() {
   async function handleSelect(id) {
     if (!id) return;
     setActiveId(id);
+    if (isMobile) setMobileView('detail'); // navigate to the full-screen detail pane
     try { const r = await api.get(`/reports/${id}`); setDetail(r); }
     catch(e) { showNotif(e.message, 'err'); }
   }
@@ -86,13 +92,14 @@ export default function App() {
   if (!user && guestReport) {
     return (
       <div style={{display:'flex',flexDirection:'column',height:'100vh',background:'#060a0f'}}>
-        {/* Guest banner */}
-        <div style={{background:T.surface2,borderBottom:`1px solid ${T.border}`,padding:'10px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        {/* Guest banner -- wraps to two rows on narrow screens instead of
+            squeezing the logo and three buttons into one overflowing row. */}
+        <div style={{background:T.surface2,borderBottom:`1px solid ${T.border}`,padding: isMobile?'10px 14px':'10px 20px',display:'flex',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between',gap:8,flexShrink:0}}>
           <div style={{fontWeight:900,fontSize:18,color:T.white,fontFamily:'monospace'}}>
             hCRI<span style={{color:T.accent}}>.io</span>
             <span style={{fontSize:12,color:T.dim,fontWeight:400,marginLeft:12}}>Guest mode — results not saved</span>
           </div>
-          <div style={{display:'flex',gap:10}}>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
             <button onClick={toggleTheme}
               style={{background:T.surface,border:`1px solid ${T.border}`,color:T.text,borderRadius:6,padding:'7px 12px',fontSize:16,cursor:'pointer'}}>
               {themeName==='dark'?'☀':'🌙'}
@@ -108,7 +115,7 @@ export default function App() {
           </div>
         </div>
         <div style={{flex:1,overflow:'hidden'}}>
-          <ReportView report={guestReport} allReports={[guestReport]} isGuest={true}/>
+          <ReportView report={guestReport} allReports={[guestReport]} isGuest={true} isMobile={isMobile}/>
         </div>
       </div>
     );
@@ -120,15 +127,25 @@ export default function App() {
   }
 
   // ── Logged-in app ────────────────────────────────────────────────────────
+  // Desktop: sidebar + report view always docked side by side (unchanged).
+  // Mobile: exactly one full-screen pane at a time, driven by mobileView --
+  // the list, or the detail view with its own back button to return here.
+  const showSidebar = !isMobile || mobileView === 'list';
+  const showDetail  = !isMobile || mobileView === 'detail';
   return (
     <div style={{display:'flex',height:'100vh',overflow:'hidden',background:T.bg}}>
-      <Sidebar user={user} reports={reports} activeId={activeId}
-        uploading={uploading} uploadProgress={progress} uploadLabel={progLabel}
-        onUpload={handleUpload} onSelect={handleSelect} onDelete={handleDelete} onLogout={logout}
-        minRf={minRf} onMinRfChange={setMinRf}/>
-      <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
-        <ReportView report={detail} allReports={reports} onMetaSave={handleMetaSave}/>
-      </div>
+      {showSidebar && (
+        <Sidebar user={user} reports={reports} activeId={activeId} isMobile={isMobile}
+          uploading={uploading} uploadProgress={progress} uploadLabel={progLabel}
+          onUpload={handleUpload} onSelect={handleSelect} onDelete={handleDelete} onLogout={logout}
+          minRf={minRf} onMinRfChange={setMinRf}/>
+      )}
+      {showDetail && (
+        <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+          <ReportView report={detail} allReports={reports} onMetaSave={handleMetaSave}
+            isMobile={isMobile} onBack={isMobile ? () => setMobileView('list') : undefined}/>
+        </div>
+      )}
       {notif&&(
         <div style={{position:'fixed',bottom:18,left:'50%',transform:'translateX(-50%)',background:T.surface2,borderRadius:6,padding:'10px 18px',fontSize:13,letterSpacing:.5,zIndex:200,pointerEvents:'none',border:`1px solid ${notif.type==='err'?T.bad+'60':T.good+'60'}`,color:notif.type==='err'?T.bad:T.good}}>
           {notif.msg}
