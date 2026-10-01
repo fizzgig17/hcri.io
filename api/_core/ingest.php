@@ -79,13 +79,33 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
         catch (\Throwable $e) {}
         $pub = $defPriv ? 0 : 1;
 
-        $s = $db->prepare('INSERT INTO reports(user_id,label,source_type,file_name,cct,duv,cie_x,cie_y,rf,rg,spd_data,meta,created_at,is_public,via_api) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,' . $pub . ',?)');
-        $s->execute([
+        $params = [
             $userId, $label, $sourceType, $filename,
             $result['cct'], $result['duv'], $result['x'] ?? null, $result['y'] ?? null,
             $result['Rf'], $result['Rg'],
             $spdData, $meta, $now, $viaApi ? 1 : 0,
-        ]);
+        ];
+        try {
+            $s = $db->prepare('INSERT INTO reports(user_id,label,source_type,file_name,cct,duv,cie_x,cie_y,rf,rg,spd_data,meta,created_at,is_public,via_api) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,' . $pub . ',?)');
+            $s->execute($params);
+        } catch (\PDOException $e) {
+            // SQLSTATE 42S22 = unknown column -- the via_api migration
+            // (hcri_api_flag_migration.sql: ALTER TABLE reports ADD COLUMN
+            // via_api ...) hasn't been run against this database yet.
+            // Every upload (API, browser UI, and inbound email alike) goes
+            // through this one function, so letting that missing reporting
+            // column take the whole insert down would break uploads
+            // entirely rather than just leaving the admin panel's "via API"
+            // count at zero -- which is the failure mode admin.php's own
+            // user-list query already tolerates. Degrade the same way here:
+            // retry without via_api, dropping its trailing param too.
+            if ($e->getCode() === '42S22' || str_contains($e->getMessage(), 'via_api')) {
+                $s = $db->prepare('INSERT INTO reports(user_id,label,source_type,file_name,cct,duv,cie_x,cie_y,rf,rg,spd_data,meta,created_at,is_public) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,' . $pub . ')');
+                $s->execute(array_slice($params, 0, 13));
+            } else {
+                throw $e;
+            }
+        }
         $newId = (int)$db->lastInsertId();
 
         return [
