@@ -11,8 +11,17 @@
 # Actions tab and (by default) a GitHub email. Fix it by reconciling that
 # server-side edit into a real commit, then re-running the workflow.
 #
-# This does NOT run `npm run build`, and does NOT run any database
-# migrations -- both stay manual, on purpose (see the deploy notes).
+# This does NOT run any database migrations -- that stays manual, on
+# purpose (see the deploy notes).
+#
+# It DOES run `npm run build` for frontend/ (a Vite React app) -- see the
+# build-frontend job below. The server itself has no Node/npm (it's a
+# shared cPanel host), so the minified assets/app.js + assets/app.css
+# Vite produces are built here in CI and committed straight back to
+# `master`, then the SSH step's `git fetch`+ff-merge picks up that commit
+# like any other. Previously these had to be built and committed by hand
+# locally before every push -- easy to forget, easy to deploy a stale or
+# un-minified build by accident.
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
 #   SPACESHIP_HOST  - server hostname or IP
@@ -25,6 +34,11 @@
 #                      SSH connection below)
 #   SPACESHIP_PATH  - absolute path to the site root on the server,
 #                      e.g. /home/youruser/hcri.io/spd
+#
+# One-time repo setting this relies on: Settings -> Actions -> General ->
+# "Workflow permissions" must be "Read and write permissions" -- otherwise
+# build-frontend's push-back step gets a 403. (Same setting the
+# hcri-companion APK pipelines need, for the same reason.)
 
 name: Deploy to Spaceship
 
@@ -33,8 +47,51 @@ on:
     branches: [master]
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend (minified, into assets/)
+        working-directory: frontend
+        run: npm run build
+
+      # vite.config.js builds with emptyOutDir: true, which wipes
+      # everything in assets/ first -- including legacy static files this
+      # build doesn't own (fonts, old playground JS, photos) that happen to
+      # live in the same folder. So this only ever stages the exact files
+      # Vite actually produces (app.js, app.css, and the two files Vite
+      # copies through from frontend/public/) -- never the whole assets/
+      # directory -- so a wipe inside this disposable checkout can't carry
+      # through as a deletion of files this build doesn't touch.
+      - name: Commit built assets if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/app.js assets/app.css assets/favicon.svg assets/icons.svg
+          if git diff --cached --quiet; then
+            echo "No build output changes."
+          else
+            git commit -m "Build frontend assets [skip ci]"
+            git push origin master
+          fi
+
   deploy:
+    needs: build-frontend
     runs-on: ubuntu-latest
     steps:
       - name: git fetch + fast-forward on server
