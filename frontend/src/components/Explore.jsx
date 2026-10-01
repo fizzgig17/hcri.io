@@ -517,14 +517,25 @@ function FilteredInsights({ q, T, heading, note }) {
 }
 
 // ── Shared filter panel + results grid ──────────────────────────────────────
-// The bundle prints this entire block twice, byte-for-byte identical, once
-// inside the desktop results-sidebar and once in the normal full-page
-// layout. Factored into these two components instead so the two call sites
-// (see <Explore> below) stay in sync by construction. `btn` is the small
+// Used at two call sites (see <Explore> below), which are almost but not
+// quite identical:
+//  - the desktop split view (viewing a report, results pinned/opened in a
+//    270px-fixed outer column) renders FilterPanel at width 100% -- it
+//    already fills that fixed column -- and with NO header pin button,
+//    since that view has its own pin toggle (📌) in its own tab bar.
+//  - the normal full-page listing (no report open) has no such wrapping
+//    column, so FilterPanel itself must be a fixed 270px desktop sidebar
+//    (100% on mobile) and needs its OWN header pin button, because that
+//    call site also offers a collapse-to-arrow affordance (see
+//    `eFiltCol`/the toggle button in <Explore>'s `listingBody`) that the
+//    pin button overrides ("pinned" = stays open even if collapsed).
+// `width` and `showPinInHeader`/`ePin`/`onTogglePin` are how the two call
+// sites customize this otherwise-shared component. `btn` is the small
 // `ne()` button-style helper from <Explore>.
 
 function FilterPanel({
   T: r, isMobile: o, isMyReportsTab, btn,
+  width, showPinInHeader, ePin, onTogglePin,
   search, onSearch,
   userOpts, userSel, onUserSel,
   catOpts, catSel, onCatSel,
@@ -541,12 +552,27 @@ function FilterPanel({
 
   return (
     <div style={{
-      width: '100%', flexShrink: 0, borderRight: o ? 'none' : `1px solid ${r.border}`,
+      width: width ?? '100%', flexShrink: 0, borderRight: o ? 'none' : `1px solid ${r.border}`,
       borderBottom: o ? `1px solid ${r.border}` : 'none', padding: '20px 16px', display: 'flex',
       flexDirection: 'column', gap: 20, background: r.surface,
       boxShadow: r.name === 'dark' ? 'none' : '2px 0 8px rgba(0,0,0,0.04)',
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: r.accent }}>⚙ Filters</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: r.accent }}>⚙ Filters</span>
+        {showPinInHeader && !o && (
+          <button
+            onClick={() => onTogglePin((p) => !p)}
+            title={ePin ? 'Filters pinned - click to unpin' : 'Pin filters open'}
+            style={{
+              background: 'none', border: 'none', padding: 2, lineHeight: 1, cursor: 'pointer',
+              fontSize: 14, color: ePin ? r.accent : r.dim, opacity: ePin ? 1 : 0.45,
+              transform: ePin ? 'none' : 'rotate(40deg)', transition: 'all .15s',
+            }}
+          >
+            📌
+          </button>
+        )}
+      </div>
 
       <div>
         <FilterLabel T={r}>Search</FilterLabel>
@@ -824,6 +850,9 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const [ee, F] = useState(null);         // currently open report
   const [I, te] = useState(!o);           // mobile: showing filters vs results in the sidebar
   const [ePin, setEPin] = useState(() => { try { return localStorage.getItem('explore_pinned') === 'true'; } catch { return false; } });
+  // Desktop-only: collapses the full-page listing's filter sidebar to a
+  // thin arrow tab. Overridden by `ePin` (pinning always keeps it open).
+  const [eFiltCol, setEFiltCol] = useState(false);
   const [eOpen, setEOpen] = useState(false);
 
   // Compare
@@ -2296,7 +2325,27 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       {folderBar}
       {uploadBar}
       {quickAnalysisBar}
-      {I && <FilterPanel {...filterPanelProps} />}
+      {/* Desktop: a thin arrow tab that collapses/expands the filter sidebar.
+          Hidden once filters are pinned open (pinning removes the need to
+          collapse) and on mobile (which uses the Filters/Results tab switch
+          in pageHeader instead). */}
+      {!o && !ePin && (
+        <button
+          onClick={() => setEFiltCol((c) => !c)}
+          title={eFiltCol ? 'Show filters' : 'Hide filters'}
+          style={{
+            position: 'absolute', left: eFiltCol ? 0 : 270, top: '50%', transform: 'translateY(-50%)',
+            zIndex: 10, background: r.surface2, border: `1px solid ${r.border}`, borderLeft: 'none',
+            borderRadius: '0 6px 6px 0', color: r.dim, cursor: 'pointer', padding: '10px 5px',
+            fontSize: 12, lineHeight: 1, writingMode: 'vertical-rl',
+          }}
+        >
+          {eFiltCol ? '▶' : '◀'}
+        </button>
+      )}
+      {(o ? I : ePin || !eFiltCol) && (
+        <FilterPanel {...filterPanelProps} width={o ? '100%' : 270} showPinInHeader ePin={ePin} onTogglePin={setEPin} />
+      )}
       {(!o || !I) && <ResultsPanel {...resultsPanelProps} />}
     </div>
   );
