@@ -11,14 +11,6 @@
 # Additional required repo secret beyond the ones deploy.yml already needs:
 #   SPACESHIP_DEV_PATH - absolute path to the dev site's document root,
 #                         e.g. /home/dcvgnomgak/dev.hcri.io
-#
-# Also builds frontend/ (Vite) and commits the minified output back to
-# `develop` before deploying -- see deploy.yml's build-frontend job for the
-# full explanation (this one's identical, just targeting `develop`).
-#
-# One-time repo setting this relies on: Settings -> Actions -> General ->
-# "Workflow permissions" must be "Read and write permissions" -- otherwise
-# build-frontend's push-back step gets a 403.
 
 name: Deploy to Spaceship (dev)
 
@@ -27,45 +19,8 @@ on:
     branches: [develop]
   workflow_dispatch: {}
 
-permissions:
-  contents: write
-
 jobs:
-  build-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend (minified, into assets/)
-        working-directory: frontend
-        run: npm run build
-
-      # See deploy.yml's build-frontend job for why this stages exact
-      # filenames rather than the whole assets/ directory.
-      - name: Commit built assets if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add assets/app.js assets/app.css assets/favicon.svg assets/icons.svg
-          if git diff --cached --quiet; then
-            echo "No build output changes."
-          else
-            git commit -m "Build frontend assets [skip ci]"
-            git push origin develop
-          fi
-
   deploy:
-    needs: build-frontend
     runs-on: ubuntu-latest
     steps:
       - name: git fetch + fast-forward on dev server
