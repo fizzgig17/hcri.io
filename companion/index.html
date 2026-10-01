@@ -242,17 +242,17 @@
         export, no re-typing numbers off a tiny screen.
       </p>
       <div class="cta-row">
-        <a class="btn solid" href="hCRICompanion.apk" download>
+        <a class="btn solid" data-apk-download href="https://github.com/fizzgig17/hcri-companion/releases/download/prod-latest/hCRICompanion.apk" download>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
           Download for Android
         </a>
         <a class="btn ghost" href="#how-it-works">See how it works</a>
       </div>
       <div class="meta-note">Android 8.0+ · Bluetooth LE required · Free, direct install (no Play Store listing)</div>
-      <!-- Filled in by the same HEAD request as #apk-date further down the
-           page (see the script near the end of body) -- kept as a second
-           element rather than reusing one id so both copies update from a
-           single fetch. Starts empty/hidden and only appears if that
+      <!-- Filled in by the same GitHub API request as #apk-date further
+           down the page (see the script near the end of body) -- kept as a
+           second element rather than reusing one id so both copies update
+           from a single fetch. Starts empty/hidden and only appears if that
            request succeeds. -->
       <div class="meta-note" id="apk-date-hero"></div>
     </div>
@@ -352,14 +352,6 @@
         <h3>Export any reading as CSV</h3>
         <p>Share a single reading or your entire history as CSV straight from the Data or History
           tab — handy for a quick spreadsheet check without ever opening hCRI.io.</p>
-      </div>
-      <div class="card">
-        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-5-5m5 5l5-5M4 21h16"/></svg></div>
-        <h3>Updates itself, right from the app</h3>
-        <p>Since it's not on the Play Store, hCRI Companion checks hcri.io/companion for a newer
-          build on its own and lets you know — Settings shows your installed version next to
-          what's on the server, and Update Now downloads and installs the new build without ever
-          leaving the app.</p>
       </div>
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/><circle cx="12" cy="12" r="9"/></svg></div>
@@ -511,17 +503,17 @@
         </ul>
       </div>
       <div>
-        <a class="btn solid" id="download-apk" href="hCRICompanion.apk" download style="height:50px;padding-inline:26px">
+        <a class="btn solid" id="download-apk" data-apk-download href="https://github.com/fizzgig17/hcri-companion/releases/download/prod-latest/hCRICompanion.apk" download style="height:50px;padding-inline:26px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
           Download APK
         </a>
-        <!-- Filled in by a HEAD request to the APK itself at load time (see
-             the script near the end of body) -- reads the file's actual
-             Last-Modified date off the server, so this always reflects
-             whatever build is currently sitting at hCRICompanion.apk
-             without needing to hand-edit this page every time you replace
-             it. Starts empty/hidden and only appears if that request
-             succeeds. -->
+        <!-- Filled in by a GitHub API request at load time (see the script
+             near the end of body) -- reads the release asset's own updated
+             timestamp, so this always reflects whatever build the deploy
+             workflow published most recently (see hcri-companion's
+             deploy-dev.yml / deploy-master.yml) without needing to
+             hand-edit this page every time a new one goes out. Starts
+             empty/hidden and only appears if that request succeeds. -->
         <div class="meta-note" id="apk-date" style="text-align:center;margin-top:8px"></div>
       </div>
     </div>
@@ -641,36 +633,61 @@
   })();
 </script>
 <script>
-  // Shows when the currently-linked APK was actually last replaced, read
-  // straight off the file itself (a HEAD request's Last-Modified response
-  // header) rather than a date typed into this page -- so it can never go
-  // stale relative to whatever build is really sitting at hCRICompanion.apk.
-  // Silently does nothing if the request fails or the host doesn't send
-  // Last-Modified for static files (some configs strip it) -- worth knowing
-  // if this never appears despite the file being current. Fills BOTH the
-  // hero's meta-note and the download section's, from one shared fetch.
+  // The APK itself now lives on GitHub (a release asset published by
+  // hcri-companion's deploy-dev.yml / deploy-master.yml), not on this
+  // server -- see those workflows for how "dev-latest"/"prod-latest" stay
+  // pointed at whatever was built most recently. This page used to scp the
+  // binary in on every deploy; now it just links to wherever GitHub is
+  // actually hosting it, which also means there's no local file for a HEAD
+  // request to read a Last-Modified header off of any more.
+  //
+  // Same hostname decides which release this page means as decides which
+  // server you're even looking at this page on (dev.hcri.io vs hcri.io) --
+  // so there's no separate "which environment" flag to keep in sync here.
   (function(){
+    var isDev = location.hostname.indexOf('dev.') === 0;
+    var tag = isDev ? 'dev-latest' : 'prod-latest';
+
+    // The hero/download buttons already carry a working prod-latest URL in
+    // their plain HTML href (see above) so they work even if this script
+    // never runs at all (blocked, offline, etc.) -- only override it here
+    // for the dev host, where the plain-HTML default would be wrong.
+    if (isDev) {
+      var url = 'https://github.com/fizzgig17/hcri-companion/releases/download/dev-latest/hCRICompanion.apk';
+      document.querySelectorAll('[data-apk-download]').forEach(function(a){ a.href = url; });
+    }
+
     var el = document.getElementById('apk-date');
     var elHero = document.getElementById('apk-date-hero');
     if (!el && !elHero) return;
-    fetch('hCRICompanion.apk', { method: 'HEAD', cache: 'no-store' })
-      .then(function(res){
-        if (!res.ok) return;
-        var lm = res.headers.get('Last-Modified');
-        if (!lm) return;
-        var d = new Date(lm);
+    // Asking the GitHub REST API for the release (rather than HEAD-ing the
+    // asset's own download URL) because that download redirects to GitHub's
+    // object storage, which doesn't send CORS headers a cross-origin fetch
+    // can read -- the response headers would be invisible to this script
+    // even though the request itself succeeds. The REST API does allow
+    // cross-origin GET for public repos, so this reads the matching asset's
+    // own `updated_at` off the release info instead -- same information,
+    // just from a source this page is actually allowed to read.
+    fetch('https://api.github.com/repos/fizzgig17/hcri-companion/releases/tags/' + tag, { cache: 'no-store' })
+      .then(function(res){ return res.ok ? res.json() : null; })
+      .then(function(data){
+        if (!data) return;
+        var asset = (data.assets || []).find(function(a){ return a.name === 'hCRICompanion.apk'; });
+        var stamp = asset ? asset.updated_at : data.published_at;
+        if (!stamp) return;
+        var d = new Date(stamp);
         if (isNaN(d.getTime())) return;
-        // toLocaleString (not toLocaleDateString) -- Last-Modified carries a
+        // toLocaleString (not toLocaleDateString) -- the timestamp carries a
         // real hour/minute, and the comparison this feature implies ("is
-        // there a newer build") is already time-precise on the server side,
-        // so the display shouldn't round that away down to just the day.
+        // there a newer build") is already time-precise at the source, so
+        // the display shouldn't round that away down to just the day.
         var text = 'APK updated ' + d.toLocaleString(undefined, {
           year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit'
         });
         if (el) el.textContent = text;
         if (elHero) elHero.textContent = text;
       })
-      .catch(function(){ /* offline, blocked, CORS on some hosts -- just leave it blank */ });
+      .catch(function(){ /* offline, blocked, GitHub API rate limit -- just leave it blank */ });
   })();
 </script>
 </body></html>
