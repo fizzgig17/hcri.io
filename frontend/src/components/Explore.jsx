@@ -1677,6 +1677,15 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
   });
 
+  // A small square icon-only button -- used in place of a labeled one
+  // where mobile space is tight (e.g. compareBar's Clear/Delete on
+  // mobile). Pass a title/aria-label at the call site.
+  const iconBtn = () => ({
+    background: 'none', border: `1px solid ${r.border}`, color: r.dim, borderRadius: 6,
+    width: 32, height: 32, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 15, lineHeight: 1, cursor: 'pointer', flexShrink: 0,
+  });
+
   // Closing the open-report view (the "← Back to Explore" button, or the
   // browser back button via usePanelBackClose below -- both just flip `ee`
   // back to null; back-button support owns the actual history navigation,
@@ -2092,9 +2101,15 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       padding: '10px 14px', boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
     }}>
       <span style={{ fontSize: 13, color: r.text, fontFamily: 'monospace', fontWeight: 700 }}>{cmpSel.length}/12 selected</span>
-      <button onClick={() => setCmpSel([])} style={{ background: 'none', border: `1px solid ${r.border}`, color: r.dim, borderRadius: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>
-        Clear
-      </button>
+      {o ? (
+        <button onClick={() => setCmpSel([])} title="Clear selection" aria-label="Clear selection" style={iconBtn()}>
+          🚫
+        </button>
+      ) : (
+        <button onClick={() => setCmpSel([])} style={{ background: 'none', border: `1px solid ${r.border}`, color: r.dim, borderRadius: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>
+          Clear
+        </button>
+      )}
       <button
         disabled={cmpSel.length < 2}
         onClick={openCompare}
@@ -2111,9 +2126,15 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
         </button>
       )}
       {tab === 'myreports' && (
-        <button onClick={bulkDelete} title="Delete selected reports" style={{ background: 'none', border: `1px solid ${r.bad}`, color: r.bad, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
-          Delete {cmpSel.length}
-        </button>
+        o ? (
+          <button onClick={bulkDelete} title={`Delete ${cmpSel.length} selected`} aria-label="Delete selected reports" style={{ ...iconBtn(), border: `1px solid ${r.bad}`, color: r.bad }}>
+            🗑
+          </button>
+        ) : (
+          <button onClick={bulkDelete} title="Delete selected reports" style={{ background: 'none', border: `1px solid ${r.bad}`, color: r.bad, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
+            Delete {cmpSel.length}
+          </button>
+        )
       )}
     </div>
   );
