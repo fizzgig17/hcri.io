@@ -49,13 +49,19 @@ export const fixtures = {
 
   notices: [],
 
+  // Matches api/_core/categories.php's all_categories(): a list of
+  // {id, value} per kind, not plain strings -- CategoryEditor.jsx/
+  // CatFilter.jsx both index into `.value`. A plain-string shape here
+  // silently never crashed because no test opened a real (non-preview)
+  // ReportDetail for a logged-in owner, which is the one place that
+  // fetches and renders this.
   categories: {
-    light_brand: ['Acebeam', 'Emisar', 'Sofirn'],
-    light_model: ['D7F', 'HT70', 'IF25A'],
-    led_brand: ['Nichia', 'Luminus', 'Osram'],
-    led_cct: ['2700K', '4000K', '5000K'],
-    led_model: ['519A', 'SST-20'],
-    optic: ['TIR', 'Reflector'],
+    light_brand: [{ id: 1, value: 'Acebeam' }, { id: 2, value: 'Emisar' }, { id: 3, value: 'Sofirn' }],
+    light_model: [{ id: 4, value: 'D7F' }, { id: 5, value: 'HT70' }, { id: 6, value: 'IF25A' }],
+    led_brand: [{ id: 7, value: 'Nichia' }, { id: 8, value: 'Luminus' }, { id: 9, value: 'Osram' }],
+    led_cct: [{ id: 10, value: '2700K' }, { id: 11, value: '4000K' }, { id: 12, value: '5000K' }],
+    led_model: [{ id: 13, value: '519A' }, { id: 14, value: 'SST-20' }],
+    optic: [{ id: 15, value: 'TIR' }, { id: 16, value: 'Reflector' }],
   },
 
   explore: {

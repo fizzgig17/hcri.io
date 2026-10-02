@@ -72,6 +72,11 @@ import MetaEditor, { RenameField } from './MetaEditor.jsx';
 import AnnexEModal from './AnnexEModal.jsx';
 import usePanelBackClose from '../hooks/usePanelBackClose';
 
+// Voting (thumbs up/down on a report) is paused for now -- not being used.
+// See the matching flag/comment in Explore.jsx; kept the "Rate this
+// report" row's code in place behind this flag rather than deleting it.
+const VOTING_ENABLED = false;
+
 const sHead = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10, fontWeight: 700 };
 
 // Holds the "current theme colors" object for KeyMetric below, which --
@@ -950,7 +955,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                 structured category tags (CategoryEditor is nested inside it). */}
             <MetaEditor report={report} isGuest={isGuest} onSave={saveMeta} />
 
-            {report?.id && (
+            {VOTING_ENABLED && report?.id && (
               <div style={{ padding: '10px 22px', borderBottom: `1px solid ${U.border}`, display: 'flex', alignItems: 'center', gap: 12, background: U.surface }}>
                 <span style={{ fontSize: 11, color: U.dim, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, fontFamily: 'monospace' }}>Rate this report</span>
                 <Votes reportId={report.id} theme={U} />

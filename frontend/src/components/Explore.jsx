@@ -110,6 +110,12 @@ import usePanelBackClose from '../hooks/usePanelBackClose';
 
 const EXPLORE_API = './index.php/api/explore';
 
+// Voting (thumbs up/down on a report) is paused for now -- not being used.
+// The Votes widget/API and ReportDetail/ExploreStats' own uses of it are
+// left in place behind this flag rather than ripped out, so it's a
+// one-line change to bring back.
+const VOTING_ENABLED = false;
+
 // Duv tint classification, series palette, and canvas helpers are shared
 // with CompareCard/OverlaySPD -- imported from lib/compareExport rather
 // than duplicated here (see the import list above).
@@ -218,8 +224,10 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
           )}
           <div style={{
             fontWeight: 700, fontSize: 14, color: n.text, fontFamily: 'monospace', minWidth: 0,
-            overflow: full ? 'visible' : 'hidden', textOverflow: full ? 'clip' : 'ellipsis',
-            whiteSpace: full ? 'normal' : 'nowrap', wordBreak: full ? 'break-word' : 'normal',
+            // Wrap the full title instead of truncating with an ellipsis --
+            // the card is a flex column with auto height, so a longer
+            // title just grows the card rather than clipping.
+            overflow: 'visible', textOverflow: 'clip', whiteSpace: 'normal', wordBreak: 'break-word',
           }}>
             {e.label || 'Unnamed'}
           </div>
@@ -229,9 +237,12 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
             <button
               onClick={(ev) => { ev.stopPropagation(); onDelete(); }}
               title="Delete this report"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '2px 5px', color: n.dim, opacity: 0.65, alignSelf: 'center', borderRadius: 5 }}
-              onMouseEnter={(ev) => { ev.currentTarget.style.color = n.bad; ev.currentTarget.style.opacity = '1'; }}
-              onMouseLeave={(ev) => { ev.currentTarget.style.color = n.dim; ev.currentTarget.style.opacity = '0.65'; }}
+              style={{
+                background: `${n.bad}15`, border: `1px solid ${n.bad}40`, color: n.bad, cursor: 'pointer',
+                fontSize: 13, lineHeight: 1, padding: '3px 6px', alignSelf: 'center', borderRadius: 5,
+              }}
+              onMouseEnter={(ev) => { ev.currentTarget.style.background = `${n.bad}28`; ev.currentTarget.style.borderColor = n.bad; }}
+              onMouseLeave={(ev) => { ev.currentTarget.style.background = `${n.bad}15`; ev.currentTarget.style.borderColor = `${n.bad}40`; }}
             >
               🗑
             </button>
@@ -272,7 +283,7 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
           {e.private && <span title="Private — only you can see this" style={{ fontSize: 14, lineHeight: 1, opacity: 0.75 }}>🔒</span>}
           <span title="Report ID" style={{ fontSize: 10, color: n.dim, opacity: 0.5, fontFamily: 'monospace', lineHeight: 1 }}>#{e.id}</span>
         </div>
-        <Votes reportId={e.id} theme={n} initialUp={e.up} initialDown={e.down} />
+        {VOTING_ENABLED && <Votes reportId={e.id} theme={n} initialUp={e.up} initialDown={e.down} />}
       </div>
     </div>
   );

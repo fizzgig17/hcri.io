@@ -100,7 +100,8 @@ export default function ExploreStats({ theme: t }) {
         {tile('Avg CRI', d.avgRa == null ? '—' : d.avgRa)}
         {tile('Avg CCT', d.avgCct ? d.avgCct + 'K' : '—')}
         {tile('High-CRI ≥90', (d.highCriPct || 0) + '%')}
-        {tile('Votes', d.votes || 0)}
+        {/* Voting is paused for now (see Explore.jsx/ReportDetail.jsx's
+            VOTING_ENABLED) -- drop the aggregate tile too while it's off. */}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 14 }}>
         {card('Color temperature (CCT)', <HBarChart items={d.cct || []} color={t.warn} theme={t} />)}
