@@ -699,7 +699,29 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div style={{ marginTop: 'calc(env(safe-area-inset-top,0px) + 52px)' }}>
+              {/* display:none (not just the app-locked overflow:hidden CSS
+                  below) while Explore is open on mobile -- this is the
+                  actual fix for the old Sidebar list bleeding through
+                  underneath Explore, not just a defense-in-depth layer.
+                  The mobile stylesheet (index.php) deliberately gives
+                  html/body/#root `height:auto; overflow:visible` so this
+                  dashboard can grow tall and scroll on its own in normal
+                  use; with Explore's own `position:fixed;inset:0` overlay
+                  then sitting on top, that tall-and-scrollable #root is
+                  still there in the layout for iOS to find. overflow:hidden
+                  (app-locked) tries to clip it off, but iOS Safari has a
+                  long-standing quirk where overflow:hidden on an ancestor
+                  doesn't reliably stop touch-scrolling -- confirmed still
+                  happening in production even with that class applied, on
+                  My Reports with the compare bar active. display:none
+                  removes this from the layout entirely instead of just
+                  clipping it, so there's nothing left for a touch-scroll
+                  gesture to reach no matter what iOS does with overflow.
+                  Kept mounted (not conditionally rendered away) rather than
+                  unmounted so state (open report, scroll position) survives
+                  and closing Explore is still instant -- same reasoning as
+                  the comment on the app-locked useEffect above. */}
+              <div style={{ marginTop: 'calc(env(safe-area-inset-top,0px) + 52px)', display: exploreOpen ? 'none' : 'block' }}>
                 {sidebarOpen ? (
                   <Sidebar
                     user={user}

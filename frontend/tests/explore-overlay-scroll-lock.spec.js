@@ -17,10 +17,23 @@
 // the OS overlay bar" / "it's like there's a page under the current one
 // and the current one doesn't reach the full length."
 //
-// The fix: App.jsx locks <html> (via the pre-existing but previously
-// no-op "app-locked" class -- it had a useEffect applying it but no CSS
-// ever defined it, see index.css) whenever Explore is open on mobile,
-// removing the scrollable surface behind the overlay entirely.
+// First attempt at a fix: App.jsx locks <html> (via the pre-existing but
+// previously no-op "app-locked" class -- it had a useEffect applying it
+// but no CSS ever defined it, see index.css) whenever Explore is open on
+// mobile, removing the scrollable surface behind the overlay via
+// overflow:hidden. That shipped, but the bleed-through was still reported
+// in production afterward (real iOS Safari, My Reports, bulk-select mode)
+// -- iOS has a long-standing quirk where overflow:hidden on an ancestor
+// doesn't reliably stop touch-scrolling, which this test's simulated wheel
+// event doesn't reproduce.
+//
+// The actual fix: App.jsx also gives the dashboard's mobile content wrapper
+// `display:none` (not just the app-locked overflow:hidden) while Explore is
+// open, so there's no layout box behind the overlay at all -- nothing for
+// any scroll mechanism, real or simulated, to reach. Kept mounted rather
+// than unmounted so state survives and closing Explore is still instant.
+// The app-locked overflow:hidden lock stays too, as a second, independent
+// layer (also covers the brief instant before/after exploreOpen toggles).
 
 import { test, expect } from '@playwright/test';
 import { installMockApi } from './mockApi.js';
@@ -70,6 +83,18 @@ test('Explore overlay locks <html> on mobile so the dashboard behind it cannot b
   await page.mouse.wheel(0, 5000);
   const scrollY = await page.evaluate(() => window.scrollY);
   expect(scrollY).toBe(0);
+
+  // The real fix, not just defense-in-depth: the dashboard behind Explore
+  // (the legacy Sidebar list) is display:none, not merely clipped by
+  // overflow:hidden -- confirmed in production that overflow:hidden alone
+  // (the app-locked class above) does NOT reliably stop real iOS Safari
+  // from touch-scrolling an ancestor into view regardless of what this
+  // emulated/CDP environment's wheel-event check says, so the assertion
+  // that actually matters is that there's no layout box for it to reach at
+  // all. Unlike the overflow:hidden case, Playwright's toBeVisible() DOES
+  // see through display:none (it's not just a clip), so this is a real
+  // regression guard.
+  await expect(page.getByText('Legacy sidebar report #0')).not.toBeVisible();
 });
 
 test('closing Explore releases the lock', async ({ page, isMobile }) => {
