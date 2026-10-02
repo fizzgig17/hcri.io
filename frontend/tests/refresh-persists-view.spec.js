@@ -81,26 +81,26 @@ test('refreshing while on My Reports > a folder stays inside that folder', async
   expect(errors, `Unexpected console/page errors:\n${errors.join('\n')}`).toEqual([]);
 });
 
-test('refreshing after a logo click back to My Reports stays on My Reports, not Explore', async ({ page }) => {
+test('the logo always goes to the browse root, even from My Reports, and that persists through a refresh', async ({ page }) => {
   await installMockApi(page, { loggedIn: true });
   await page.addInitScript(() => localStorage.setItem('spd_token', 'mock-token'));
   await page.goto('/');
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
 
+  // The logo used to return to whichever of browse/myreports was last
+  // visited -- which made it a no-op (and read as "broken") when clicked
+  // from My Reports, since that was also the "last visited" tab. It
+  // should always go to the actual root (browse), regardless.
   await page.getByRole('button', { name: 'My Reports' }).click();
   await expect(page.getByText('+ New Folder')).toBeVisible();
-  await page.getByRole('button', { name: 'Insights', exact: true }).click();
-  await expect(page.getByText('+ New Folder')).toHaveCount(0);
 
-  // The logo returns to whichever of browse/myreports was last visited --
-  // here, My Reports.
   await page.locator(VISIBLE_LOGO).click();
-  await expect(page.getByText('+ New Folder')).toBeVisible({ timeout: 5000 });
-  expect(page.url()).toContain('explore=mine');
+  await expect(page.getByText('+ New Folder')).toHaveCount(0);
+  expect(page.url()).not.toContain('mine');
 
   await page.reload();
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
-  await expect(page.getByText('+ New Folder')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('+ New Folder')).toHaveCount(0);
 });
 
 test('clicking the logo always still goes home, even from inside a folder', async ({ page }) => {

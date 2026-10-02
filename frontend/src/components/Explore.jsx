@@ -2386,22 +2386,21 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           <div
             onClick={() => {
               if (!n && onHomeFn) { onHomeFn(); return; }
-              let targetTab = 'browse';
-              try { targetTab = n && localStorage.getItem('hcri_last_list') === 'myreports' ? 'myreports' : 'browse'; } catch {}
-              // Already at the explore root on the tab we'd land on, and
-              // not inside a folder -- don't push a redundant history
-              // entry (see goHome's comment in App.jsx and
-              // tests/no-redundant-history.spec.js). A folder still
-              // counts as "not at the root" even on the right tab --
-              // the logo should always back out of it.
+              // The logo always goes to the actual root -- the browse
+              // tab, full stop. (This used to instead return to whichever
+              // of browse/myreports was last visited, so clicking it from
+              // My Reports was a no-op -- same tab, nothing happened --
+              // which read as the logo being broken.)
+              const targetTab = 'browse';
+              // Already there, and not inside a folder -- don't push a
+              // redundant history entry (see goHome's comment in App.jsx
+              // and tests/no-redundant-history.spec.js). A folder still
+              // counts as "not at the root" even on the right tab -- the
+              // logo should always back out of it.
               if (!ee && folderSel == null && tab === targetTab) return;
               F(null);
               setFolderSel(null);
               setTab(targetTab);
-              // Tag the entry with the tab it actually landed on (etab) and
-              // reflect it in the URL -- previously this always pushed the
-              // bare pathname, so refreshing after a logo click back to My
-              // Reports/Insights lost that and fell back to Explore/browse.
               try { window.history.pushState({ hcri: 1, view: 'explore', etab: targetTab }, '', exploreTabUrl(targetTab)); } catch {}
             }}
             style={{ fontWeight: 900, fontSize: o ? 18 : 20, color: r.text, fontFamily: 'monospace', cursor: 'pointer' }}

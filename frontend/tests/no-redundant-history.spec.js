@@ -71,25 +71,18 @@ test('clicking the logo while already at the explore root does not push a new hi
   await page.locator(VISIBLE_LOGO).click();
   expect(await page.evaluate(() => window.history.length)).toBe(lenAtStart);
 
-  // The logo returns to whichever of browse/myreports was last visited
-  // (persisted to localStorage), not hardcoded to "browse" -- so switch to
-  // My Reports (which updates that), then to Insights (which doesn't), and
-  // THEN click the logo: it should land back on My Reports, a real change
-  // from Insights, confirming the guard isn't just disabling the
-  // pushState outright.
+  // The logo always goes to the browse root -- so switch to My Reports
+  // (a real change from browse), then click it: it should land back on
+  // browse, confirming the guard isn't just disabling the pushState
+  // outright.
   await page.getByRole('button', { name: 'My Reports' }).click();
   await expect(page.getByText('+ New Folder')).toBeVisible();
   const lenOnMyReports = await page.evaluate(() => window.history.length);
   expect(lenOnMyReports).toBe(lenAtStart + 1);
 
-  await page.getByRole('button', { name: 'Insights', exact: true }).click();
-  await expect(page.getByText('+ New Folder')).toHaveCount(0);
-  const lenOnInsights = await page.evaluate(() => window.history.length);
-  expect(lenOnInsights).toBe(lenOnMyReports + 1);
-
   await page.locator(VISIBLE_LOGO).click();
-  await expect(page.getByText('+ New Folder')).toBeVisible();
-  expect(await page.evaluate(() => window.history.length)).toBe(lenOnInsights + 1);
+  await expect(page.getByText('+ New Folder')).toHaveCount(0);
+  expect(await page.evaluate(() => window.history.length)).toBe(lenOnMyReports + 1);
 });
 
 test('reloading straight onto Explore, then clicking Explore again, leaves back working normally', async ({ page }) => {
