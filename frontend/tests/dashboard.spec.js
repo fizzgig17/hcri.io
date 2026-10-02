@@ -13,7 +13,16 @@ import { captureConsoleErrors } from './helpers.js';
 
 test('logged-in landing page (Explore, auto-opened after login) renders the report list with no console errors', async ({ page }) => {
   const errors = captureConsoleErrors(page);
-  await installMockApi(page, { loggedIn: true });
+  // reports: [] -- the default fixtures.reports (the user's own Sidebar
+  // list, which this test deliberately doesn't cover -- see header
+  // comment) happens to share report #101 "HT70 #1" with
+  // fixtures.explore.reports below. The still-mounted legacy Sidebar
+  // renders that duplicate regardless of whether it's on-screen, so
+  // getByText(r.label) below would match it twice and fail Playwright's
+  // strict-mode uniqueness check. An empty Sidebar list sidesteps the
+  // collision instead of relying on scoping every locator to Explore's
+  // container.
+  await installMockApi(page, { loggedIn: true, reports: [] });
 
   // The app reads its session token from localStorage (see lib/api.js's
   // setToken) before anything mounts.
