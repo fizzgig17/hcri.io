@@ -833,18 +833,33 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   // last-viewed-tab localStorage fallback below, which is for a genuinely
   // fresh navigation with no history of its own and would otherwise just
   // re-show whatever tab was last visited, defeating back/forward.
+  // The `?explore=<val>` <-> tab id mapping, both directions -- shared by
+  // the tab useState initializer below, the popstate listener, the tab
+  // bar, the logo click, and anything else that tags a history entry with
+  // a specific tab (folder select, report open) so refreshing or sharing
+  // that URL lands back in the same place. 'mine' (not 'myreports') for
+  // My Reports is the pre-existing convention; kept as-is.
+  const exploreTabUrl = (id) => {
+    const val = id === 'myreports' ? 'mine' : id === 'browse' ? '' : id; // insights/finsights/myinsights pass through as-is
+    return window.location.pathname + '?explore' + (val ? '=' + val : '');
+  };
+  const tabFromExploreVal = (val, loggedIn) => {
+    if (val === 'mine') return loggedIn ? 'myreports' : 'browse';
+    if (val === 'insights' || val === 'finsights') return val;
+    if (val === 'myinsights') return loggedIn ? 'myinsights' : 'browse';
+    return 'browse';
+  };
+
   const [tab, setTab] = useState(() => {
     try {
-      const q = typeof window < 'u' ? window.location.search : '';
-      if (q.includes('insights')) return 'insights';
-      if (q.includes('mine') && n) return 'myreports';
-      if (!q.includes('explore')) {
-        const st = typeof window < 'u' ? window.history.state : null;
-        if (st && st.view === 'explore' && st.etab) {
-          return st.etab === 'insights' ? 'insights' : (st.etab === 'myreports' && n ? 'myreports' : 'browse');
-        }
-        if (n && localStorage.getItem('hcri_last_list') === 'myreports') return 'myreports';
+      const sp = typeof window < 'u' ? new URLSearchParams(window.location.search) : null;
+      const explore = sp && sp.get('explore');
+      if (explore != null) return tabFromExploreVal(explore, !!n);
+      const st = typeof window < 'u' ? window.history.state : null;
+      if (st && st.view === 'explore' && st.etab) {
+        return tabFromExploreVal(st.etab === 'myreports' ? 'mine' : st.etab, !!n);
       }
+      if (n && localStorage.getItem('hcri_last_list') === 'myreports') return 'myreports';
     } catch {}
     return 'browse';
   });
@@ -929,7 +944,24 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   // "screens" above -- panels a user would expect the back button to
   // step out of, as opposed to inline toggles like the quick-analysis
   // accordion (anaOpen) or the folder-menu dropdown (folderMenuOpen).
-  usePanelBackClose(!!ee, () => F(null));
+  // The open report also tags its history entry with its id (`rid`) in
+  // the URL, not just the generic marker usePanelBackClose pushes by
+  // default -- so refreshing (or sharing the URL) while a report is open
+  // lands back on that same report instead of the bare tab underneath it.
+  // See the mount effect below that restores `ee` from `?rid=`, and
+  // claimPanel's comment in panelHistory.js for why closing a RESTORED
+  // report (one the page loaded with already, not one opened by a click
+  // in this session) rewrites the URL instead of calling history.back().
+  usePanelBackClose(!!ee, () => F(null), () => {
+    const base = exploreTabUrl(tab);
+    const rid = ee && ee.id;
+    return {
+      state: { hcri: 1, view: 'explore', etab: tab, rid },
+      url: base + '&rid=' + rid,
+      closedState: { hcri: 1, view: 'explore', etab: tab },
+      closedUrl: base,
+    };
+  });
   usePanelBackClose(comparing, () => setComparing(false));
   usePanelBackClose(catModalOpen, () => setCatModalOpen(false));
   usePanelBackClose(mrPasteOpen, () => setMrPasteOpen(false));
@@ -1074,14 +1106,15 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   useEffect(() => {
     const onPop = (ev) => {
       try {
-        const q = window.location.search;
-        if (q.includes('explore')) {
-          setTab(q.includes('insights') ? 'insights' : q.includes('mine') && n ? 'myreports' : 'browse');
+        const sp = new URLSearchParams(window.location.search);
+        const explore = sp.get('explore');
+        if (explore != null) {
+          setTab(tabFromExploreVal(explore, !!n));
           return;
         }
         const st = (ev && ev.state) || window.history.state || {};
         if (st && st.view === 'explore' && st.etab) {
-          setTab(st.etab === 'insights' ? 'insights' : st.etab === 'myreports' && n ? 'myreports' : 'browse');
+          setTab(tabFromExploreVal(st.etab === 'myreports' ? 'mine' : st.etab, !!n));
         }
       } catch {}
     };
@@ -1316,6 +1349,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       const willEmptyFolder = folderSel != null && w.filter((x) => !okIds.includes(x.id)).length === 0;
       if (willEmptyFolder) {
         await loadFolders();
+        __hcriClearFolderUrl();
         setFolderSel(null);
         if (onHardResetFn) onHardResetFn(); else L(1);
       } else {
@@ -1351,7 +1385,11 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     try {
       await fetch(`./index.php/api/folders/${fid}`, { method: 'DELETE', headers: authHeaders() });
       setFolders((p) => p.filter((f) => f.id !== fid));
-      if (folderSel === fid) setFolderSel(null); else L(k);
+      // Deleting the folder you're currently viewing exits it too -- also
+      // strip the now-stale `folder` param it left in the URL (same as
+      // leaving via "← My Reports"), or a refresh would 404/land on an
+      // empty "folder" that no longer exists.
+      if (folderSel === fid) { __hcriClearFolderUrl(); setFolderSel(null); } else L(k);
     } catch {}
   };
 
@@ -1657,6 +1695,19 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       F(e);
     }
   };
+
+  // Restore an open report from `?rid=` on mount -- a refresh while
+  // viewing one, or a bookmarked/shared link straight into it. Loads the
+  // same way a card click does; usePanelBackClose's pushArgs above
+  // recognizes the URL is already there and claims the existing history
+  // entry instead of pushing a redundant one (see claimPanel's comment in
+  // panelHistory.js).
+  useEffect(() => {
+    try {
+      const rid = new URLSearchParams(window.location.search).get('rid');
+      if (rid) openReport({ id: Number(rid) });
+    } catch {}
+  }, []);
 
   const onDragStartReport = (ev, rep) => {
     const ids = cmpSel.some((x) => x.id === rep.id) ? cmpSel.map((x) => x.id) : [rep.id];
@@ -2162,7 +2213,19 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           {folders.map((fo) => (
             <div
               key={fo.id}
-              onClick={() => { setFolderSel(fo.id); setCmpSel([]); A(1); }}
+              onClick={() => {
+                setFolderSel(fo.id);
+                setCmpSel([]);
+                A(1);
+                // Tag the URL/history entry with the folder, same as a
+                // tab switch -- so refreshing or sharing a link while
+                // inside a folder lands back in it instead of at the top
+                // of My Reports. __hcriClearFolderUrl (on leaving, via a
+                // tab switch or "← My Reports") strips this back off.
+                try {
+                  window.history.pushState({ hcri: 1, view: 'explore', etab: 'myreports', folder: fo.id }, '', exploreTabUrl('myreports') + '&folder=' + fo.id);
+                } catch {}
+              }}
               draggable
               onDragStart={(ev) => { dragFolderRef.current = fo.id; try { ev.dataTransfer.effectAllowed = 'move'; } catch {} }}
               onDragEnd={() => { dragFolderRef.current = null; setDragOverFolder(null); }}
@@ -2292,14 +2355,17 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
         <button
           key={id}
           onClick={() => {
-            // Already on this tab -- don't push a redundant history entry
-            // for a click that wouldn't change anything on screen (see
-            // tests/no-redundant-history.spec.js).
-            if (id === tab) return;
+            // Already on this tab and not inside a folder -- don't push a
+            // redundant history entry for a click that wouldn't change
+            // anything on screen (see tests/no-redundant-history.spec.js).
+            // Being inside a folder still counts as a real change even on
+            // the same tab -- clicking "My Reports" while inside one
+            // should back out of it, matching __hcriResetListView below.
+            if (id === tab && folderSel == null) return;
             __hcriResetListView();
             setTab(id);
             try {
-              window.history.pushState({ hcri: 1, view: 'explore', etab: id }, '', window.location.pathname + '?explore' + (id === 'insights' ? '=insights' : id === 'myreports' ? '=mine' : ''));
+              window.history.pushState({ hcri: 1, view: 'explore', etab: id }, '', exploreTabUrl(id));
             } catch {}
           }}
           style={{
@@ -2322,13 +2388,21 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
               if (!n && onHomeFn) { onHomeFn(); return; }
               let targetTab = 'browse';
               try { targetTab = n && localStorage.getItem('hcri_last_list') === 'myreports' ? 'myreports' : 'browse'; } catch {}
-              // Already at the explore root on the tab we'd land on --
-              // don't push a redundant history entry (see goHome's comment
-              // in App.jsx and tests/no-redundant-history.spec.js).
-              if (!ee && tab === targetTab) return;
+              // Already at the explore root on the tab we'd land on, and
+              // not inside a folder -- don't push a redundant history
+              // entry (see goHome's comment in App.jsx and
+              // tests/no-redundant-history.spec.js). A folder still
+              // counts as "not at the root" even on the right tab --
+              // the logo should always back out of it.
+              if (!ee && folderSel == null && tab === targetTab) return;
               F(null);
+              setFolderSel(null);
               setTab(targetTab);
-              try { window.history.pushState({ hcri: 1, view: 'explore' }, '', window.location.pathname); } catch {}
+              // Tag the entry with the tab it actually landed on (etab) and
+              // reflect it in the URL -- previously this always pushed the
+              // bare pathname, so refreshing after a logo click back to My
+              // Reports/Insights lost that and fell back to Explore/browse.
+              try { window.history.pushState({ hcri: 1, view: 'explore', etab: targetTab }, '', exploreTabUrl(targetTab)); } catch {}
             }}
             style={{ fontWeight: 900, fontSize: o ? 18 : 20, color: r.text, fontFamily: 'monospace', cursor: 'pointer' }}
           >

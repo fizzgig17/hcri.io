@@ -35,6 +35,11 @@ export const fixtures = {
     },
   ],
 
+  // My Reports' folders (api/folders.php's GET shape: id/name/count).
+  folders: [
+    { id: 1, name: 'Flashlights', count: 2 },
+  ],
+
   spd: {
     wls: Array.from({ length: 41 }, (_, i) => 380 + i * 10),
     vals: Array.from({ length: 41 }, (_, i) => Math.max(0, Math.sin((i / 40) * Math.PI) * 100)),

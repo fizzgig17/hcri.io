@@ -65,6 +65,25 @@ images, etc. — on every test run. Never point the test suite at the real
   fix and why it was needed -- none of the app's modals pushed a history
   entry when opened, so back skipped past them to whatever was in browser
   history before the site was ever opened.
+- `no-redundant-history.spec.js` — clicking a tab/the logo while already
+  on it doesn't push a new history entry (which used to make a single
+  back press look like it did nothing, since the redundant entry and the
+  one under it rendered the same screen).
+- `refresh-persists-view.spec.js` — refreshing the browser leaves you
+  where you were: a report open in Explore, a folder inside My Reports,
+  or wherever a logo click landed you. Only the logo itself should take
+  you back to the root. Fixed by tagging each of those in the URL
+  (`?rid=`, `&folder=`, `?explore=mine`/`=insights`), not just an
+  in-memory history marker -- see `claimPanel` in `panelHistory.js` for
+  how a *restored* report (one the page loaded with, not one opened by a
+  click this session) avoids pushing a redundant entry on top of itself.
+  Known not-yet-covered gap: the Compare view (`comparing` in
+  Explore.jsx) has the same issue -- opening it via the "Compare" button
+  doesn't write `?compare=` to the URL, only the separate "copy compare
+  link" share feature does, so refreshing while comparing loses it. Left
+  alone for now because its restore effect sets `comparing` true before
+  its async fetch resolves, which needs more care to fix without
+  reintroducing a redundant-push bug.
 
 ## Known obsolete UI (not covered on purpose)
 

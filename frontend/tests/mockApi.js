@@ -91,6 +91,11 @@ export async function installMockApi(page, opts = {}) {
       return json(fixtures.categories);
     }
 
+    // ── Folders (My Reports' folder bar, api/folders.php) ───────────────
+    if (path === '/folders' && method === 'GET') {
+      return json(fixtures.folders);
+    }
+
     // ── Admin (AdminPanel.jsx's adminFetch, api/admin.php) ──────────────
     if (path === '/admin' && method === 'GET') {
       return json(fixtures.adminStats);

@@ -30,12 +30,34 @@ const stack = [];
 // close-the-top-panel handling a second time.
 let suppressNextPop = 0;
 
-export function pushPanel(onClose) {
+// `state`/`url` let a caller push an IDENTIFIABLE entry (e.g. a report id
+// in the URL, see usePanelBackClose's `pushArgs`) instead of the generic
+// `{hcri:1, panel:true}` marker -- needed so a panel's own state survives
+// a refresh via the URL, not just this in-memory stack (which is reset on
+// every page load). Callers that don't need that keep the old behavior.
+export function pushPanel(onClose, state, url) {
   const entry = { onClose };
   stack.push(entry);
   try {
-    window.history.pushState({ hcri: 1, panel: true }, '');
+    window.history.pushState(state || { hcri: 1, panel: true }, '', url);
   } catch {}
+  return entry;
+}
+
+// Used when a panel starts out open because the CURRENT history entry
+// already represents it -- e.g. the page loaded (or was refreshed) with a
+// `?rid=`/`?folder=`-style URL that survived the reload. There's nothing
+// to push; the browser is already sitting on this entry. `closedState`/
+// `closedUrl` describe what the entry should become if the panel is later
+// closed WITHOUT the back button (its own "X"/"← Back" affordance) --
+// closePanel rewrites the current entry to that instead of calling
+// history.back(), since there may be no earlier in-app entry to land on
+// (a bare deep link has nothing behind it in session history; back() in
+// that case would leave the site entirely, the exact bug this file exists
+// to prevent).
+export function claimPanel(onClose, closedState, closedUrl) {
+  const entry = { onClose, claimed: true, closedState, closedUrl };
+  stack.push(entry);
   return entry;
 }
 
@@ -44,8 +66,12 @@ export function closePanel(entry) {
   if (i === -1) return; // already closed (e.g. the back button beat us to it)
   stack.splice(i, 1);
   try {
-    suppressNextPop++;
-    window.history.back();
+    if (entry.claimed) {
+      window.history.replaceState(entry.closedState || {}, '', entry.closedUrl);
+    } else {
+      suppressNextPop++;
+      window.history.back();
+    }
   } catch {}
 }
 
