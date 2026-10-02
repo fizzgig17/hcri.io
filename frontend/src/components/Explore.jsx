@@ -105,6 +105,7 @@ import { FeedbackModal } from './AuthScreen';
 import AccountSettings from './AccountSettings';
 import { SERIES_COLORS, tintInfo, compareShareCard } from '../lib/compareExport';
 import usePanelBackClose from '../hooks/usePanelBackClose';
+import { useVisualViewportBottomInset } from '../hooks/useVisualViewportBottomInset';
 
 // ── Shared constants ─────────────────────────────────────────────────────────
 
@@ -814,6 +815,11 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const { theme: r, themeName: i, toggleTheme: a } = useTheme();
   const o = useIsMobile(768);
   const s = i === 'dark';
+  // How much of the bottom of the screen Safari's own chrome (bottom
+  // toolbar) is currently covering -- see the hook's own comment. Only
+  // matters for the fixed/docked compare-selection bar below; 0 on
+  // browsers without a chrome-overlap problem, so this is a no-op there.
+  const vvBottomInset = useVisualViewportBottomInset();
 
   // Filters
   const [c, u] = useState('');                       // search text
@@ -2124,7 +2130,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       // real room: a compact header row (count + Clear), then the action
       // buttons full-width and evenly sized below.
       <div style={{
-        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1500,
+        position: 'fixed', left: 0, right: 0, bottom: vvBottomInset, zIndex: 1500,
         background: r.surface, borderTop: `1px solid ${r.border}`, boxShadow: '0 -6px 24px rgba(0,0,0,0.45)',
         display: 'flex', flexDirection: 'column', gap: 8,
         padding: '10px 14px calc(env(safe-area-inset-bottom) + 10px)', boxSizing: 'border-box',
@@ -2160,7 +2166,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       </div>
     ) : (
       <div style={{
-        position: 'fixed', bottom: 22, left: 22, zIndex: 1500,
+        position: 'fixed', bottom: 22 + vvBottomInset, left: 22, zIndex: 1500,
         display: 'flex', alignItems: 'center', gap: 10, background: r.surface, border: `1px solid ${r.border}`, borderRadius: 10,
         padding: '10px 14px', boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
       }}>
