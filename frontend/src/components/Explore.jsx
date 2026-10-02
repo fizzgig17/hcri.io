@@ -689,7 +689,15 @@ function ResultsPanel({
   onOpenReport, onDeleteReport, onDragStartReport,
 }) {
   return (
-    <div style={{ flex: 1, padding: o ? '14px' : '20px', minWidth: 0 }}>
+    <div style={{
+      flex: 1, minWidth: 0,
+      // Extra bottom padding on mobile so the last card never sits flush
+      // against the true bottom of the screen -- Safari/Firefox's bottom
+      // toolbar is translucent, so content directly behind it (e.g. a
+      // card's title/delete icon) stays visible and reads as a glitch
+      // while scrolling or as the toolbar collapses.
+      padding: o ? `14px 14px calc(env(safe-area-inset-bottom) + 28px)` : '20px',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
         <div style={{ display: 'inline-flex', border: `1px solid ${r.border}`, borderRadius: 8, overflow: 'hidden' }}>
           <button

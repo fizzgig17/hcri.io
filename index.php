@@ -986,7 +986,17 @@ header('Content-Type: text/html; charset=utf-8');
 
 <meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover lets the page draw under the iOS/notch safe areas
+     and is what makes env(safe-area-inset-*) resolve to a real value
+     instead of 0 -- without it, content (and anything using those env()
+     insets, like the mobile selection bar's bottom padding) can render
+     flush against the true edge of the screen, visible/legible through
+     Safari's and Firefox's translucent bottom toolbar as the page is
+     scrolled or the toolbar collapses. -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<meta name="theme-color" content="#060a0f">
 
 <style>
 
