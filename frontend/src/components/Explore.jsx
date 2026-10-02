@@ -822,12 +822,29 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   });
 
   // Tab
+  // App.jsx remounts this whole component (bumps exploreKey) on every
+  // popstate that lands back on an "explore" view, so this initializer is
+  // what actually determines which tab the back/forward buttons land you
+  // on -- not just the initial mount. A back press to the implicit
+  // "browse" entry created when Explore first auto-opens after login has
+  // no `?explore` URL of its own (bare `/`), so for that case this must
+  // consult the entry's own history.state.etab (tagged by
+  // __hcriClearFolderUrl/the tab-bar click handler) -- NOT the
+  // last-viewed-tab localStorage fallback below, which is for a genuinely
+  // fresh navigation with no history of its own and would otherwise just
+  // re-show whatever tab was last visited, defeating back/forward.
   const [tab, setTab] = useState(() => {
     try {
       const q = typeof window < 'u' ? window.location.search : '';
       if (q.includes('insights')) return 'insights';
       if (q.includes('mine') && n) return 'myreports';
-      if (!q.includes('explore') && n && localStorage.getItem('hcri_last_list') === 'myreports') return 'myreports';
+      if (!q.includes('explore')) {
+        const st = typeof window < 'u' ? window.history.state : null;
+        if (st && st.view === 'explore' && st.etab) {
+          return st.etab === 'insights' ? 'insights' : (st.etab === 'myreports' && n ? 'myreports' : 'browse');
+        }
+        if (n && localStorage.getItem('hcri_last_list') === 'myreports') return 'myreports';
+      }
     } catch {}
     return 'browse';
   });
@@ -1048,13 +1065,24 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     try { if (tab === 'browse' || tab === 'myreports') localStorage.setItem('hcri_last_list', tab); } catch {}
   }, [tab]);
 
-  // Back/forward support for the ?explore / ?explore=mine / ?explore=insights URLs.
+  // Back/forward support for the ?explore / ?explore=mine / ?explore=insights
+  // URLs. The implicit "browse" entry created when Explore auto-opens after
+  // login (App.jsx's post-login useEffect) never gets its own `?explore`
+  // URL -- it's a bare `/` -- so going back to it can't be recognized from
+  // the URL alone; fall back to the entry's history.state.etab (tagged by
+  // __hcriClearFolderUrl/the tab-bar click handler) for that case.
   useEffect(() => {
-    const onPop = () => {
+    const onPop = (ev) => {
       try {
         const q = window.location.search;
-        if (!q.includes('explore')) return;
-        setTab(q.includes('insights') ? 'insights' : q.includes('mine') && n ? 'myreports' : 'browse');
+        if (q.includes('explore')) {
+          setTab(q.includes('insights') ? 'insights' : q.includes('mine') && n ? 'myreports' : 'browse');
+          return;
+        }
+        const st = (ev && ev.state) || window.history.state || {};
+        if (st && st.view === 'explore' && st.etab) {
+          setTab(st.etab === 'insights' ? 'insights' : st.etab === 'myreports' && n ? 'myreports' : 'browse');
+        }
       } catch {}
     };
     window.addEventListener('popstate', onPop);
@@ -1329,12 +1357,23 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   useEffect(() => { if (tab === 'myreports' && n) loadFolders(); }, [tab, n]);
 
+  // Called (via __hcriResetListView) both when leaving a folder within My
+  // Reports (its original purpose -- `tab` really is 'myreports' then)
+  // and, more broadly, at the start of EVERY tab-bar click, to strip a
+  // stale `folder` param before the click handler pushes a new entry for
+  // the tab being switched TO. This replaces the CURRENT (about-to-be-left)
+  // entry's state, so it must tag it with the tab being left (`tab`, still
+  // the pre-switch value here since this runs before setTab) -- not always
+  // 'myreports'. Hardcoding that used to corrupt the previous tab's entry
+  // (e.g. leaving Explore for My Reports relabeled the Explore entry as
+  // 'myreports' too), so pressing back from My Reports landed back on
+  // My Reports instead of Explore. See tests/back-button.spec.js.
   const __hcriClearFolderUrl = () => {
     try {
       const sp = new URLSearchParams(window.location.search);
       sp.delete('folder');
       const q = sp.toString();
-      window.history.replaceState({ hcri: 1, view: 'explore', etab: 'myreports' }, '', window.location.pathname + (q ? '?' + q : ''));
+      window.history.replaceState({ hcri: 1, view: 'explore', etab: tab }, '', window.location.pathname + (q ? '?' + q : ''));
     } catch {}
   };
   const __hcriResetListView = () => {
