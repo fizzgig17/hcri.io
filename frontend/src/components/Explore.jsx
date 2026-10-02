@@ -2386,20 +2386,23 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           <div
             onClick={() => {
               if (!n && onHomeFn) { onHomeFn(); return; }
-              // The logo always goes to the actual root -- the browse
-              // tab, full stop. (This used to instead return to whichever
-              // of browse/myreports was last visited, so clicking it from
-              // My Reports was a no-op -- same tab, nothing happened --
-              // which read as the logo being broken.)
-              const targetTab = 'browse';
-              // Already there, and not inside a folder -- don't push a
-              // redundant history entry (see goHome's comment in App.jsx
-              // and tests/no-redundant-history.spec.js). A folder still
-              // counts as "not at the root" even on the right tab -- the
-              // logo should always back out of it.
-              if (!ee && folderSel == null && tab === targetTab) return;
-              F(null);
-              setFolderSel(null);
+              // "Home" is the base of whichever list (Explore/browse or
+              // My Reports) the user was last on, same as the deployed
+              // site's own behavior -- not hardcoded to browse.
+              let targetTab = 'browse';
+              try { targetTab = n && localStorage.getItem('hcri_last_list') === 'myreports' ? 'myreports' : 'browse'; } catch {}
+              // Already at the clean BASE of that list -- right tab, no
+              // folder, no open report, no filters/search applied -- so
+              // there's really nothing to do: don't push a redundant
+              // history entry (see goHome's comment in App.jsx and
+              // tests/no-redundant-history.spec.js). The earlier version
+              // of this only checked the tab itself, which made the logo
+              // look broken: clicking it while already on the right tab
+              // but with a folder open, or a filter/search applied,
+              // silently did nothing instead of actually resetting.
+              const atBase = !ee && folderSel == null && !filtersTouched && tab === targetTab;
+              if (atBase) return;
+              __hcriResetListView();
               setTab(targetTab);
               try { window.history.pushState({ hcri: 1, view: 'explore', etab: targetTab }, '', exploreTabUrl(targetTab)); } catch {}
             }}

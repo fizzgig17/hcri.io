@@ -81,39 +81,51 @@ test('refreshing while on My Reports > a folder stays inside that folder', async
   expect(errors, `Unexpected console/page errors:\n${errors.join('\n')}`).toEqual([]);
 });
 
-test('the logo always goes to the browse root, even from My Reports, and that persists through a refresh', async ({ page }) => {
+test('the logo goes home to the BASE of the last-visited list (My Reports here), and that persists through a refresh', async ({ page }) => {
   await installMockApi(page, { loggedIn: true });
   await page.addInitScript(() => localStorage.setItem('spd_token', 'mock-token'));
   await page.goto('/');
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
 
-  // The logo used to return to whichever of browse/myreports was last
-  // visited -- which made it a no-op (and read as "broken") when clicked
-  // from My Reports, since that was also the "last visited" tab. It
-  // should always go to the actual root (browse), regardless.
+  // "Home" is whichever of browse/My Reports was last visited (matches
+  // the deployed site's own behavior), not hardcoded to browse.
   await page.getByRole('button', { name: 'My Reports' }).click();
   await expect(page.getByText('+ New Folder')).toBeVisible();
 
-  await page.locator(VISIBLE_LOGO).click();
-  await expect(page.getByText('+ New Folder')).toHaveCount(0);
-  expect(page.url()).not.toContain('mine');
-
-  await page.reload();
-  await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
-  await expect(page.getByText('+ New Folder')).toHaveCount(0);
-});
-
-test('clicking the logo always still goes home, even from inside a folder', async ({ page }) => {
-  await installMockApi(page, { loggedIn: true });
-  await page.addInitScript(() => localStorage.setItem('spd_token', 'mock-token'));
-  await page.goto('/');
-  await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
-
-  await page.getByRole('button', { name: 'My Reports' }).click();
   const folderName = fixtures.folders[0].name;
   await page.getByText(folderName).click();
   await expect(page.getByText('← My Reports')).toBeVisible({ timeout: 10000 });
 
+  // Still logged in with My Reports as the last-visited list, but now
+  // INSIDE a folder -- the logo should take you to the BASE of that list
+  // (out of the folder), not just no-op because the tab itself hasn't
+  // changed. This is the bug that made the logo look broken: it only
+  // checked the tab name, so being on the right tab but in a dirty state
+  // (a folder open, here) silently did nothing.
   await page.locator(VISIBLE_LOGO).click();
   await expect(page.getByText('← My Reports')).toHaveCount(0);
+  await expect(page.getByText('+ New Folder')).toBeVisible();
+  expect(page.url()).toContain('mine');
+
+  await page.reload();
+  await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
+  await expect(page.getByText('+ New Folder')).toBeVisible();
+});
+
+test('clicking the logo resets an applied filter even while already on the right (home) tab', async ({ page, isMobile }) => {
+  // The other half of the same bug: "am I home already" used to check
+  // only the tab name, so searching/filtering on browse (still "home" --
+  // same tab) and then clicking the logo did nothing, leaving the
+  // filter applied instead of actually resetting to the clean base view.
+  await installMockApi(page, { loggedIn: true });
+  await page.addInitScript(() => localStorage.setItem('spd_token', 'mock-token'));
+  await page.goto('/');
+  await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
+
+  if (isMobile) await page.getByRole('button', { name: '⚙ Filter' }).click();
+  await page.getByPlaceholder('Search by name…').fill('zzz-no-match');
+  await expect(page.getByPlaceholder('Search by name…')).toHaveValue('zzz-no-match');
+
+  await page.locator(VISIBLE_LOGO).click();
+  await expect(page.getByPlaceholder('Search by name…')).toHaveValue('');
 });
