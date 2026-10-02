@@ -22,6 +22,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { basePath, getToken } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // Mirrors useIsMobile's 768px breakpoint, but used outside render (to decide
 // whether to auto-focus the "add" input after a mutation) so it's a plain
@@ -46,6 +47,7 @@ const KINDS = [
 
 export default function AdminCats({ theme: o }) {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile(768);
   usePanelBackClose(open, () => setOpen(false));
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(false);
@@ -667,30 +669,32 @@ export default function AdminCats({ theme: o }) {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.7)',
+            background: isMobile ? o.bg : 'rgba(0,0,0,0.7)',
             zIndex: 4000,
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            padding: 16,
+            padding: isMobile ? 0 : 16,
             overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setOpen(false);
+            if (!isMobile && e.target === e.currentTarget) setOpen(false);
           }}
         >
           <div
             style={{
               background: o.surface,
-              border: `1px solid ${o.border}`,
-              borderRadius: 12,
+              border: isMobile ? 'none' : `1px solid ${o.border}`,
+              borderRadius: isMobile ? 0 : 12,
               width: '100%',
-              maxWidth: 720,
-              maxHeight: '90vh',
+              maxWidth: isMobile ? '100%' : 720,
+              maxHeight: isMobile ? 'none' : '90vh',
+              minHeight: isMobile ? '100%' : 'auto',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              marginTop: '2vh',
+              marginTop: isMobile ? 0 : '2vh',
             }}
           >
             <div

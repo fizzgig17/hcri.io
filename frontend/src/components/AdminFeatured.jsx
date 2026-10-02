@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function AdminFeatured({ theme: o }) {
   const [open, setOpen] = useState(false);
@@ -18,6 +19,7 @@ export default function AdminFeatured({ theme: o }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   usePanelBackClose(open, () => setOpen(false));
+  const isMobile = useIsMobile(768);
 
   const auth = () => ({ Authorization: `Bearer ${getToken()}` });
 
@@ -96,24 +98,28 @@ export default function AdminFeatured({ theme: o }) {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.7)',
+            background: isMobile ? o.bg : 'rgba(0,0,0,0.7)',
             zIndex: 3500,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
             justifyContent: 'center',
-            padding: 20,
+            padding: isMobile ? 0 : 20,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
           }}
-          onClick={() => setOpen(false)}
+          onClick={() => { if (!isMobile) setOpen(false); }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: o.surface,
-              border: `1px solid ${o.border}`,
-              borderRadius: 12,
-              padding: 24,
+              border: isMobile ? 'none' : `1px solid ${o.border}`,
+              borderRadius: isMobile ? 0 : 12,
+              padding: isMobile ? '18px 16px' : 24,
               width: '100%',
-              maxWidth: 460,
+              maxWidth: isMobile ? '100%' : 460,
+              minHeight: isMobile ? '100%' : 'auto',
+              boxSizing: 'border-box',
               display: 'flex',
               flexDirection: 'column',
               gap: 14,

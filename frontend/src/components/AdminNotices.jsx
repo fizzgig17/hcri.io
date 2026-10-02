@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 function noticeColor(type, t) {
   return type === 'important' ? t.bad : type === 'issue' ? t.warn : t.good;
@@ -24,6 +25,7 @@ function noticeColor(type, t) {
 export default function AdminNotices({ theme: o }) {
   const [open, setOpen] = useState(false);
   usePanelBackClose(open, () => setOpen(false));
+  const isMobile = useIsMobile(768);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -194,26 +196,28 @@ export default function AdminNotices({ theme: o }) {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.8)',
+            background: isMobile ? o.bg : 'rgba(0,0,0,0.8)',
             zIndex: 4000,
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            padding: 16,
+            padding: isMobile ? 0 : 16,
             overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setOpen(false);
+            if (!isMobile && e.target === e.currentTarget) setOpen(false);
           }}
         >
           <div
             style={{
               background: o.surface,
-              border: `1px solid ${o.border}`,
-              borderRadius: 12,
+              border: isMobile ? 'none' : `1px solid ${o.border}`,
+              borderRadius: isMobile ? 0 : 12,
               width: '100%',
-              maxWidth: 720,
-              margin: '24px 0',
+              maxWidth: isMobile ? '100%' : 720,
+              minHeight: isMobile ? '100%' : 'auto',
+              margin: isMobile ? 0 : '24px 0',
             }}
           >
             <div
@@ -223,6 +227,9 @@ export default function AdminNotices({ theme: o }) {
                 alignItems: 'center',
                 padding: '14px 18px',
                 borderBottom: `1px solid ${o.border}`,
+                position: isMobile ? 'sticky' : 'static',
+                top: 0,
+                background: o.surface,
               }}
             >
               <div style={{ fontWeight: 800, fontSize: 15, color: o.text, fontFamily: 'monospace' }}>Notices</div>
