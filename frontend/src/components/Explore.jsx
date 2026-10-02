@@ -2292,6 +2292,10 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
         <button
           key={id}
           onClick={() => {
+            // Already on this tab -- don't push a redundant history entry
+            // for a click that wouldn't change anything on screen (see
+            // tests/no-redundant-history.spec.js).
+            if (id === tab) return;
             __hcriResetListView();
             setTab(id);
             try {
@@ -2316,8 +2320,14 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           <div
             onClick={() => {
               if (!n && onHomeFn) { onHomeFn(); return; }
+              let targetTab = 'browse';
+              try { targetTab = n && localStorage.getItem('hcri_last_list') === 'myreports' ? 'myreports' : 'browse'; } catch {}
+              // Already at the explore root on the tab we'd land on --
+              // don't push a redundant history entry (see goHome's comment
+              // in App.jsx and tests/no-redundant-history.spec.js).
+              if (!ee && tab === targetTab) return;
               F(null);
-              try { setTab(n && localStorage.getItem('hcri_last_list') === 'myreports' ? 'myreports' : 'browse'); } catch { setTab('browse'); }
+              setTab(targetTab);
               try { window.history.pushState({ hcri: 1, view: 'explore' }, '', window.location.pathname); } catch {}
             }}
             style={{ fontWeight: 900, fontSize: o ? 18 : 20, color: r.text, fontFamily: 'monospace', cursor: 'pointer' }}

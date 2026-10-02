@@ -340,6 +340,10 @@ export default function App() {
   }
 
   function goHome() {
+    // No-op if we're already there -- don't push a redundant history entry
+    // for a click that wouldn't change anything on screen (see
+    // tests/no-redundant-history.spec.js).
+    if (!exploreOpen && !detail && !activeId) return;
     try {
       window.history.pushState({ hcri: 1, view: 'home' }, '', window.location.pathname);
     } catch (e) {}
@@ -351,6 +355,8 @@ export default function App() {
   }
 
   function openExplore() {
+    // Already on Explore -- see goHome's comment.
+    if (exploreOpen) return;
     try {
       window.history.pushState({ hcri: 1, view: 'explore' }, '', window.location.pathname + '?explore');
     } catch (e) {}
@@ -369,6 +375,9 @@ export default function App() {
   // Clicking the logo: back to the dashboard's "root" (Explore, despite the
   // name -- this is what the deployed bundle actually does).
   function goRoot() {
+    // Already at the explore root (no report open, nothing shared) --
+    // see goHome's comment.
+    if (exploreOpen && !detail && !activeId && !sharedReport) return;
     try {
       window.history.pushState({ hcri: 1, view: 'explore' }, '', window.location.pathname);
     } catch (e) {}
@@ -381,6 +390,8 @@ export default function App() {
 
   async function openReport(id) {
     if (!id) return;
+    // Already viewing this exact report -- see goHome's comment.
+    if (activeId === id && detail && detail.id === id) return;
     window.track && window.track('open_report');
     setActiveId(id);
     if (isMobile || !sidebarPinned) setSidebarOpen(false);
