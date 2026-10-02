@@ -24,6 +24,7 @@ import { fixtures } from './fixtures.js';
  * @param {Array}  [opts.reports] - overrides the default /reports list.
  * @param {Array}  [opts.notices] - overrides the default /notices list.
  * @param {object} [opts.explore] - overrides the default /explore response.
+ * @param {Array}  [opts.adminUsers] - overrides the default /admin/users list.
  */
 export async function installMockApi(page, opts = {}) {
   const loggedIn = !!opts.loggedIn;
@@ -31,6 +32,7 @@ export async function installMockApi(page, opts = {}) {
   const reports = opts.reports || fixtures.reports;
   const notices = opts.notices || fixtures.notices;
   const explore = opts.explore || fixtures.explore;
+  const adminUsers = opts.adminUsers || fixtures.adminUsers;
 
   await page.route('**/index.php/api/**', async (route) => {
     const req = route.request();
@@ -74,10 +76,54 @@ export async function installMockApi(page, opts = {}) {
     if (path === '/explore_stats' || path === '/explore/stats') {
       return json(fixtures.exploreStats);
     }
+    // Opening a single report from Explore's results grid (Explore.jsx's
+    // openReport). Keep this ABOVE /admin's own /admin/... routes and
+    // below the plain /explore -- order matters since path matching here
+    // is sequential, not a router.
+    if (/^\/explore\/\d+$/.test(path) && method === 'GET') {
+      const id = Number(path.split('/').pop());
+      const item = fixtures.exploreItem.id === id ? fixtures.exploreItem : { ...fixtures.exploreItem, id };
+      return json(item);
+    }
 
     // ── Categories (filter dropdowns) ───────────────────────────────────
     if (path === '/categories' && method === 'GET') {
       return json(fixtures.categories);
+    }
+
+    // ── Admin (AdminPanel.jsx's adminFetch, api/admin.php) ──────────────
+    if (path === '/admin' && method === 'GET') {
+      return json(fixtures.adminStats);
+    }
+    if (path === '/admin/users' && method === 'GET') {
+      return json(adminUsers);
+    }
+    if (/^\/admin\/users\/\d+\/reports$/.test(path) && method === 'GET') {
+      return json(reports);
+    }
+    if (/^\/admin\/users\/\d+$/.test(path) && (method === 'PATCH' || method === 'DELETE')) {
+      return json({ ok: true });
+    }
+    if (path === '/admin/recalc' && method === 'POST') {
+      return json(fixtures.adminStats);
+    }
+    if (path === '/admin/featured') {
+      return method === 'GET' ? json(fixtures.featured) : json({ ok: true });
+    }
+    if (path === '/admin/notices' && method === 'GET') {
+      return json(fixtures.adminNotices);
+    }
+    if (/^\/admin\/notices/.test(path)) {
+      return json({ ok: true });
+    }
+    if (path === '/admin/categories' && method === 'GET') {
+      return json(fixtures.adminCategories);
+    }
+    if (path === '/admin/categories/case_prefs' && method === 'GET') {
+      return json({ prefs: {} });
+    }
+    if (/^\/admin\/categories\//.test(path)) {
+      return json({ ok: true });
     }
 
     // Anything else: respond with an empty-but-valid 200 rather than letting

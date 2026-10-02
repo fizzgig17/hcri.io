@@ -64,8 +64,53 @@ export const fixtures = {
     total: 2, page: 1, pages: 1,
   },
 
+  // A single report as returned by api/explore_item.php (GET /explore/:id)
+  // -- opened when a report card is clicked in Explore's results grid
+  // (Explore.jsx's openReport -> ResultsPanel's onOpenReport). Separate
+  // shape from `explore.reports` above (that's the summary list row).
+  exploreItem: {
+    id: 101, label: 'HT70 #1', sourceType: 'csv', notes: '',
+    cct: 5000, duv: -0.001, x: 0.345, y: 0.355, Rf: 92, Rg: 102,
+    rfBins: null, rcsBins: [], rhsBins: [], ra: 94, r9: 88, ri: null,
+    instrumentModel: null, instrumentVersion: null, rawHeaders: null,
+    shareToken: null, isPublic: true, private: false,
+    userId: 1, folderId: null, userName: 'Test User',
+    createdAt: '2026-09-01 10:00:00',
+    wls: Array.from({ length: 41 }, (_, i) => 380 + i * 10),
+    vals: Array.from({ length: 41 }, (_, i) => Math.max(0, Math.sin((i / 40) * Math.PI) * 100)),
+    categories: {},
+  },
+
   exploreStats: {
     count: 2, avgRa: 92, avgCct: 4500, highCriPct: 50, votes: 0,
     cct: [], ra: [], r9: [], duv: [], ledModels: [], lightBrands: [], overTime: [],
+  },
+
+  // ── Admin panel (AdminPanel.jsx, api/admin.php) ──────────────────────
+  adminStats: { users: 2, reports: 2 },
+
+  adminUsers: [
+    {
+      id: 1, name: 'Test User', email: 'test@example.com', isAdmin: true, isSuper: false,
+      disabled: false, nameMasked: false, reportCount: 2, createdAt: '2026-01-01 00:00:00',
+      lastLoginAt: '2026-09-30 12:00:00', lastActiveAt: '2026-10-01 08:00:00',
+    },
+    {
+      id: 2, name: 'Other User', email: 'other@example.com', isAdmin: false, isSuper: false,
+      disabled: false, nameMasked: false, reportCount: 0, createdAt: '2026-02-15 00:00:00',
+      // never logged in / never active -- exercises AdminPanel.jsx's "never" fallback text
+      lastLoginAt: null, lastActiveAt: null,
+    },
+  ],
+
+  featured: [101],
+
+  adminNotices: [
+    { id: 1, type: 'news', location: 'top', message: 'Welcome to hCRI.io.', startAt: null, endAt: null },
+  ],
+
+  adminCategories: {
+    light_brand: [{ id: 1, value: 'Acebeam', count: 3 }],
+    light_model: [{ id: 2, value: 'D7F', count: 1 }],
   },
 };

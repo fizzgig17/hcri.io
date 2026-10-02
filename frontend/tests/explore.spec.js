@@ -8,6 +8,7 @@
 
 import { test, expect } from '@playwright/test';
 import { installMockApi } from './mockApi.js';
+import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
 
 test('guest Explore page renders with no console errors', async ({ page }) => {
@@ -56,6 +57,20 @@ test('filter sidebar is full width on mobile, shown via the Filter toggle', asyn
   const box = await panel.boundingBox();
   const viewport = page.viewportSize();
   expect(box.width).toBeGreaterThan(viewport.width * 0.9);
+});
+
+test('clicking a report card opens its detail view, with a way back to Explore, no console errors', async ({ page }) => {
+  const errors = captureConsoleErrors(page);
+  await installMockApi(page, { loggedIn: false });
+  await page.goto('/?explore');
+
+  const label = fixtures.explore.reports[0].label;
+  await expect(page.getByText(label).first()).toBeVisible({ timeout: 10000 });
+  await page.getByText(label).first().click();
+
+  await expect(page.getByRole('button', { name: '← Back to Explore' })).toBeVisible({ timeout: 10000 });
+
+  expect(errors, `Unexpected console/page errors:\n${errors.join('\n')}`).toEqual([]);
 });
 
 test('collapse arrow toggles the desktop filter sidebar', async ({ page, isMobile }) => {

@@ -34,13 +34,36 @@ images, etc. — on every test run. Never point the test suite at the real
 
 - `guest-landing.spec.js` — the logged-out landing page boots with no
   console errors, desktop and mobile.
-- `dashboard.spec.js` — the logged-in dashboard (Sidebar + report list)
-  boots, and opening a report renders its detail view, with no console
-  errors.
-- `explore.spec.js` — the public Explore page boots, and specifically
-  regression-tests the filter-sidebar layout bug (desktop: fixed 270px
-  sidebar beside the results grid; mobile: full width behind a toggle;
-  collapse arrow works) that this suite was first written to catch.
+- `dashboard.spec.js` — logging in lands on Explore (auto-opened by
+  App.jsx's post-login useEffect), with no console errors. The classic
+  Sidebar + "Saved Reports" list UI (still reachable today behind a
+  `?report=` deep link, since it's what the post-login redirect check
+  exempts) is intentionally NOT covered here -- it's on the list to be
+  removed in an upcoming frontend revamp, so it's not worth testing now.
+- `explore.spec.js` — the public Explore page boots; regression-tests the
+  filter-sidebar layout bug (desktop: fixed 270px sidebar beside the
+  results grid; mobile: full width behind a toggle; collapse arrow works)
+  that this suite was first written to catch; and covers opening a report
+  card into its detail view (and back) with no console errors -- this is
+  the real, current way a report gets opened now (Explore.jsx's
+  openReport), not the old Sidebar list.
+- `admin.spec.js` — the admin panel (non-admins don't see the Admin
+  button; an admin can open it and see stats/users with no console
+  errors; the Featured Reports tool opens; toggling a user's admin status
+  calls the PATCH endpoint with the right payload). Note: two different
+  `title="Admin"` buttons exist in the DOM for a logged-in admin
+  (Sidebar's and Explore's -- see admin.spec.js's header comment); tests
+  must target the one inside Explore's `z-index: 1500` overlay, not just
+  "the first" or "the visible" one.
+
+## Known obsolete UI (not covered on purpose)
+
+The Sidebar + "Saved Reports" list (frontend/src/components/Sidebar.jsx)
+is slated for removal in an upcoming frontend revamp -- a plain login no
+longer lands there (Explore does, see dashboard.spec.js), and it's now
+only reachable via a `?report=` deep link. Don't add new test coverage
+for it; when it's actually removed, delete Sidebar.jsx and anything in
+App.jsx that renders it.
 
 ## Adding a test
 
