@@ -22,8 +22,6 @@ import { installMockApi } from './mockApi.js';
 import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
 
-const VISIBLE_ADMIN_BTN = '[style*="z-index: 1500"] [title="Admin"]';
-
 test('back button closes the Admin panel and returns to Explore, not off the site', async ({ page }) => {
   const errors = captureConsoleErrors(page);
   await installMockApi(page, { loggedIn: true, user: { ...fixtures.user, is_admin: 1 } });
@@ -31,7 +29,7 @@ test('back button closes the Admin panel and returns to Explore, not off the sit
   await page.goto('/');
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
 
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
 
   await page.goBack();
@@ -39,7 +37,7 @@ test('back button closes the Admin panel and returns to Explore, not off the sit
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toHaveCount(0);
   // Still on the app, not navigated away -- the toolbar/explore chrome is
   // still there and still interactive.
-  await expect(page.locator(VISIBLE_ADMIN_BTN)).toBeVisible();
+  await expect(page.getByTitle('Admin')).toBeVisible();
 
   expect(errors, `Unexpected console/page errors:\n${errors.join('\n')}`).toEqual([]);
 });
@@ -68,7 +66,7 @@ test('nested panels close one at a time with back, innermost first', async ({ pa
   await page.goto('/');
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
 
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
 
   // Open a sub-tool nested inside the Admin panel.
@@ -92,7 +90,7 @@ test('closing a panel with its own close button, then pressing back, does not re
   await page.goto('/');
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
 
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
 
   // Close it the normal way (its own "X"/close affordance) rather than

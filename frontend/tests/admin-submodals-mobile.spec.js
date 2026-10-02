@@ -13,14 +13,12 @@ import { installMockApi } from './mockApi.js';
 import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
 
-const VISIBLE_ADMIN_BTN = '[style*="z-index: 1500"] [title="Admin"]';
-
 async function loginAsAdmin(page) {
   await installMockApi(page, { loggedIn: true, user: { ...fixtures.user, is_admin: 1 } });
   await page.addInitScript(() => localStorage.setItem('spd_token', 'mock-token'));
   await page.goto('/');
   await expect(page.getByText('Loading…')).toHaveCount(0, { timeout: 10000 });
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
 }
 

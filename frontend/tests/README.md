@@ -35,26 +35,21 @@ images, etc. — on every test run. Never point the test suite at the real
 - `guest-landing.spec.js` — the logged-out landing page boots with no
   console errors, desktop and mobile.
 - `dashboard.spec.js` — logging in lands on Explore (auto-opened by
-  App.jsx's post-login useEffect), with no console errors. The classic
-  Sidebar + "Saved Reports" list UI (still reachable today behind a
-  `?report=` deep link, since it's what the post-login redirect check
-  exempts) is intentionally NOT covered here -- it's on the list to be
-  removed in an upcoming frontend revamp, so it's not worth testing now.
+  App.jsx's post-login useEffect), with no console errors. Explore is the
+  whole logged-in app now (the old Sidebar + "Saved Reports" dashboard was
+  removed -- it was already unreachable in normal use and everything in
+  it was already duplicated inside Explore).
 - `explore.spec.js` — the public Explore page boots; regression-tests the
   filter-sidebar layout bug (desktop: fixed 270px sidebar beside the
   results grid; mobile: full width behind a toggle; collapse arrow works)
   that this suite was first written to catch; and covers opening a report
   card into its detail view (and back) with no console errors -- this is
   the real, current way a report gets opened now (Explore.jsx's
-  openReport), not the old Sidebar list.
+  openReport).
 - `admin.spec.js` — the admin panel (non-admins don't see the Admin
   button; an admin can open it and see stats/users with no console
   errors; the Featured Reports tool opens; toggling a user's admin status
-  calls the PATCH endpoint with the right payload). Note: two different
-  `title="Admin"` buttons exist in the DOM for a logged-in admin
-  (Sidebar's and Explore's -- see admin.spec.js's header comment); tests
-  must target the one inside Explore's `z-index: 1500` overlay, not just
-  "the first" or "the visible" one.
+  calls the PATCH endpoint with the right payload).
 - `back-button.spec.js` — regression tests for "the back button takes me
   off the entire site": the back button closes an open panel (Admin, an
   Explore report's detail view) instead of navigating away; nested panels
@@ -84,15 +79,6 @@ images, etc. — on every test run. Never point the test suite at the real
   alone for now because its restore effect sets `comparing` true before
   its async fetch resolves, which needs more care to fix without
   reintroducing a redundant-push bug.
-
-## Known obsolete UI (not covered on purpose)
-
-The Sidebar + "Saved Reports" list (frontend/src/components/Sidebar.jsx)
-is slated for removal in an upcoming frontend revamp -- a plain login no
-longer lands there (Explore does, see dashboard.spec.js), and it's now
-only reachable via a `?report=` deep link. Don't add new test coverage
-for it; when it's actually removed, delete Sidebar.jsx and anything in
-App.jsx that renders it.
 
 ## Adding a test
 
