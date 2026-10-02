@@ -1,10 +1,8 @@
 // frontend/src/App.jsx
 //
 // Reconstructed from the deployed assets/app.js (minified function Ge, the
-// root component mounted directly by main.jsx). This replaces a much
-// simpler stale App.jsx that only ever rendered AuthScreen / Sidebar+
-// ReportView directly -- the real deployed app is a small router/state
-// machine with several more entry points than that:
+// root component mounted directly by main.jsx). The real deployed app is a
+// small router/state machine with several entry points:
 //
 //   - A shared/public report view (`?report=<id>` or `?share=<token>`),
 //     reachable whether or not anyone is logged in, with its own minimal
@@ -14,40 +12,47 @@
 //     `/explore` path) that works with no account at all, with sign-in
 //     offered as an AuthScreen overlay (`overlayMode`) rather than a
 //     redirect.
-//   - The logged-in dashboard: Sidebar + ReportDetail side by side on
-//     desktop, or a single full-screen pane that toggles between them on
-//     mobile (useIsMobile(768)), plus Explore as a full-page overlay that
-//     a logged-in user can open from the dashboard.
+//   - The logged-in app: Explore rendered directly as the full page (it's
+//     a fully self-contained component -- own upload/paste, own filters,
+//     own Help/Feedback/Account/Admin modals, own "My Reports" library and
+//     per-report detail view, own internal history handling). There used
+//     to be a separate "logged-in dashboard" here (Sidebar + ReportDetail)
+//     that Explore rendered as a full-page overlay on top of; it was
+//     removed because it was already unreachable in normal use (the
+//     effect that auto-opens Explore right after login meant a logged-in
+//     user essentially never saw it) and everything in it -- upload,
+//     paste, filtering, Help/Feedback/Account, even Admin access -- was
+//     already duplicated, more capably, inside Explore itself. The one
+//     exception, the per-report "Recalculate metrics from SPD" button, was
+//     dropped rather than ported (not something anyone uses).
 //   - The logged-out marketing/landing page (AuthScreen, full screen).
 //
-// Browser history is wired by hand with pushState/replaceState + a
-// popstate listener (not a router library) so the back button steps back
-// through report -> explore -> home the way the bundle does it. The
-// sidebar's pinned/unpinned state persists to localStorage
-// ("sidebar_pinned"), and an unpinned sidebar auto-closes on narrow
-// desktop widths and whenever a report is opened on mobile.
+// Browser history for the shared-report and guest-explore entry points is
+// wired by hand with pushState/replaceState + a popstate listener (not a
+// router library). Explore.jsx has its own, separate popstate listener for
+// navigation *within* itself (tabs, folders, compare, etc.) once a user is
+// logged in or has opened guest Explore -- this file's listener only needs
+// to care about entering/exiting the shared-report view and the top-level
+// guest-explore/landing-page split.
 //
-// On top of that, every panel/modal with no URL of its own (AdminPanel,
-// AccountSettings, HelpModal, FeedbackModal, PasteSPDModal, Explore's
-// Compare view and open-report detail pane, etc.) pushes its own history
-// entry while open via usePanelBackClose() (hooks/usePanelBackClose.js,
-// lib/panelHistory.js), so the back button closes the topmost open panel
-// instead of leaving the page behind it -- see tests/back-button.spec.js.
-// The onPop handler below checks that stack first, via
-// handlePanelPopState(), before falling through to its own routing.
+// Every panel/modal with no URL of its own (AdminPanel, AccountSettings,
+// HelpModal, FeedbackModal, PasteSPDModal, Explore's Compare view and
+// open-report detail pane, etc.) pushes its own history entry while open
+// via usePanelBackClose() (hooks/usePanelBackClose.js, lib/panelHistory.js),
+// so the back button closes the topmost open panel instead of leaving the
+// page behind it -- see tests/back-button.spec.js. The onPop handler below
+// checks that stack first, via handlePanelPopState(), before falling
+// through to its own routing.
 
 import { useEffect, useState } from 'react';
 import { useTheme } from './lib/ThemeContext.jsx';
 import { useAuth } from './hooks/useAuth';
 import { useIsMobile } from './hooks/useIsMobile';
-import { api } from './lib/api';
 import { setTZ } from './lib/tz';
 import { TopNotices } from './components/Notices';
-import HelpModal, { GlobalHelp } from './components/HelpModal';
-import AuthScreen, { FeedbackModal } from './components/AuthScreen';
-import Sidebar from './components/Sidebar';
+import { GlobalHelp } from './components/HelpModal';
+import AuthScreen from './components/AuthScreen';
 import ReportDetail from './components/ReportDetail';
-import PasteSPDModal from './components/PasteSPDModal';
 import Explore from './components/Explore';
 import PasswordReset from './components/PasswordReset';
 import { handlePanelPopState } from './lib/panelHistory';
@@ -55,11 +60,7 @@ import usePanelBackClose from './hooks/usePanelBackClose';
 
 export default function App() {
   const { theme: T, themeName, toggleTheme } = useTheme();
-  const { user, setUser, checking, tryAutoLogin, login, register, logout } = useAuth();
-
-  function patchUser(u) {
-    setUser && setUser(u);
-  }
+  const { user, checking, tryAutoLogin, login, register, logout } = useAuth();
 
   // Keep the shared tz helper (used by fmtTZ() across report views) in
   // sync with whatever timezone the logged-in user has set.
@@ -72,19 +73,14 @@ export default function App() {
   const [sharedLoading, setSharedLoading] = useState(false);
   const [sharedError, setSharedError] = useState(null);
 
-  // ── Dashboard state ──────────────────────────────────────────────────────
-  const [reports, setReports] = useState([]);
-  const [detail, setDetail] = useState(null);
-  const [activeId, setActiveId] = useState(null);
-  const [minRf, setMinRf] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [pasteOpen, setPasteOpen] = useState(false);
-
   // ── Explore state ────────────────────────────────────────────────────────
   // Initial value is derived straight from the URL so a deep link into
   // Explore (or a page reload while on it) opens straight into Explore
-  // instead of flashing the dashboard/landing page first. A report/share/
-  // reset link always wins over an explore-looking URL.
+  // instead of flashing the landing page first. A report/share/reset link
+  // always wins over an explore-looking URL. For a logged-in user, Explore
+  // is always what's shown (see the user-login effect below); exploreOpen's
+  // remaining job there is just driving the mobile scroll-lock effect and
+  // being bumped back to true by onPop's 'explore' history-state handling.
   const [exploreOpen, setExploreOpen] = useState(() => {
     try {
       if (typeof window > 'u') return false;
@@ -108,54 +104,20 @@ export default function App() {
     () => new URLSearchParams(window.location.search).get('reset') || '',
   );
 
-  // ── Sidebar / layout ─────────────────────────────────────────────────────
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  // Back-button support for the modals/panels above that have no URL of
-  // their own -- see lib/panelHistory.js. (exploreOpen/exploreAuthOpen's
-  // sibling exploreOpen is a top-level view, already handled by the
-  // report/explore/home pushState/popstate routing above it; only
-  // exploreAuthOpen -- the sign-in overlay shown over guest Explore --
-  // needs this.)
-  usePanelBackClose(pasteOpen, () => setPasteOpen(false));
+  // Back-button support for the exploreAuthOpen sign-in overlay shown over
+  // guest Explore (it has no URL of its own) -- see lib/panelHistory.js.
   usePanelBackClose(exploreAuthOpen, () => setExploreAuthOpen(false));
-  usePanelBackClose(helpOpen, () => setHelpOpen(false));
-  usePanelBackClose(feedbackOpen, () => setFeedbackOpen(false));
 
-  const [sidebarPinned, setSidebarPinned] = useState(() => {
-    try {
-      return localStorage.getItem('sidebar_pinned') !== 'false';
-    } catch {
-      return true;
-    }
-  });
   const isMobile = useIsMobile(768);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('sidebar_pinned', sidebarPinned);
-    } catch {}
-  }, [sidebarPinned]);
-
-  // Locks page scroll on the <html>/#root while a logged-in desktop user
-  // has the sidebar collapsed -- mirrors the deployed "app-locked" class.
-  //
-  // Also locks it on mobile whenever the Explore overlay is open. Explore
-  // renders as a `position:fixed; inset:0` layer *on top of* the logged-in
-  // dashboard (Sidebar + ReportDetail) rather than replacing it -- the
-  // dashboard stays mounted underneath so closing Explore is instant. On
-  // mobile that dashboard can be taller than the viewport (the Sidebar's
-  // own report list), and the mobile stylesheet override intentionally
-  // sets `#root { height: auto; overflow: visible }` so that dashboard can
-  // scroll on its own. With Explore's overlay then sitting on top, iOS
-  // Safari/Firefox can let a scroll/rubber-band gesture "fall through" to
-  // that tall, still-scrollable #root once the overlay's own inner scroll
-  // bottoms out -- surfacing the old Sidebar list behind it (reported as
-  // "an artifact at the bottom of the screen" / "a page under the current
-  // one"). Locking #root while Explore is open removes that scrollable
-  // surface entirely, so there's nothing for the gesture to fall through
-  // to; Explore keeps scrolling normally via its own overflowY:auto.
+  // Locks page scroll on the <html> element on mobile whenever Explore is
+  // being shown full-screen -- for a logged-in user that's unconditionally
+  // true (Explore is the whole app), and for a guest it tracks exploreOpen.
+  // Explore manages its own internal scrolling (overflowY:auto), so this
+  // just keeps the document itself from being a second, competing scroll
+  // surface underneath it on mobile Safari/Firefox. Desktop never needed
+  // this (the guest-Explore page has always just scrolled normally at
+  // desktop widths, with no lock), so the logged-in case now matches that.
   useEffect(() => {
     // The class goes on <html>, not #root: #root's `height: 100%` can only
     // resolve to a real pixel value (letting `overflow: hidden` actually
@@ -164,30 +126,11 @@ export default function App() {
     // `height: auto` leaves the percentage height undefined, so it
     // computes as 'auto' and nothing gets clipped.
     const el = document.documentElement;
-    if ((!isMobile && user) || (isMobile && exploreOpen)) el.classList.add('app-locked');
+    if (isMobile && (exploreOpen || user)) el.classList.add('app-locked');
     else el.classList.remove('app-locked');
     return () => el.classList.remove('app-locked');
   }, [isMobile, user, exploreOpen]);
 
-  // Unpinning the sidebar while a report is open on desktop closes it.
-  useEffect(() => {
-    if (!isMobile && !sidebarPinned && detail) setSidebarOpen(false);
-  }, [detail]);
-
-  // On a narrow desktop window (not mobile-layout, just a narrow one) with
-  // the sidebar unpinned, auto-close it.
-  useEffect(() => {
-    function onResize() {
-      if (window.innerWidth < 700 && !sidebarPinned) setSidebarOpen(false);
-    }
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadLabel, setUploadLabel] = useState('');
-  const [notif, setNotif] = useState(null);
   const [guestReport, setGuestReport] = useState(null);
 
   // Auto-login on mount; also force Explore open if the URL path itself
@@ -249,19 +192,13 @@ export default function App() {
         const shr = sp.get('share');
         const exp = window.location.search.includes('explore') || window.location.search.includes('compare=');
 
-        if (st && st.view === 'report' && st.rid) {
-          setSharedReport(null);
-          setExploreOpen(false);
-          setActiveId(st.rid);
-          window.trackPage && window.trackPage('/report', 'Report');
-          api.get('/reports/' + st.rid).then(setDetail).catch(() => {});
-          return;
-        }
+        // (No more 'report'/'home' view-state handling here -- those only
+        // ever came from the old dashboard's openReport()/goHome(), which
+        // no longer exist. A logged-in user is just always showing Explore,
+        // which has its own popstate listener for navigation within itself.)
         if (rep) {
           setSharedLoading(true);
           setExploreOpen(false);
-          setDetail(null);
-          setActiveId(null);
           fetch('./index.php/api/explore/' + encodeURIComponent(rep))
             .then(r => r.json())
             .then(r => { r && r.id ? setSharedReport(r) : setSharedError('Could not load report.'); })
@@ -272,8 +209,6 @@ export default function App() {
         if (shr) {
           setSharedLoading(true);
           setExploreOpen(false);
-          setDetail(null);
-          setActiveId(null);
           fetch('./index.php/api/shared/' + encodeURIComponent(shr))
             .then(r => r.json())
             .then(r => { r.error ? setSharedError(r.error) : setSharedReport(r); })
@@ -283,8 +218,6 @@ export default function App() {
         }
         if (exp || (st && st.view === 'explore')) {
           setSharedReport(null);
-          setDetail(null);
-          setActiveId(null);
           setExploreKey(k => k + 1);
           setExploreOpen(true);
           window.trackPage && window.trackPage('/explore', 'Explore');
@@ -292,9 +225,6 @@ export default function App() {
         }
         setSharedReport(null);
         setExploreOpen(false);
-        setDetail(null);
-        setActiveId(null);
-        api.get('/reports').then(setReports).catch(() => {});
         window.trackPage && window.trackPage('/', 'Home');
       } catch (e) {}
     };
@@ -302,29 +232,11 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // Load/clear the logged-in user's report list, and default to Explore
-  // right after login unless we're mid-way through a report/share/reset
-  // deep link.
+  // Clear the guest-upload result once a user logs in (see handleGuestUpload
+  // below).
   useEffect(() => {
-    if (!user) {
-      setReports([]);
-      setDetail(null);
-      return;
-    }
-    setGuestReport(null);
-    api.get('/reports').then(setReports).catch(e => showNotif(e.message, 'err'));
-    try {
-      const sp = new URLSearchParams(window.location.search);
-      if (!sp.get('report') && !sp.get('share') && !sp.get('reset')) setExploreOpen(true);
-    } catch (e) {}
+    if (user) setGuestReport(null);
   }, [user]);
-
-  // Shows the small toast at the bottom of the logged-in dashboard for
-  // ~3.2s. type is 'ok' (green) or 'err' (red).
-  function showNotif(msg, type = 'ok') {
-    setNotif({ msg, type });
-    setTimeout(() => setNotif(null), 3200);
-  }
 
   // Handler for AuthScreen's guest (logged-out) upload box. Note: this sets
   // guestReport, but nothing in this component's render output ever reads
@@ -335,47 +247,10 @@ export default function App() {
     setGuestReport(result);
   }
 
-  async function handleUpload(file) {
-    window.track && window.track('upload_report');
-    setUploading(true);
-    setUploadProgress(20);
-    setUploadLabel('Uploading…');
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('label', file.name.replace(/\.[^.]+$/, ''));
-    try {
-      setUploadProgress(60);
-      setUploadLabel('Analyzing…');
-      const r = await api.upload('/reports', fd);
-      setUploadProgress(100);
-      setUploadLabel('Done ✓');
-      setReports(prev => [r, ...prev]);
-      openReport(r.id);
-      showNotif('Saved: ' + r.label, 'ok');
-      setTimeout(() => setUploading(false), 1500);
-    } catch (e) {
-      setUploading(false);
-      showNotif(e.message, 'err');
-    }
-  }
-
-  function goHome() {
-    // No-op if we're already there -- don't push a redundant history entry
+  function openExplore() {
+    // No-op if already on Explore -- don't push a redundant history entry
     // for a click that wouldn't change anything on screen (see
     // tests/no-redundant-history.spec.js).
-    if (!exploreOpen && !detail && !activeId) return;
-    try {
-      window.history.pushState({ hcri: 1, view: 'home' }, '', window.location.pathname);
-    } catch (e) {}
-    window.trackPage && window.trackPage('/', 'Home');
-    setExploreOpen(false);
-    setDetail(null);
-    setActiveId(null);
-    setSidebarOpen(true);
-  }
-
-  function openExplore() {
-    // Already on Explore -- see goHome's comment.
     if (exploreOpen) return;
     try {
       window.history.pushState({ hcri: 1, view: 'explore' }, '', window.location.pathname + '?explore');
@@ -389,109 +264,6 @@ export default function App() {
       return localStorage.getItem('hcri_last_list');
     } catch (e) {
       return null;
-    }
-  }
-
-  // Clicking the logo: back to the dashboard's "root" (Explore, despite the
-  // name -- this is what the deployed bundle actually does).
-  function goRoot() {
-    // Already at the explore root (no report open, nothing shared) --
-    // see goHome's comment.
-    if (exploreOpen && !detail && !activeId && !sharedReport) return;
-    try {
-      window.history.pushState({ hcri: 1, view: 'explore' }, '', window.location.pathname);
-    } catch (e) {}
-    window.trackPage && window.trackPage('/', 'Explore');
-    setSharedReport(null);
-    setDetail(null);
-    setActiveId(null);
-    setExploreOpen(true);
-  }
-
-  async function openReport(id) {
-    if (!id) return;
-    // Already viewing this exact report -- see goHome's comment.
-    if (activeId === id && detail && detail.id === id) return;
-    window.track && window.track('open_report');
-    setActiveId(id);
-    if (isMobile || !sidebarPinned) setSidebarOpen(false);
-    try {
-      window.history.replaceState(
-        { hcri: 1, view: exploreOpen ? 'explore' : 'home' },
-        '',
-        window.location.pathname + (exploreOpen ? '?explore' : ''),
-      );
-    } catch (e) {}
-    try {
-      window.history.pushState({ hcri: 1, view: 'report', rid: id }, '', window.location.pathname);
-    } catch (e) {}
-    window.trackPage && window.trackPage('/report', 'Report');
-    try {
-      setDetail(await api.get(`/reports/${id}`));
-    } catch (e) {
-      showNotif(e.message, 'err');
-    }
-  }
-
-  // Applied after ReportDetail's metadata editor saves (label/notes/etc. --
-  // the actual PATCH happens inside ReportDetail/MetaEditor); just merges
-  // the updated fields into both the sidebar's report list and the open
-  // detail pane so both stay in sync without a refetch.
-  async function handleMetaSave(updated) {
-    setReports(prev => prev.map(r => (r.id === updated.id ? { ...r, ...updated } : r)));
-    setDetail(prev => prev && { ...prev, ...updated });
-  }
-
-  // Result handler for the logged-in "paste nm/value data" modal.
-  function handlePasteResult(result) {
-    setPasteOpen(false);
-    setDetail({ ...result, createdAt: result.createdAt || new Date().toISOString(), shareToken: null });
-    if (result.id) {
-      setReports(prev => [
-        {
-          id: result.id,
-          label: result.label,
-          Rf: result.Rf,
-          Rg: result.Rg,
-          cct: result.cct,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
-      setActiveId(result.id);
-    } else {
-      setActiveId(null);
-    }
-  }
-
-  // Deletes a report after a confirm() prompt, removes it from the sidebar
-  // list, and clears the detail pane if it was the one open.
-  async function handleDelete(id) {
-    if (!confirm('Delete this report?')) return;
-    try {
-      await api.del(`/reports/${id}`);
-      setReports(prev => prev.filter(r => r.id !== id));
-      if (activeId === id) {
-        setActiveId(null);
-        setDetail(null);
-      }
-      showNotif('Deleted', 'ok');
-    } catch (e) {
-      showNotif(e.message, 'err');
-    }
-  }
-
-  // Re-runs the TM-30 Rf/Rg calculation for a report server-side (used when
-  // the calculation method changes) and patches the new values into both
-  // the sidebar list and the open detail pane.
-  async function handleRecalc(id) {
-    try {
-      const r = await api.post(`/reports/${id}/recalc`);
-      setReports(prev => prev.map(rep => (rep.id === id ? { ...rep, Rf: r.Rf, Rg: r.Rg } : rep)));
-      if (activeId === id) setDetail(prev => ({ ...prev, ...r }));
-      showNotif(`Recalculated — Rf ${r.Rf}, Rg ${r.Rg}`, 'ok');
-    } catch (e) {
-      showNotif('Recalc failed: ' + e.message, 'err');
     }
   }
 
@@ -647,269 +419,27 @@ export default function App() {
     );
   }
 
-  // ── Logged-in dashboard ───────────────────────────────────────────────────
+  // ── Logged-in: Explore is the whole app ──────────────────────────────────
+  // There used to be a separate dashboard here (Sidebar + ReportDetail)
+  // that Explore rendered as a full-page overlay on top of -- removed; see
+  // the header comment. This now mirrors the guest-accessible Explore
+  // branch above exactly, just with a real `user`. Explore doesn't call
+  // onHome/onBack for a logged-in user (see its own `if (!n && onHomeFn)`
+  // guard), so they're not passed here; onHardReset (full remount via
+  // exploreKey) is real functionality independent of the old dashboard and
+  // stays wired.
   if (user) {
     return (
       <>
         <TopNotices theme={T} />
         <GlobalHelp />
-        <div
-          className={isMobile ? 'mobile-layout' : 'desktop-layout'}
-          style={{
-            background: T.bg,
-            width: '100%',
-            height: isMobile ? 'auto' : '100vh',
-            overflow: isMobile ? 'visible' : 'hidden',
-            display: isMobile ? 'block' : 'flex',
-            minWidth: 0,
-          }}
-        >
-          {isMobile ? (
-            <>
-              <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: T.surface2, borderBottom: `1px solid ${T.border}`, paddingTop: 'env(safe-area-inset-top,0px)' }}>
-                <div style={{ height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', gap: 8 }}>
-                  <button
-                    onClick={() => setSidebarOpen(v => !v)}
-                    style={{ background: 'none', border: 'none', color: T.text, fontSize: 26, cursor: 'pointer', padding: '6px 8px', flexShrink: 0, lineHeight: 1 }}
-                  >
-                    {sidebarOpen ? '✕' : '☰'}
-                  </button>
-                  <div
-                    onClick={goRoot}
-                    style={{ fontWeight: 900, fontSize: 18, color: T.white, fontFamily: 'monospace', flexShrink: 0, cursor: 'pointer' }}
-                  >
-                    hCRI<span style={{ color: T.accent }}>.io</span>
-                  </div>
-                  <div style={{ flex: 1, fontSize: 12, color: T.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', padding: '0 4px' }}>
-                    {!sidebarOpen && detail ? detail.label : ''}
-                  </div>
-                  <button
-                    onClick={() => { window.track && window.track('open_explore'); openExplore(); }}
-                    style={{ background: `${T.accent}18`, border: `1.5px solid ${T.accent}`, color: T.accent, borderRadius: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}
-                  >
-                    🔭 Explore
-                  </button>
-                  {user && (
-                    <button
-                      onClick={logout}
-                      style={{ background: 'none', border: `1.5px solid ${T.border}`, color: T.dim, borderRadius: 8, padding: '7px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700, flexShrink: 0 }}
-                    >
-                      Sign Out
-                    </button>
-                  )}
-                </div>
-              </div>
-              {/* display:none (not just the app-locked overflow:hidden CSS
-                  below) while Explore is open on mobile -- this is the
-                  actual fix for the old Sidebar list bleeding through
-                  underneath Explore, not just a defense-in-depth layer.
-                  The mobile stylesheet (index.php) deliberately gives
-                  html/body/#root `height:auto; overflow:visible` so this
-                  dashboard can grow tall and scroll on its own in normal
-                  use; with Explore's own `position:fixed;inset:0` overlay
-                  then sitting on top, that tall-and-scrollable #root is
-                  still there in the layout for iOS to find. overflow:hidden
-                  (app-locked) tries to clip it off, but iOS Safari has a
-                  long-standing quirk where overflow:hidden on an ancestor
-                  doesn't reliably stop touch-scrolling -- confirmed still
-                  happening in production even with that class applied, on
-                  My Reports with the compare bar active. display:none
-                  removes this from the layout entirely instead of just
-                  clipping it, so there's nothing left for a touch-scroll
-                  gesture to reach no matter what iOS does with overflow.
-                  Kept mounted (not conditionally rendered away) rather than
-                  unmounted so state (open report, scroll position) survives
-                  and closing Explore is still instant -- same reasoning as
-                  the comment on the app-locked useEffect above. */}
-              <div style={{ marginTop: 'calc(env(safe-area-inset-top,0px) + 52px)', display: exploreOpen ? 'none' : 'block' }}>
-                {sidebarOpen ? (
-                  <Sidebar
-                    user={user}
-                    onHome={goRoot}
-                    reports={reports}
-                    activeId={activeId}
-                    style={{ width: '100%', borderRight: 'none' }}
-                    uploading={uploading}
-                    uploadProgress={uploadProgress}
-                    uploadLabel={uploadLabel}
-                    onUpload={handleUpload}
-                    onSelect={openReport}
-                    onDelete={handleDelete}
-                    onRecalc={handleRecalc}
-                    onPaste={() => setPasteOpen(true)}
-                    onExplore={() => { window.track && window.track('open_explore'); openExplore(); }}
-                    onLogout={logout}
-                    minRf={minRf}
-                    onMinRfChange={setMinRf}
-                  />
-                ) : (
-                  <ReportDetail
-                    report={detail}
-                    allReports={reports}
-                    onMetaSave={handleMetaSave}
-                    onRefresh={async () => {
-                      try {
-                        if (!detail || !detail.id) return;
-                        const d = await api.get('/reports/' + detail.id);
-                        d && setDetail(d);
-                      } catch (e) {}
-                    }}
-                  />
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <div
-                style={{
-                  width: sidebarOpen ? 320 : 0,
-                  minWidth: sidebarOpen ? 320 : 0,
-                  maxWidth: sidebarOpen ? 320 : 0,
-                  overflow: 'hidden',
-                  transition: 'width .2s ease, min-width .2s ease',
-                  position: 'relative',
-                  flexShrink: 0,
-                  height: '100%',
-                }}
-              >
-                {sidebarOpen && (
-                  <div style={{ width: 320, height: '100%', position: 'relative' }}>
-                    <Sidebar
-                      user={user}
-                      onHome={goRoot}
-                      reports={reports}
-                      activeId={activeId}
-                      uploading={uploading}
-                      uploadProgress={uploadProgress}
-                      uploadLabel={uploadLabel}
-                      onUpload={handleUpload}
-                      onSelect={openReport}
-                      onDelete={handleDelete}
-                      onRecalc={handleRecalc}
-                      onPaste={() => setPasteOpen(true)}
-                      onExplore={() => { window.track && window.track('open_explore'); openExplore(); }}
-                      onLogout={logout}
-                      minRf={minRf}
-                      onMinRfChange={setMinRf}
-                      onUserUpdate={patchUser}
-                      pinned={sidebarPinned}
-                      onTogglePin={() => {
-                        const next = !sidebarPinned;
-                        setSidebarPinned(next);
-                        if (next) setSidebarOpen(true);
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-              <div
-                className="report-wrapper"
-                style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%', position: 'relative' }}
-              >
-                <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  {(!sidebarPinned || !sidebarOpen) && (
-                    <button
-                      onClick={() => setSidebarOpen(v => !v)}
-                      title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-                      style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderRadius: '0 6px 6px 0', color: T.dim, cursor: 'pointer', padding: '10px 5px', fontSize: 12, lineHeight: 1, writingMode: 'vertical-rl' }}
-                    >
-                      {sidebarOpen ? '◀' : '▶'}
-                    </button>
-                  )}
-                  {!sidebarOpen && (
-                    <>
-                      <button
-                        onClick={toggleTheme}
-                        title={themeName === 'dark' ? 'Light mode' : 'Dark mode'}
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 0 0', color: T.dim, cursor: 'pointer', padding: '8px 5px', fontSize: 14, lineHeight: 1 }}
-                      >
-                        {themeName === 'dark' ? '☀' : '🌙'}
-                      </button>
-                      <button
-                        onClick={() => { window.track && window.track('open_explore'); openExplore(); }}
-                        title="Explore"
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', color: '#00d4ff', cursor: 'pointer', padding: '8px 5px', fontSize: 14, lineHeight: 1 }}
-                      >
-                        🔭
-                      </button>
-                      <button
-                        onClick={() => setHelpOpen(true)}
-                        title="Help"
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', color: T.dim, cursor: 'pointer', padding: '8px 5px', fontSize: 13, lineHeight: 1 }}
-                      >
-                        ?
-                      </button>
-                      <button
-                        onClick={() => setFeedbackOpen(true)}
-                        title="Send feedback"
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', color: T.dim, cursor: 'pointer', padding: '8px 5px', fontSize: 13, lineHeight: 1 }}
-                      >
-                        ✉
-                      </button>
-                      <button
-                        onClick={logout}
-                        title="Sign out"
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 6px 0', color: T.dim, cursor: 'pointer', padding: '8px 5px', fontSize: 11, lineHeight: 1, writingMode: 'vertical-rl', fontFamily: 'monospace', fontWeight: 700 }}
-                      >
-                        Sign Out
-                      </button>
-                    </>
-                  )}
-                </div>
-                <ReportDetail
-                  report={detail}
-                  allReports={reports}
-                  onMetaSave={handleMetaSave}
-                  onRefresh={async () => {
-                    try {
-                      if (!detail || !detail.id) return;
-                      const d = await api.get('/reports/' + detail.id);
-                      d && setDetail(d);
-                    } catch (e) {}
-                  }}
-                />
-              </div>
-            </>
-          )}
-
-          {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
-          {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
-          {pasteOpen && (
-            <PasteSPDModal user={user} onResult={handlePasteResult} onClose={() => setPasteOpen(false)} />
-          )}
-          {exploreOpen && (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 1500, overflowY: 'auto', overflowX: 'hidden' }}>
-              <Explore
-                key={exploreKey}
-                onBack={goHome}
-                user={user}
-                onHome={goHome}
-                onLogout={logout}
-                onHardReset={() => setExploreKey(k => k + 1)}
-              />
-            </div>
-          )}
-          {notif && (
-            <div
-              style={{
-                position: 'fixed',
-                bottom: 18,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: T.surface2,
-                borderRadius: 6,
-                padding: '10px 18px',
-                fontSize: 13,
-                letterSpacing: 0.5,
-                zIndex: 200,
-                pointerEvents: 'none',
-                border: `1px solid ${notif.type === 'err' ? T.bad + '60' : T.good + '60'}`,
-                color: notif.type === 'err' ? T.bad : T.good,
-              }}
-            >
-              {notif.msg}
-            </div>
-          )}
+        <div style={{ minHeight: '100vh' }}>
+          <Explore
+            key={exploreKey}
+            user={user}
+            onLogout={logout}
+            onHardReset={() => setExploreKey(k => k + 1)}
+          />
         </div>
       </>
     );

@@ -28,7 +28,7 @@ import { installMockApi } from './mockApi.js';
 import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
 
-const VISIBLE_LOGO = '[style*="z-index: 1500"] >> text=hCRI.io';
+const VISIBLE_LOGO = 'text=hCRI.io';
 
 test('refreshing while a report is open (guest Explore) stays on that report', async ({ page }) => {
   const errors = captureConsoleErrors(page);

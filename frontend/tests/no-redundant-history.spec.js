@@ -11,21 +11,16 @@
 // change the page... but clicking back on it stays on the same page").
 //
 // Fixed by guarding each pushState call site (Explore.jsx's tab bar and
-// logo click, App.jsx's goHome/openExplore/goRoot/openReport) to bail out
-// before doing anything -- including the pushState -- when the target is
-// already the current view. See the "already there" comments at each
-// call site.
+// logo click, App.jsx's openExplore) to bail out before doing anything --
+// including the pushState -- when the target is already the current view.
+// See the "already there" comments at each call site.
 
 import { test, expect } from '@playwright/test';
 import { installMockApi } from './mockApi.js';
 import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
 
-// Logged-in Explore renders inside a z-index:1500 overlay on top of the
-// (hidden but still present) Sidebar/home screen behind it, which has its
-// own "hCRI.io" logo -- same ambiguity as admin.spec.js's Admin button.
-// Scope to the visible, logged-in Explore instance.
-const VISIBLE_LOGO = '[style*="z-index: 1500"] >> text=hCRI.io';
+const VISIBLE_LOGO = 'text=hCRI.io';
 
 test('clicking the already-active tab does not push a new history entry', async ({ page }) => {
   const errors = captureConsoleErrors(page);

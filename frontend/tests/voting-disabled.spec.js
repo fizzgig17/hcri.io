@@ -12,12 +12,6 @@ import { installMockApi } from './mockApi.js';
 import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
 
-// A logged-in Explore renders inside a z-index:1500 overlay on top of the
-// (hidden but still present) Sidebar/home screen behind it, which has its
-// own copy of the same report card -- same ambiguity as admin.spec.js's
-// Admin button. Scope to the visible, logged-in Explore instance.
-const VISIBLE = '[style*="z-index: 1500"]';
-
 test('no thumbs-up/down voting UI on Explore report cards', async ({ page }) => {
   const errors = captureConsoleErrors(page);
   await installMockApi(page, { loggedIn: false });
@@ -46,7 +40,7 @@ test('no "Rate this report" row on the report detail view', async ({ page }) => 
 
   await page.getByRole('button', { name: 'My Reports' }).click();
   const label = fixtures.explore.reports[0].label;
-  const card = page.locator(VISIBLE).getByText(label).first();
+  const card = page.getByText(label).first();
   await expect(card).toBeVisible({ timeout: 10000 });
   await card.click();
   await expect(page.getByRole('button', { name: '← Back to My Reports' })).toBeVisible({ timeout: 10000 });

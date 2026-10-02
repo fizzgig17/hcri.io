@@ -3,22 +3,14 @@
 // Smoke test for the admin panel (AdminPanel.jsx). Only visible to admin
 // users, so this logs in as a mocked admin.
 //
-// Two different "Admin" (title="Admin") buttons exist in the DOM at once
-// for a logged-in admin: Sidebar.jsx's (always rendered underneath, even
-// though logged-in users are auto-redirected to Explore after login --
-// see App.jsx's post-login useEffect) and Explore.jsx's own toolbar
-// button. Both report as CSS-"visible" (neither is display:none), so
-// `getByTitle('Admin')` and even a `:visible` filter are ambiguous --
-// only an actual z-index/overlap check (or a human eye) can tell they
-// aren't both reachable. The real, clickable one is the one inside
-// App.jsx's `position: fixed; z-index: 1500` Explore overlay, so scope
-// to that container explicitly rather than guessing by DOM order.
+// Explore.jsx's own toolbar is the only Admin (title="Admin") entry point
+// now -- App.jsx used to also render the old Sidebar dashboard underneath
+// Explore, which had its own independent Admin button and made
+// `getByTitle('Admin')` ambiguous, but that dashboard has been removed.
 import { test, expect } from '@playwright/test';
 import { installMockApi } from './mockApi.js';
 import { fixtures } from './fixtures.js';
 import { captureConsoleErrors } from './helpers.js';
-
-const VISIBLE_ADMIN_BTN = '[style*="z-index: 1500"] [title="Admin"]';
 
 async function loginAsAdmin(page) {
   await installMockApi(page, { loggedIn: true, user: { ...fixtures.user, is_admin: 1 } });
@@ -40,7 +32,7 @@ test('admin panel opens and shows stats + the user list, no console errors', asy
   const errors = captureConsoleErrors(page);
   await loginAsAdmin(page);
 
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
 
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
   for (const u of fixtures.adminUsers) {
@@ -53,7 +45,7 @@ test('admin panel opens and shows stats + the user list, no console errors', asy
 test('the Featured Reports tool opens and shows the mocked featured list', async ({ page }) => {
   const errors = captureConsoleErrors(page);
   await loginAsAdmin(page);
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
 
   await page.getByRole('button', { name: '★ Featured' }).click();
@@ -64,7 +56,7 @@ test('the Featured Reports tool opens and shows the mocked featured list', async
 
 test('toggling admin status on a user calls the PATCH endpoint', async ({ page }) => {
   await loginAsAdmin(page);
-  await page.locator(VISIBLE_ADMIN_BTN).click();
+  await page.getByTitle('Admin').click();
   await expect(page.getByText(`${fixtures.adminStats.users} users`)).toBeVisible({ timeout: 10000 });
 
   // The per-user admin actions (Make Admin, Recalc, etc.) live in the
