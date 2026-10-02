@@ -140,14 +140,34 @@ export default function App() {
 
   // Locks page scroll on the <html>/#root while a logged-in desktop user
   // has the sidebar collapsed -- mirrors the deployed "app-locked" class.
+  //
+  // Also locks it on mobile whenever the Explore overlay is open. Explore
+  // renders as a `position:fixed; inset:0` layer *on top of* the logged-in
+  // dashboard (Sidebar + ReportDetail) rather than replacing it -- the
+  // dashboard stays mounted underneath so closing Explore is instant. On
+  // mobile that dashboard can be taller than the viewport (the Sidebar's
+  // own report list), and the mobile stylesheet override intentionally
+  // sets `#root { height: auto; overflow: visible }` so that dashboard can
+  // scroll on its own. With Explore's overlay then sitting on top, iOS
+  // Safari/Firefox can let a scroll/rubber-band gesture "fall through" to
+  // that tall, still-scrollable #root once the overlay's own inner scroll
+  // bottoms out -- surfacing the old Sidebar list behind it (reported as
+  // "an artifact at the bottom of the screen" / "a page under the current
+  // one"). Locking #root while Explore is open removes that scrollable
+  // surface entirely, so there's nothing for the gesture to fall through
+  // to; Explore keeps scrolling normally via its own overflowY:auto.
   useEffect(() => {
-    const el = document.getElementById('root');
-    if (el) {
-      if (!isMobile && user) el.classList.add('app-locked');
-      else el.classList.remove('app-locked');
-      return () => el.classList.remove('app-locked');
-    }
-  }, [isMobile, user]);
+    // The class goes on <html>, not #root: #root's `height: 100%` can only
+    // resolve to a real pixel value (letting `overflow: hidden` actually
+    // clip anything) if its whole ancestor chain -- html and body too --
+    // has a definite height. Locking #root alone while html/body stay
+    // `height: auto` leaves the percentage height undefined, so it
+    // computes as 'auto' and nothing gets clipped.
+    const el = document.documentElement;
+    if ((!isMobile && user) || (isMobile && exploreOpen)) el.classList.add('app-locked');
+    else el.classList.remove('app-locked');
+    return () => el.classList.remove('app-locked');
+  }, [isMobile, user, exploreOpen]);
 
   // Unpinning the sidebar while a report is open on desktop closes it.
   useEffect(() => {
