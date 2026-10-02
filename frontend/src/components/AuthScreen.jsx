@@ -21,6 +21,7 @@ import ReportView from './ReportView';
 // SPD text directly instead of uploading a file, and returns the same shape
 // as guest_analyze. That modal is reconstructed as PasteSPDModal.jsx.
 import PasteSPDModal from './PasteSPDModal';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 // ── Feedback / contact modal (bundle: `E`) ─────────────────────────────────
 export function FeedbackModal({ user, onClose }) {
@@ -152,6 +153,9 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
   const [pasteOpen, setPasteOpen] = useState(false);
   const [guestReport, setGuestReport] = useState(null);
   const [featured, setFeatured] = useState([]);
+  usePanelBackClose(resetOpen, () => setResetOpen(false));
+  usePanelBackClose(feedbackOpen, () => setFeedbackOpen(false));
+  usePanelBackClose(pasteOpen, () => setPasteOpen(false));
   const [authOpen, setAuthOpen] = useState(() => !!overlayMode);
   const [showPw, setShowPw] = useState(false);
   const [agree, setAgree] = useState(false);

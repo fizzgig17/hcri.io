@@ -17,6 +17,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 // Turns a help-topic title into a URL-safe slug, e.g. "Uploading via the
 // API" -> "uploading-via-the-api".
@@ -65,6 +66,7 @@ export function GlobalHelp() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(null);
   const [slug, setSlug] = useState(null);
+  usePanelBackClose(open, () => setOpen(false));
 
   useEffect(() => {
     function onOpenHelp(ev) {

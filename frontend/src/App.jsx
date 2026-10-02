@@ -26,6 +26,15 @@
 // sidebar's pinned/unpinned state persists to localStorage
 // ("sidebar_pinned"), and an unpinned sidebar auto-closes on narrow
 // desktop widths and whenever a report is opened on mobile.
+//
+// On top of that, every panel/modal with no URL of its own (AdminPanel,
+// AccountSettings, HelpModal, FeedbackModal, PasteSPDModal, Explore's
+// Compare view and open-report detail pane, etc.) pushes its own history
+// entry while open via usePanelBackClose() (hooks/usePanelBackClose.js,
+// lib/panelHistory.js), so the back button closes the topmost open panel
+// instead of leaving the page behind it -- see tests/back-button.spec.js.
+// The onPop handler below checks that stack first, via
+// handlePanelPopState(), before falling through to its own routing.
 
 import { useEffect, useState } from 'react';
 import { useTheme } from './lib/ThemeContext.jsx';
@@ -41,6 +50,8 @@ import ReportDetail from './components/ReportDetail';
 import PasteSPDModal from './components/PasteSPDModal';
 import Explore from './components/Explore';
 import PasswordReset from './components/PasswordReset';
+import { handlePanelPopState } from './lib/panelHistory';
+import usePanelBackClose from './hooks/usePanelBackClose';
 
 export default function App() {
   const { theme: T, themeName, toggleTheme } = useTheme();
@@ -101,6 +112,17 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Back-button support for the modals/panels above that have no URL of
+  // their own -- see lib/panelHistory.js. (exploreOpen/exploreAuthOpen's
+  // sibling exploreOpen is a top-level view, already handled by the
+  // report/explore/home pushState/popstate routing above it; only
+  // exploreAuthOpen -- the sign-in overlay shown over guest Explore --
+  // needs this.)
+  usePanelBackClose(pasteOpen, () => setPasteOpen(false));
+  usePanelBackClose(exploreAuthOpen, () => setExploreAuthOpen(false));
+  usePanelBackClose(helpOpen, () => setHelpOpen(false));
+  usePanelBackClose(feedbackOpen, () => setFeedbackOpen(false));
+
   const [sidebarPinned, setSidebarPinned] = useState(() => {
     try {
       return localStorage.getItem('sidebar_pinned') !== 'false';
@@ -194,6 +216,13 @@ export default function App() {
 
     const onPop = (ev) => {
       try {
+        // Any open panel/modal (Admin, Account Settings, Help, Feedback,
+        // Paste-data, Compare, etc.) gets first claim on a back press --
+        // see lib/panelHistory.js. If one handled it, the underlying
+        // report/explore/home view hasn't actually changed, so don't also
+        // run the routing below.
+        if (handlePanelPopState()) return;
+
         const st = (ev && ev.state) || window.history.state || {};
         const sp = new URLSearchParams(window.location.search);
         const rep = sp.get('report');

@@ -33,6 +33,7 @@ import { BinBarChart, CESBars, RawDataPanel } from './ReportCharts.jsx';
 import MetaEditor from './MetaEditor.jsx';
 import ReportActionsMenu from './ReportActionsMenu.jsx';
 import AnnexEModal from './AnnexEModal.jsx';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 import ChromaticityPanel from './Chromaticity.jsx';
 
 // ── CRI R1–R15 bar chart (kept from the prior pass -- see note above) ───────
@@ -176,6 +177,7 @@ export default function ReportView({ report, allReports = [], isGuest = false, o
   const isMobile = isMobileProp ?? isMobileAuto;
   const [tab, setTab] = useState('report');
   const [showAnnexE, setShowAnnexE] = useState(false);
+  usePanelBackClose(showAnnexE, () => setShowAnnexE(false));
 
   const C = {
     bg: T.bg, surface: T.surface, surface2: T.surface2, border: T.border, text: T.text,

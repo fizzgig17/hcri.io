@@ -55,6 +55,16 @@ images, etc. — on every test run. Never point the test suite at the real
   (Sidebar's and Explore's -- see admin.spec.js's header comment); tests
   must target the one inside Explore's `z-index: 1500` overlay, not just
   "the first" or "the visible" one.
+- `back-button.spec.js` — regression tests for "the back button takes me
+  off the entire site": the back button closes an open panel (Admin, an
+  Explore report's detail view) instead of navigating away; nested panels
+  (e.g. Admin -> Featured Reports) close one at a time, innermost first;
+  and closing a panel with its own close button doesn't leave a dangling
+  history entry that a later back press would land on. See
+  `src/lib/panelHistory.js` and `src/hooks/usePanelBackClose.js` for the
+  fix and why it was needed -- none of the app's modals pushed a history
+  entry when opened, so back skipped past them to whatever was in browser
+  history before the site was ever opened.
 
 ## Known obsolete UI (not covered on purpose)
 

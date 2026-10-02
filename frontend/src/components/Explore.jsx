@@ -104,6 +104,7 @@ import AdminPanel from './AdminPanel';
 import { FeedbackModal } from './AuthScreen';
 import AccountSettings from './AccountSettings';
 import { SERIES_COLORS, tintInfo, compareShareCard } from '../lib/compareExport';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 // ── Shared constants ─────────────────────────────────────────────────────────
 
@@ -907,6 +908,19 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const [__relOpen, __setRelOpen] = useState(false);
   const __hcriRelated = (typeof window !== 'undefined' && window.__hcriRelated) || [];
 
+  // Back-button support (see ../hooks/usePanelBackClose.js) for the real
+  // "screens" above -- panels a user would expect the back button to
+  // step out of, as opposed to inline toggles like the quick-analysis
+  // accordion (anaOpen) or the folder-menu dropdown (folderMenuOpen).
+  usePanelBackClose(!!ee, () => F(null));
+  usePanelBackClose(comparing, () => setComparing(false));
+  usePanelBackClose(catModalOpen, () => setCatModalOpen(false));
+  usePanelBackClose(mrPasteOpen, () => setMrPasteOpen(false));
+  usePanelBackClose(adminOpen, () => setAdminOpen(false));
+  usePanelBackClose(helpOpen, () => setHelpOpen(false));
+  usePanelBackClose(fbOpen, () => setFbOpen(false));
+  usePanelBackClose(profileOpen, () => setProfileOpen(false));
+
   const setDuv = _setDuv;
 
   // ── Data fetch ───────────────────────────────────────────────────────────
@@ -1586,11 +1600,11 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     borderRadius: 6, padding: '7px 16px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
   });
 
+  // Closing the open-report view (the "← Back to Explore" button, or the
+  // browser back button via usePanelBackClose below -- both just flip `ee`
+  // back to null; back-button support owns the actual history navigation,
+  // see the comment on that hook call).
   const goBackFromReport = () => {
-    try {
-      const qs = tab === 'myreports' ? (folderSel != null ? `?explore=mine&folder=${folderSel}` : '?explore=mine') : '?explore';
-      window.history.replaceState({ hcri: 1, view: 'explore', etab: tab, folder: folderSel }, '', window.location.pathname + qs);
-    } catch {}
     F(null);
     L(k);
   };

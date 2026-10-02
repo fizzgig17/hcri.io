@@ -70,6 +70,7 @@ import MetaEditor, { RenameField } from './MetaEditor.jsx';
 // TM-30 report modal -- reconstructed by the Batch C1 pass as AnnexEModal.jsx
 // (the "TM-30 Report" action); imported here under that real name.
 import AnnexEModal from './AnnexEModal.jsx';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 const sHead = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10, fontWeight: 700 };
 
@@ -645,6 +646,9 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [publicSaving, setPublicSaving] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  usePanelBackClose(helpOpen, () => setHelpOpen(false));
+  usePanelBackClose(tm30Open, () => setTm30Open(false));
+  usePanelBackClose(shareCardOpen, () => setShareCardOpen(false));
 
   const U = {
     bg: T.bg, surface: T.surface, surface2: T.surface2, border: T.border,

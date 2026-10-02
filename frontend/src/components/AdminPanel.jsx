@@ -38,6 +38,7 @@ import AdminNotices from './AdminNotices.jsx';
 import AdminCats from './AdminCats.jsx';
 import AdminReportModal from './AdminReportModal.jsx';
 import CreateUserModal from './CreateUserModal.jsx';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 // Thin fetch wrapper for every /api/admin/* call: always sends the bearer
 // token + JSON content-type, and throws with the server's error message on
@@ -74,6 +75,8 @@ export default function AdminPanel({ onClose, me }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [recalc, setRecalc] = useState(null); // null | 'running' | {done,failed,total,errors}
   const [quickView, setQuickView] = useState(null);
+  usePanelBackClose(addUserOpen, () => setAddUserOpen(false));
+  usePanelBackClose(!!quickView, () => setQuickView(null));
 
   const S = {
     overlay: {

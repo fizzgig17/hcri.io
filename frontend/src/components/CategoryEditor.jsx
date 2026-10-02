@@ -24,6 +24,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 const KINDS = [
   ['light_brand', 'Light Brand'],
@@ -57,6 +58,7 @@ export default function CategoryEditor({ report, isGuest }) {
   const [openK, setOpenK] = useState(null);
   const [hi, setHi] = useState(0);
   const [reqOpen, setReqOpen] = useState(false);
+  usePanelBackClose(reqOpen, () => setReqOpen(false));
 
   useEffect(() => { setVals(initVals()); }, [report && report.id]);
 

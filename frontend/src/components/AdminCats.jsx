@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { basePath, getToken } from '../lib/api';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 // Mirrors useIsMobile's 768px breakpoint, but used outside render (to decide
 // whether to auto-focus the "add" input after a mutation) so it's a plain
@@ -45,6 +46,7 @@ const KINDS = [
 
 export default function AdminCats({ theme: o }) {
   const [open, setOpen] = useState(false);
+  usePanelBackClose(open, () => setOpen(false));
   const [data, setData] = useState({});
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');

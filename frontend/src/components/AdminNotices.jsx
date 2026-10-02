@@ -15,6 +15,7 @@
 
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 function noticeColor(type, t) {
   return type === 'important' ? t.bad : type === 'issue' ? t.warn : t.good;
@@ -22,6 +23,7 @@ function noticeColor(type, t) {
 
 export default function AdminNotices({ theme: o }) {
   const [open, setOpen] = useState(false);
+  usePanelBackClose(open, () => setOpen(false));
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');

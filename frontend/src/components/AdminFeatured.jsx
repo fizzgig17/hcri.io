@@ -9,6 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 export default function AdminFeatured({ theme: o }) {
   const [open, setOpen] = useState(false);
@@ -16,6 +17,7 @@ export default function AdminFeatured({ theme: o }) {
   const [reports, setReports] = useState([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  usePanelBackClose(open, () => setOpen(false));
 
   const auth = () => ({ Authorization: `Bearer ${getToken()}` });
 

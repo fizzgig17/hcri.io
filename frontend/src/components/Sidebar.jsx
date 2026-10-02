@@ -23,6 +23,7 @@ import HelpModal from './HelpModal';
 import AccountSettings from './AccountSettings';
 import { FeedbackModal } from './AuthScreen';
 import AdminPanel from './AdminPanel';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 
 function rfColor(rf, T) {
   if (rf == null) return T.dim;
@@ -62,6 +63,12 @@ export default function Sidebar({
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Back-button support (see ../lib/panelHistory.js) -- so the back
+  // button closes these modals instead of navigating off the page.
+  usePanelBackClose(adminOpen, () => setAdminOpen(false));
+  usePanelBackClose(feedbackOpen, () => setFeedbackOpen(false));
+  usePanelBackClose(accountOpen, () => setAccountOpen(false));
+  usePanelBackClose(helpOpen, () => setHelpOpen(false));
 
   const S = {
     sidebar: {
