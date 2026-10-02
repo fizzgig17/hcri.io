@@ -2095,48 +2095,82 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   // ── Compare-selection floating bar ───────────────────────────────────────
   const compareBar = cmpSel.length > 0 && !(o && I) && (
-    <div style={{
-      position: 'fixed', bottom: o ? 12 : 22, left: o ? '50%' : 22, transform: o ? 'translateX(-50%)' : 'none', zIndex: 1500,
-      display: 'flex', alignItems: 'center', gap: 10, background: r.surface, border: `1px solid ${r.border}`, borderRadius: 10,
-      padding: '10px 14px', boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
-    }}>
-      <span style={{ fontSize: 13, color: r.text, fontFamily: 'monospace', fontWeight: 700 }}>{cmpSel.length}/12 selected</span>
-      {o ? (
-        <button onClick={() => setCmpSel([])} title="Clear selection" aria-label="Clear selection" style={iconBtn()}>
-          🚫
-        </button>
-      ) : (
+    o ? (
+      // Docked full-width bottom bar on mobile, not a floating centered
+      // pill -- the pill's fixed-size buttons plus the "N/12 selected"
+      // text didn't fit a phone's width in one row, so the browser's
+      // shrink-to-fit sizing for a fixed/centered box with no explicit
+      // width squeezed the text into an awkward two-line wrap instead of
+      // actually growing the bar. Docking it edge-to-edge gives the row
+      // real room: a compact header row (count + Clear), then the action
+      // buttons full-width and evenly sized below.
+      <div style={{
+        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1500,
+        background: r.surface, borderTop: `1px solid ${r.border}`, boxShadow: '0 -6px 24px rgba(0,0,0,0.45)',
+        display: 'flex', flexDirection: 'column', gap: 8,
+        padding: '10px 14px calc(env(safe-area-inset-bottom) + 10px)', boxSizing: 'border-box',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, color: r.text, fontFamily: 'monospace', fontWeight: 700 }}>{cmpSel.length}/12 selected</span>
+          <button onClick={() => setCmpSel([])} title="Clear selection" aria-label="Clear selection" style={iconBtn()}>
+            🚫
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            disabled={cmpSel.length < 2}
+            onClick={openCompare}
+            style={{
+              flex: 1, minWidth: 0, background: cmpSel.length < 2 ? r.border : r.accent, color: cmpSel.length < 2 ? r.dim : (r.name === 'dark' ? '#06121f' : '#fff'),
+              border: 'none', borderRadius: 6, padding: '11px 8px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: cmpSel.length < 2 ? 'default' : 'pointer',
+            }}
+          >
+            Compare →
+          </button>
+          {tab === 'myreports' && (
+            <button onClick={() => { setCatModalOpen(true); loadAllCategories(); }} title="Add category values to the selected reports" style={{ flex: 1, minWidth: 0, background: 'none', border: `1px solid ${r.border}`, color: r.text, borderRadius: 6, padding: '11px 8px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
+              Categorize
+            </button>
+          )}
+          {tab === 'myreports' && (
+            <button onClick={bulkDelete} title={`Delete ${cmpSel.length} selected`} aria-label="Delete selected reports" style={{ flexShrink: 0, width: 42, background: 'none', border: `1px solid ${r.bad}`, color: r.bad, borderRadius: 6, padding: '11px 8px', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              🗑
+            </button>
+          )}
+        </div>
+      </div>
+    ) : (
+      <div style={{
+        position: 'fixed', bottom: 22, left: 22, zIndex: 1500,
+        display: 'flex', alignItems: 'center', gap: 10, background: r.surface, border: `1px solid ${r.border}`, borderRadius: 10,
+        padding: '10px 14px', boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
+      }}>
+        <span style={{ fontSize: 13, color: r.text, fontFamily: 'monospace', fontWeight: 700 }}>{cmpSel.length}/12 selected</span>
         <button onClick={() => setCmpSel([])} style={{ background: 'none', border: `1px solid ${r.border}`, color: r.dim, borderRadius: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>
           Clear
         </button>
-      )}
-      <button
-        disabled={cmpSel.length < 2}
-        onClick={openCompare}
-        style={{
-          background: cmpSel.length < 2 ? r.border : r.accent, color: cmpSel.length < 2 ? r.dim : (r.name === 'dark' ? '#06121f' : '#fff'),
-          border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: cmpSel.length < 2 ? 'default' : 'pointer',
-        }}
-      >
-        Compare →
-      </button>
-      {tab === 'myreports' && (
-        <button onClick={() => { setCatModalOpen(true); loadAllCategories(); }} title="Add category values to the selected reports" style={{ background: 'none', border: `1px solid ${r.border}`, color: r.text, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
-          Categorize
+        <button
+          disabled={cmpSel.length < 2}
+          onClick={openCompare}
+          style={{
+            background: cmpSel.length < 2 ? r.border : r.accent, color: cmpSel.length < 2 ? r.dim : (r.name === 'dark' ? '#06121f' : '#fff'),
+            border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: cmpSel.length < 2 ? 'default' : 'pointer',
+          }}
+        >
+          Compare →
         </button>
-      )}
-      {tab === 'myreports' && (
-        o ? (
-          <button onClick={bulkDelete} title={`Delete ${cmpSel.length} selected`} aria-label="Delete selected reports" style={{ ...iconBtn(), border: `1px solid ${r.bad}`, color: r.bad }}>
-            🗑
+        {tab === 'myreports' && (
+          <button onClick={() => { setCatModalOpen(true); loadAllCategories(); }} title="Add category values to the selected reports" style={{ background: 'none', border: `1px solid ${r.border}`, color: r.text, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
+            Categorize
           </button>
-        ) : (
+        )}
+        {tab === 'myreports' && (
           <button onClick={bulkDelete} title="Delete selected reports" style={{ background: 'none', border: `1px solid ${r.bad}`, color: r.bad, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
             Delete {cmpSel.length}
           </button>
-        )
-      )}
-    </div>
+        )}
+      </div>
+    )
   );
 
   // ── Categorize modal ─────────────────────────────────────────────────────
