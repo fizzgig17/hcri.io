@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Playwright test suite (see tests/) -- throwaway build output and run
+# artifacts, never the real deploy build (that's vite.config.js's own
+# ../assets, which this never touches -- see vite.config.test.js).
+test-dist
+test-results
+playwright-report
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
