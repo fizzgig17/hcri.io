@@ -70,11 +70,20 @@ export default function Sidebar({
   usePanelBackClose(accountOpen, () => setAccountOpen(false));
   usePanelBackClose(helpOpen, () => setHelpOpen(false));
 
+  // TEMP DEBUG (not for master -- see the "locate the controls" request):
+  // grey the whole sidebar and green-outline the four controls that live
+  // ONLY here and nowhere in Explore -- Upload dropzone, Paste nm/value,
+  // per-report Recalculate (↺), and the Min Rf filter slider. Remove this
+  // block (and the 4 `debugOutline` spreads below) once you've confirmed
+  // what to do with those before the real Sidebar-removal change.
+  const DEBUG_GREY = '#3a3a3a';
+  const debugOutline = { outline: '3px solid #00ff66', outlineOffset: -3 };
+
   const S = {
     sidebar: {
       width: style.width || 320,
       flexShrink: style.width ? 1 : 0,
-      background: T.surface2,
+      background: DEBUG_GREY,
       borderRight: style.borderRight === undefined ? `1px solid ${T.border}` : style.borderRight,
       display: 'flex',
       flexDirection: 'column',
@@ -154,7 +163,7 @@ export default function Sidebar({
 
         <div style={S.body}>
           <div
-            style={{ ...S.dropZone, ...(dragOver ? S.dropOver : {}) }}
+            style={{ ...S.dropZone, ...(dragOver ? S.dropOver : {}), ...debugOutline }}
             onClick={() => fileRef.current.click()}
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -186,6 +195,7 @@ export default function Sidebar({
               border: `1px solid ${T.accent}40`, color: T.accent, borderRadius: 6, padding: '7px 12px',
               fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              ...debugOutline,
             }}
           >
             <span>⌨</span> Paste nm / value data
@@ -223,7 +233,7 @@ export default function Sidebar({
                     {r.Rf ?? '—'}
                   </div>
                   <button
-                    style={{ ...S.delBtn, fontSize: 13 }}
+                    style={{ ...S.delBtn, fontSize: 13, ...debugOutline }}
                     title="Recalculate metrics from SPD"
                     onMouseEnter={e => Object.assign(e.currentTarget.style, { color: T.accent })}
                     onMouseLeave={e => Object.assign(e.currentTarget.style, { color: T.dim })}
@@ -255,7 +265,7 @@ export default function Sidebar({
             )}
           </div>
 
-          <div style={S.controls}>
+          <div style={{ ...S.controls, ...debugOutline }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <span style={{ fontSize: 13, color: T.text, flex: 1, fontWeight: 500 }}>Min Rf filter</span>
               <span style={{ fontSize: 14, color: T.accent, fontWeight: 700, minWidth: 28, textAlign: 'right' }}>{minRf}</span>
