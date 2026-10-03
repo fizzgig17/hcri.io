@@ -270,7 +270,10 @@
         </div>
         <div class="stat-grid">
           <div class="stat"><div class="v">3325K</div><div class="k">CCT</div></div>
-          <div class="stat"><div class="v">94.4</div><div class="k">Ra</div></div>
+          <div class="stat"><div class="v">94.4</div><div class="k">Ra (CRI)</div></div>
+          <div class="stat"><div class="v">.0021</div><div class="k">Duv</div></div>
+          <div class="stat"><div class="v">612</div><div class="k">Lux</div></div>
+          <div class="stat"><div class="v">92</div><div class="k">Rf</div></div>
           <div class="stat"><div class="v">97</div><div class="k">R9</div></div>
         </div>
         <svg class="spd" viewBox="0 0 300 110" preserveAspectRatio="none">
@@ -319,7 +322,15 @@
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg></div>
         <h3>Ra, R9, and the full R1–R15 set</h3>
         <p>Every CRI sample computed with hCRI.io's own ported CIE 13.3 algorithm — the same Ra/R9
-          your report page will show once the scan is uploaded.</p>
+          your report page will show once the scan is uploaded — plotted as the same color-coded
+          R1–R15 bar chart hCRI.io's own report page uses, right on the Spectrum tab.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="18" r="1.6"/><path d="M6 6h0M6 12h0M6 18h0M18 6h0M18 12h0M18 18h0"/></svg></div>
+        <h3>Pick your own measurements</h3>
+        <p>Choose which values show on the Main tab's result card, and in what order, from Settings —
+          CCT, Ra, Rf, Rg, any of R1–R15, even CIE x/y, drag-reordered by holding the handle on each
+          row. The rest stay a tap away without cluttering the card after every reading.</p>
       </div>
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 8l4 4-4 4M3 12h18"/></svg></div>
@@ -339,7 +350,8 @@
         <h3>Every reading, saved automatically</h3>
         <p>The History tab keeps a running log of everything you've scanned. Rename a reading,
           re-upload it later, or delete it — renaming before upload sends it to hCRI.io under that
-          same title.</p>
+          same title. Tap View on any past reading to reopen its full measurement grid, spectrum,
+          CIE plot, and R-values, exactly as they looked the moment it was taken.</p>
       </div>
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
@@ -379,6 +391,7 @@
     </div>
     <div class="chip-row">
       <span class="chip"><span class="k">Model</span> HPCS-310</span>
+      <span class="chip"><span class="k">Model</span> HPCS-310P</span>
       <span class="chip"><span class="k">Model</span> HPCS-330</span>
       <span class="chip"><span class="k">Model</span> HPCS-330P</span>
       <span class="chip"><span class="k">Model</span> HPCS330Pro</span>
@@ -452,8 +465,8 @@
         <div class="num"></div>
         <div>
           <h4>Check the Spectrum tab</h4>
-          <p>Swipe between the SPD curve and the CIE 1931 plot to confirm the reading looks right
-            before it goes anywhere.</p>
+          <p>Swipe between the SPD curve, the CIE 1931 plot, and the R1–R15 bar chart to confirm the
+            reading looks right before it goes anywhere.</p>
         </div>
       </div>
       <div class="step">
@@ -470,7 +483,9 @@
         <div>
           <h4>Come back to it anytime</h4>
           <p>Every reading is kept in <code>History</code>. Rename it, re-upload it later, share it
-            (or your whole history) as a CSV, or delete it -- whenever you get to it.</p>
+            (or your whole history) as a CSV, or delete it -- whenever you get to it. Tap
+            <code>View</code> on any of them to reopen its full measurement grid, spectrum, CIE
+            plot, and R-values.</p>
         </div>
       </div>
       <div class="step">
