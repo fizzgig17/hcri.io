@@ -899,6 +899,23 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const [rng, setRng] = useState(null);  // data-aware slider ranges
   const rngInit = useRef(false);
   const rngScope = useRef(null);
+  // The self-contained scroll region fullPage renders below (see fullPage
+  // itself) -- used to scroll the LIST back to its own top after loading
+  // page 1 (see the fetch effect below), instead of scrollIntoView()/
+  // window.scrollTo(), which operate on whatever ancestor chain the
+  // browser decides is scrollable. That ambiguity is exactly what broke
+  // on mobile Safari: with the outer page deliberately locked
+  // (overflow:hidden, see app-locked in App.jsx) while fullPage's own div
+  // is the real scroll surface, a smooth scrollIntoView() on the grid
+  // could still end up nudging the supposedly-locked outer page instead
+  // of (or in addition to) this div -- invisibly, since overflow:hidden
+  // hides the result rather than preventing the scroll outright. That
+  // would both explain the header ending up permanently scrolled out of
+  // view after the list loads, and leave the outer page's scrollTop no
+  // longer at a clean 0, which is exactly what breaks pull-to-refresh.
+  // Scrolling this ref directly removes that ambiguity -- it can only
+  // ever move the one div it's attached to.
+  const scrollAreaRef = useRef(null);
   const [vAll, setVAll] = useState(false);
   const [perPage, setPerPage] = useState(computeInitialPerPage());
   const perPageRef = useRef(computeInitialPerPage());
@@ -1044,8 +1061,13 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       if ((j.page || 1) === 1) {
         setTimeout(() => {
           try {
-            const g = isDesktopViewport() ? null : document.querySelector('[data-expgrid]');
-            g ? g.scrollIntoView({ behavior: 'smooth', block: 'start' }) : window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Scroll OUR OWN scroll region back to its top directly,
+            // rather than scrollIntoView()-ing the grid (which lets the
+            // browser pick whichever ancestor(s) it decides to scroll --
+            // see scrollAreaRef's own comment for why that's unsafe here)
+            // or window.scrollTo (the outer page is deliberately locked
+            // and isn't meant to move at all).
+            if (scrollAreaRef.current) scrollAreaRef.current.scrollTo({ top: 0, behavior: 'smooth' });
           } catch {}
         }, 0);
       }
@@ -2597,7 +2619,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     // it shortly after first paint).
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace', overflow: 'hidden' }}>
       {pageHeader}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <div ref={scrollAreaRef} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {tabContent}
       </div>
     </div>
