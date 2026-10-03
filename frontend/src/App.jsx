@@ -44,7 +44,7 @@
 // checks that stack first, via handlePanelPopState(), before falling
 // through to its own routing.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useTheme } from './lib/ThemeContext.jsx';
 import { useAuth } from './hooks/useAuth';
 import { useIsMobile } from './hooks/useIsMobile';
@@ -118,7 +118,36 @@ export default function App() {
   // surface underneath it on mobile Safari/Firefox. Desktop never needed
   // this (the guest-Explore page has always just scrolled normally at
   // desktop widths, with no lock), so the logged-in case now matches that.
-  useEffect(() => {
+  //
+  // useLayoutEffect, not useEffect, and that's load-bearing: index.php's
+  // own inline CSS unlocks html/body/#root (overflow:visible) at mobile
+  // widths by default, specifically so non-Explore pages can scroll
+  // natively there -- .app-locked (in app.css) overrides that back to
+  // overflow:hidden once added, via plain CSS specificity. A plain
+  // useEffect only adds that class AFTER the browser paints, so on a
+  // fresh mobile load there's a real (if brief) window where the page is
+  // actually unlocked with Explore's own height:100vh content already
+  // sized into the DOM. If that content is even slightly taller than the
+  // CURRENTLY visible viewport -- which it very often is on first load,
+  // since 100vh resolves to the viewport height with the browser's own
+  // chrome fully collapsed, taller than what's visible while the address
+  // bar is still expanded -- mobile Safari responds to that genuine
+  // overflow by auto-scrolling a bit to tuck its chrome away, same as it
+  // would on any normal overflowing page. .app-locked then lands and
+  // freezes overflow:hidden at THAT scrolled position, not back at the
+  // top -- permanently hiding whatever scrolled out of view (the
+  // header/tabs here) and disabling pull-to-refresh along with it, since
+  // that needs the outer page to still be natively scrollable. Chrome
+  // doesn't auto-scroll to hide its chrome the same way, so the same
+  // oversized first paint shows up there as a simple cut-off top edge
+  // instead of a full disappearance.
+  //
+  // useLayoutEffect runs synchronously right after React commits the DOM
+  // change but before the browser paints anything, so .app-locked is
+  // already present on <html> in the very first frame the user actually
+  // sees -- there's no painted unlocked frame for Safari's chrome-driven
+  // auto-scroll to react to in the first place.
+  useLayoutEffect(() => {
     // The class goes on <html>, not #root: #root's `height: 100%` can only
     // resolve to a real pixel value (letting `overflow: hidden` actually
     // clip anything) if its whole ancestor chain -- html and body too --
