@@ -2460,7 +2460,19 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   );
 
   const pageHeader = (
-    <div style={{ background: r.surface2, borderBottom: `1px solid ${r.border}`, position: 'sticky', top: 0, zIndex: 50, boxShadow: s ? 'none' : '0 2px 8px rgba(0,0,0,0.08)' }}>
+    // No longer position:'sticky' -- pageHeader now lives as a plain,
+    // non-scrolling flex sibling above fullPage's own scroll region (see
+    // fullPage below), so it's always on-screen without needing to stick to
+    // anything. Sticky was only needed in the old layout where fullPage
+    // itself was the single scrolling surface and the header had to stick
+    // to the top of THAT scroll as it passed underneath. Left in place
+    // after the scroll-container split, it became a sticky element with no
+    // real scrolling ancestor -- which is exactly the shape of a known
+    // WebKit/Safari bug where such an element can compute its containing
+    // block wrong and render zero-size or off-screen. That matches the
+    // "header and tabs disappeared" regression on a real phone while
+    // looking completely fine in Chromium, which doesn't have the bug.
+    <div style={{ background: r.surface2, borderBottom: `1px solid ${r.border}`, boxShadow: s ? 'none' : '0 2px 8px rgba(0,0,0,0.08)' }}>
       <div style={{ padding: o ? '8px 14px' : '0 16px', display: 'flex', flexDirection: o ? 'column' : 'row', alignItems: o ? 'stretch' : 'center', justifyContent: 'space-between', gap: o ? 8 : 0, minHeight: 52, boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div
@@ -2576,9 +2588,11 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     : listingBody;
 
   const fullPage = (
-    <div style={{ minHeight: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace', overflow: 'hidden' }}>
       {pageHeader}
-      {tabContent}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {tabContent}
+      </div>
     </div>
   );
 
