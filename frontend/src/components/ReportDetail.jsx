@@ -970,7 +970,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                     checked={!isPublic}
                     disabled={publicSaving}
                     onChange={async (ev) => {
-                      const excluded = !ev.target.checked; // checkbox = "excluded"; isPublic is the inverse
+                      const excluded = ev.target.checked; // checkbox = "excluded"; isPublic is the inverse
                       setPublicSaving(true);
                       try {
                         const r = await (await fetch('./index.php/api/explore', {
