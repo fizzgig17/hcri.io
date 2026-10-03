@@ -2575,29 +2575,10 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     : tab === 'myinsights' ? <FilteredInsights q={`userId=${(n && n.id) || 0}`} T={r} heading="My Insights" note="Statistics across your own reports, including private ones." />
     : listingBody;
 
-  // `fullPage` is what renders for the plain Explore/My Reports listing
-  // (and the Insights tabs) -- everything EXCEPT viewing a single report.
-  // It used to be just `minHeight: 100vh` with no bounded height/overflow
-  // of its own, relying on the document/body itself to be the scrolling
-  // element. That stopped working the moment App.jsx's mobile `app-locked`
-  // class became unconditional for any logged-in user or open Explore (see
-  // its own comment: "Explore manages its own internal scrolling... this
-  // just keeps the document from being a second, competing scroll surface
-  // underneath it") -- that assumption was only ever true for
-  // mobileDetailView/splitView below (both already `height:100vh;
-  // overflow:hidden` with their own inner `overflow:auto` content div).
-  // fullPage never got the same treatment, so once the document was
-  // locked, there was no scrollable surface left under it at all: Explore
-  // and My Reports simply couldn't scroll on mobile. Giving it the exact
-  // same shape as mobileDetailView fixes that and makes the "Explore
-  // manages its own internal scrolling" comment actually true everywhere,
-  // not just for the single-report views.
   const fullPage = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace' }}>
       {pageHeader}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {tabContent}
-      </div>
+      {tabContent}
     </div>
   );
 
