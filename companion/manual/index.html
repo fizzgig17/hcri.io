@@ -1,0 +1,440 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>hCRI Companion — User Manual</title>
+<meta name="description" content="Full user manual for hCRI Companion, the Android Bluetooth client for Hopoocolor HPCS-series spectrometers.">
+<link rel="canonical" href="https://www.hcri.io/companion/manual/">
+<script>
+  (function(){
+    try {
+      var t = localStorage.getItem('hcri_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root{
+    --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2d3645;
+    --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --accent-dim:rgba(88,166,255,.14);
+    --good:#3fb978; --warn:#d29922; --bad:#f85149;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2f7; --surface:#ffffff; --surface2:#dce6f0; --border:rgba(40,90,160,0.25);
+    --text:#0d1f30; --dim:#2a5070; --accent:#005baa; --accent-dim:rgba(0,91,170,.14);
+    --good:#0a6e2e; --warn:#8a5a00; --bad:#aa1133;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box}
+  html,body{background:var(--bg);transition:background-color .15s,color .15s}
+  body{
+    margin:0; color:var(--text); line-height:1.6;
+    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    padding-inline:16px;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  img,svg{max-width:100%}
+  code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:.92em;color:var(--text)}
+
+  header.top{
+    display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between;
+    padding-block:18px; border-bottom:1px solid var(--border); max-width:1080px;margin:0 auto;
+  }
+  .brand{font-size:19px;font-weight:900;letter-spacing:.2px;display:flex;align-items:baseline;gap:8px}
+  .brand .dot{color:var(--accent)}
+  .brand .tag{
+    font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.4px;
+    border:1px solid var(--border);border-radius:999px;padding:2px 8px;
+  }
+  nav.links{display:flex;gap:18px;font-size:13px;flex-wrap:wrap;align-items:center}
+  nav.links a{color:var(--dim)}
+  nav.links a:hover{color:var(--text)}
+  .btn-sm{
+    display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+    border:1.5px solid rgba(88,166,255,.45);background:var(--accent-dim);color:var(--accent);
+    border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .btn-sm:hover{background:rgba(88,166,255,.22);text-decoration:none}
+  .btn-sm svg{width:14px;height:14px}
+
+  .page{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:48px;padding-block:36px 72px}
+  @media (max-width:860px){ .page{grid-template-columns:1fr} }
+
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:12.5px;max-height:calc(100vh - 40px);overflow:auto}
+  @media (max-width:860px){ nav.toc{position:static;max-height:none;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface)} }
+  nav.toc .toc-title{color:var(--dim);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:sec}
+  nav.toc li{counter-increment:sec;margin-bottom:7px}
+  nav.toc li a{color:var(--dim);display:block}
+  nav.toc li a:hover{color:var(--text)}
+  nav.toc li a::before{content:counter(sec) '. ';color:var(--accent);font-weight:700}
+
+  main{min-width:0}
+  .doc-title{font-size:clamp(26px,4vw,36px);margin:0 0 6px;letter-spacing:-.01em}
+  .doc-meta{color:var(--dim);font-size:12.5px;margin-bottom:38px}
+  .doc-meta a{color:var(--dim)}
+
+  section{padding-block:30px;border-top:1px solid var(--border)}
+  section:first-of-type{border-top:none;padding-top:0}
+  h2{font-size:21px;margin:0 0 14px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px}
+  h2 .num{color:var(--accent);font-size:15px;font-weight:700}
+  h3{font-size:15px;margin:22px 0 8px}
+  p{margin:0 0 12px;font-size:13.5px}
+  p.dim{color:var(--dim)}
+  ul,ol{margin:0 0 12px;padding-left:22px;font-size:13.5px}
+  li{margin-bottom:6px}
+  .lede{color:var(--dim);font-size:14.5px;max-width:68ch}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;margin:14px 0;
+  }
+  .card h4{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;font-size:13px;color:var(--dim)}
+  .card.tip h4{color:var(--good)}
+  .card.warn h4{color:var(--warn)}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+  td code{font-size:12px}
+
+  .steps{list-style:none;margin:0;padding:0;counter-reset:step}
+  .steps li{
+    counter-increment:step;position:relative;padding-left:40px;margin-bottom:16px;font-size:13.5px;
+  }
+  .steps li::before{
+    content:counter(step);position:absolute;left:0;top:-1px;
+    width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(88,166,255,.4);
+    color:var(--accent);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;
+  }
+  .steps li strong{display:block;margin-bottom:2px}
+  .steps li span{color:var(--dim)}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .chip{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600}
+
+  footer{border-top:1px solid var(--border);padding-block:24px;max-width:1080px;margin:0 auto;font-size:12.5px;color:var(--dim)}
+  footer a{color:var(--dim)}
+  footer a:hover{color:var(--accent)}
+
+  @media print{
+    nav.toc, header .links, .btn-sm, .no-print{display:none!important}
+    :root{ --bg:#fff; --surface:#fff; --surface2:#f3f3f3; --border:#ccc; --text:#111; --dim:#555; --accent:#1a4fb4; color-scheme: light; }
+    body{padding:0}
+    .page{display:block;max-width:none;padding:0}
+    header.top{max-width:none}
+    section{break-inside:avoid-page;border-top:1px solid #ccc}
+    h2{break-after:avoid}
+    a{color:#1a4fb4;text-decoration:underline}
+    .card{break-inside:avoid-page}
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+</head><body>
+
+<header class="top">
+  <div class="brand">hCRI<span class="dot">.io</span> <span style="font-weight:600;color:var(--dim)">Companion</span>
+    <span class="tag">Manual</span>
+  </div>
+  <nav class="links">
+    <a href="../">← Companion home</a>
+    <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a>
+    <a class="btn-sm" href="hCRI-Companion-Manual.pdf" download>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+      Download PDF
+    </a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme" style="background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text);padding:0">🌙</button>
+  </nav>
+</header>
+
+<div class="page">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#requirements">Requirements</a></li>
+      <li><a href="#installing">Installing the app</a></li>
+      <li><a href="#account">Connecting your hCRI.io account</a></li>
+      <li><a href="#pairing">Pairing with your meter</a></li>
+      <li><a href="#reading">Taking a reading</a></li>
+      <li><a href="#main-tab">The Main tab</a></li>
+      <li><a href="#data-tab">The Data tab</a></li>
+      <li><a href="#history-tab">The History tab</a></li>
+      <li><a href="#logs-tab">The Logs tab</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#background">Background &amp; reconnect behavior</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#support">Feedback &amp; support</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <h1 class="doc-title">hCRI Companion — User Manual</h1>
+    <div class="doc-meta">Covers app version 1.2 · Last updated October 3, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+
+    <section id="overview">
+      <h2><span class="num">01</span> Overview</h2>
+      <p class="lede">hCRI Companion is an independent Android app that connects to a Hopoocolor HPCS-series
+        spectrometer over Bluetooth Low Energy, reads the full spectrum off the sensor, computes the same
+        colorimetric values hCRI.io itself computes, and uploads a reading to your hCRI.io account in one
+        tap — no cable, no CSV export, no re-typing numbers off the meter's own tiny screen.</p>
+      <p>Every CCT, Duv, Ra, Rf, Rg, and R1–R15 value shown in the app is computed with the exact same
+        algorithm hCRI.io's report page uses, so a reading never disagrees with itself between your phone
+        and your account.</p>
+      <h3>Supported meters</h3>
+      <div class="chip-row">
+        <span class="chip">HPCS-310</span>
+        <span class="chip">HPCS-310P</span>
+        <span class="chip">HPCS-330</span>
+        <span class="chip">HPCS-330P</span>
+        <span class="chip">HPCS330Pro</span>
+      </div>
+      <p class="dim">The app detects which model you're connected to from its advertised Bluetooth name and
+        reads its data with that model's own field layout automatically — nothing to configure. The full,
+        up-to-date list (including which models are independently verified against a real captured
+        reading) is always on the app's own Settings → About section.</p>
+    </section>
+
+    <section id="requirements">
+      <h2><span class="num">02</span> Requirements</h2>
+      <ul>
+        <li>Android 8.0 (Oreo) or newer</li>
+        <li>Bluetooth Low Energy (BLE) support</li>
+        <li>A paired Hopoocolor HPCS-series meter, powered on and in range</li>
+        <li>An hCRI.io account, if you want to upload readings (not required just to take and view them)</li>
+      </ul>
+    </section>
+
+    <section id="installing">
+      <h2><span class="num">03</span> Installing the app</h2>
+      <p>hCRI Companion isn't on the Play Store — it's a direct install, the same way most spectrometer
+        and BLE utilities in this space are distributed.</p>
+      <ol class="steps">
+        <li><strong>Download the APK</strong><span>From the <a href="../#download">Companion download page</a>, tap Download APK. Android downloads the file like any other.</span></li>
+        <li><strong>Allow installs from this source</strong><span>Opening the downloaded file for the first time, Android will ask to confirm installing from an unknown source — this is expected for any app distributed outside the Play Store. Allow it for your browser or Files app.</span></li>
+        <li><strong>Install and open</strong><span>Finish the install prompt, then open hCRI Companion from your app drawer.</span></li>
+      </ol>
+      <div class="card tip">
+        <h4>Updating later</h4>
+        <p>There's no in-app auto-update. Re-download and install the APK the same way to get a newer
+          build — it installs over the existing app and keeps your saved readings, account, and settings.</p>
+      </div>
+    </section>
+
+    <section id="account">
+      <h2><span class="num">04</span> Connecting your hCRI.io account</h2>
+      <p>You only need to do this once. From the <code>Settings</code> tab:</p>
+      <ol class="steps">
+        <li><strong>Enter your hCRI.io username</strong><span>The same username you sign in with at hcri.io.</span></li>
+        <li><strong>Enter your hCRI.io API token</strong><span>Find or generate this from your hCRI.io account. The field is masked while typing.</span></li>
+        <li><strong>Tap Save</strong><span>The token is stored in your device's secure keychain (Android Keystore) — not in plain text, and not readable by any other app.</span></li>
+      </ol>
+      <p>Once saved, the fields switch to a locked, read-only view with a <code>Forget Credentials</code>
+        button — a deliberate extra step before replacing a saved key, so a stray keystroke can't silently
+        overwrite a working token.</p>
+    </section>
+
+    <section id="pairing">
+      <h2><span class="num">05</span> Pairing with your meter</h2>
+      <p>On the <code>Main</code> tab, tap <code>Connect to Meter</code>. The app scans for a few seconds
+        and connects automatically if exactly one supported meter is in range.</p>
+      <p>If more than one matching meter is found, a picker appears so you choose which one — look for its
+        advertised name and signal strength. A small <code>⇄ Switch meter</code> icon next to the status
+        row lets you reopen that same list later without a fresh scan.</p>
+      <div class="card warn">
+        <h4>Meter won't connect?</h4>
+        <p>Tap <code>Meter won't connect? Reset connection</code>, underneath the Connect button. This
+          clears a stale Bluetooth connection left over from a previous session — the most common reason a
+          meter seems stuck, and something that used to require power-cycling the meter itself.</p>
+      </div>
+    </section>
+
+    <section id="reading">
+      <h2><span class="num">06</span> Taking a reading</h2>
+      <p>Once connected, tap <code>Take Reading</code>. The meter takes its exposure, and a short haptic
+        buzz confirms the moment it lands (a different pattern if it fails) — handy when you're not looking
+        directly at the screen. The spectrum, CCT, Duv, Ra, and the rest of your chosen measurements appear
+        immediately after.</p>
+      <p>Every completed reading is saved automatically to <a href="#history-tab">History</a> — there's
+        nothing extra to do to keep it.</p>
+    </section>
+
+    <section id="main-tab">
+      <h2><span class="num">07</span> The Main tab</h2>
+      <p>Main is where you connect, take readings, and review the latest one. Its result card always shows
+        the same layout — a grid of measurements, the three swipeable charts, and the action button
+        directly underneath them — whether or not a reading has happened yet (before your first reading,
+        everything just reads zero/blank, so nothing jumps around once real numbers appear).</p>
+      <h3>Measurement grid</h3>
+      <p>Shows CCT, Ra (CRI), Duv, Lux, Rf, R9, and Rg by default. Which measurements appear here, and in
+        what order, is fully customizable from <a href="#settings">Settings</a> — including any individual
+        R1–R15 sample and the raw CIE x/y coordinates.</p>
+      <h3>Spectrum / Chrom / R-Values</h3>
+      <p>Swipe (or tap the dots) between three views of the same reading:</p>
+      <ul>
+        <li><strong>Spectrum</strong> — the full wavelength-by-wavelength power distribution, colored by
+          wavelength, plus a collapsible list of every raw nm/value pair.</li>
+        <li><strong>Chrom</strong> — the CIE 1931 chromaticity diagram, with your reading's x/y point
+          plotted against the real spectral locus and the Planckian (blackbody) curve.</li>
+        <li><strong>R-Values</strong> — the full CRI R1–R15 breakdown as a color-coded bar chart, the same
+          chart hCRI.io's own report page uses.</li>
+      </ul>
+      <h3>Uploading</h3>
+      <p>Tap <code>Upload to hCRI.io</code> to send the current reading. A small green checkmark appears
+        next to the button once it succeeds — there's no popup to dismiss on a routine upload. If an
+        upload fails, an alert explains what happened; check the <a href="#logs-tab">Logs tab</a> for the
+        server's own response if you need more detail.</p>
+    </section>
+
+    <section id="data-tab">
+      <h2><span class="num">08</span> The Data tab</h2>
+      <p>A closer look at the current reading, plus the controls for naming and sending it:</p>
+      <ul>
+        <li><strong>Upload Title</strong> — type a custom title, or leave it blank to use the
+          auto-generated username + timestamp + device label.</li>
+        <li><strong>Upload Preview</strong> — the exact wavelength/value payload about to be sent, so you
+          can eyeball the range and point count before it goes anywhere.</li>
+        <li><strong>R1–R15</strong>, <strong>Chromaticity</strong>, and <strong>Device Info</strong> —
+          full numeric detail, including the meter's own firmware version and integration time.</li>
+        <li><strong>Upload to hCRI.io</strong> and <strong>Share CSV</strong> — the same upload button as
+          Main (with the same inline checkmark), plus exporting this one reading as a CSV file through
+          Android's share sheet.</li>
+      </ul>
+    </section>
+
+    <section id="history-tab">
+      <h2><span class="num">09</span> The History tab</h2>
+      <p>Every reading you've ever taken, grouped by day, newest first. From here you can:</p>
+      <ul>
+        <li><strong>View</strong> a past reading's full measurement grid, spectrum, chromaticity, and
+          R-values exactly as they looked when it was taken.</li>
+        <li><strong>Rename</strong> a reading — renaming before upload sends it to hCRI.io under that new
+          title.</li>
+        <li><strong>Re-upload</strong> a reading at any time, including ones already sent.</li>
+        <li><strong>Select</strong> multiple readings and upload them to hCRI.io in one batch, instead of
+          opening and sending each individually.</li>
+        <li><strong>Share</strong> a single reading, or your entire history, as CSV.</li>
+        <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone; a
+          copy already uploaded to hCRI.io stays there until you delete it from your account separately.</li>
+      </ul>
+    </section>
+
+    <section id="logs-tab">
+      <h2><span class="num">10</span> The Logs tab</h2>
+      <p>A running debug log of connect/disconnect/measure/upload activity, each line timestamped in your
+        phone's own local time. Useful for troubleshooting, or to attach to a bug report.</p>
+      <ul>
+        <li><strong>Share Debug Log</strong> — sends the current log through Android's share sheet (email,
+          messaging, wherever you'd like to send it).</li>
+        <li><strong>Clear</strong> — empties the log.</li>
+      </ul>
+      <p class="dim">Turning on <code>Verbose logging</code> in Settings adds the low-level Bluetooth
+        hex traffic and the full raw result body to this log — off by default, since the standard log
+        already covers ordinary connection and measurement status.</p>
+    </section>
+
+    <section id="settings">
+      <h2><span class="num">11</span> Settings</h2>
+      <h3>hCRI.io account</h3>
+      <p>Your username and API token — see <a href="#account">Connecting your hCRI.io account</a> above.</p>
+      <h3>Appearance</h3>
+      <p>Light, Dark, or System (the default) — follows your phone's own light/dark setting unless
+        overridden here.</p>
+      <h3>Stay connected in background</h3>
+      <p><strong>On by default.</strong> Keeps the meter connected when you switch away from the app or
+        lock the screen, so coming back doesn't need a fresh reconnect. Turn this off to disconnect the
+        meter whenever the app isn't in the foreground instead — saves the meter's own battery, at the cost
+        of reconnecting (a few seconds) every time you come back. See
+        <a href="#background">Background &amp; reconnect behavior</a> for the full picture.</p>
+      <h3>Keep screen awake while connected</h3>
+      <p>Prevents the screen from locking during a session with the meter connected. Uses more battery —
+        off by default.</p>
+      <h3>Verbose logging</h3>
+      <p>Adds the full wavelength-by-wavelength and Bluetooth hex detail to the debug log — see
+        <a href="#logs-tab">The Logs tab</a>.</p>
+      <h3>Main Screen Measurements</h3>
+      <p>Check which measurements show on the Main tab's result card, and hold the <code>⠿</code> handle to
+        drag a row and reorder it. <code>Reset to Default</code> restores CCT, Ra, Duv, Lux, Rf, R9, Rg in
+        that order.</p>
+      <h3>About</h3>
+      <p>The current list of supported meter models (and which are independently verified), a
+        <code>Send Feedback</code> button that opens a pre-addressed email, and a link back to this
+        Companion page.</p>
+    </section>
+
+    <section id="background">
+      <h2><span class="num">12</span> Background &amp; reconnect behavior</h2>
+      <p>By default, switching away from hCRI Companion — the app switcher, locking your screen, a phone
+        call — leaves the meter connected (<code>Stay connected in background</code>, on by default in
+        Settings). Coming back to the app picks up right where you left off, with no reconnect delay.</p>
+      <p>If you'd rather the app disconnect the meter whenever it isn't the one on screen (trading a short
+        reconnect delay for a little extra meter battery life), turn that setting off. Either way, coming
+        back to the foreground with nothing connected always tries to reconnect automatically — you
+        shouldn't need to tap Connect yourself just because the meter dropped on its own while you were
+        away.</p>
+      <p class="dim">Sharing a CSV or the debug log briefly hands control to Android's own share sheet,
+        which looks like backgrounding the app — this is recognized and never triggers a disconnect either
+        way, since you're still right there using the app.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2><span class="num">13</span> Troubleshooting</h2>
+      <h3>Meter won't connect, or seems stuck</h3>
+      <p>Tap <code>Meter won't connect? Reset connection</code> on the Main tab (shown while
+        disconnected). This clears a leftover Bluetooth connection from a previous session — by far the
+        most common cause, and something that used to require power-cycling the meter.</p>
+      <h3>App crashed, or won't open</h3>
+      <p>A crash lands on a "Try Again" screen rather than kicking you back to your home screen. If the app
+        won't stay open at all, force-close it from Android's recent-apps view and reopen it — this app
+        recovers from a mid-session crash cleanly.</p>
+      <h3>A reading looks wrong</h3>
+      <p>Double-check the correct meter model connected (shown next to the status dot on Main) — each
+        model has its own field layout, and the wrong one can occasionally still connect if its advertised
+        name happens to be ambiguous. If a value still looks off, check Settings → About for whether that
+        model is marked independently verified.</p>
+      <h3>Still stuck?</h3>
+      <p>From the Logs tab, tap <code>Share Debug Log</code> and send it along with a description of what
+        happened to <a href="mailto:fizzgig@hcri.io">fizzgig@hcri.io</a>, or use
+        <code>Send Feedback</code> on the About section of Settings.</p>
+    </section>
+
+    <section id="privacy">
+      <h2><span class="num">14</span> Privacy</h2>
+      <p>hCRI Companion doesn't collect, store, or transmit anything about you on its own — no analytics,
+        no tracking, no third-party server in the loop. A reading lives only on your device until you tap
+        Upload, which sends it straight to your own hCRI.io account over an encrypted connection and
+        nowhere else. Full details are in the
+        <a href="../#privacy-policy">Privacy Policy</a> on the Companion page.</p>
+    </section>
+
+    <section id="support">
+      <h2><span class="num">15</span> Feedback &amp; support</h2>
+      <p>Questions, bug reports, or feature requests are always welcome at
+        <a href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20Feedback">fizzgig@hcri.io</a> — the
+        same address the app's own <code>Send Feedback</code> button (Settings → About) opens for you.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  hCRI Companion Manual · <a href="../">Companion home</a> · <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a> · <a href="hCRI-Companion-Manual.pdf" download>Download as PDF</a>
+</footer>
+
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
+</body></html>
