@@ -436,19 +436,31 @@ if ($m === 'PATCH') {
 
         if ($b['shareAction'] === 'enable') {
 
-            // Generate a unique token
+            // Reuse the existing token if this report is already shared --
+            // minting a new one every time would silently invalidate any
+            // link already handed out (email, chat, etc.) for no reason.
 
-            do {
+            $existingStmt = $db->prepare('SELECT share_token FROM reports WHERE id=?');
 
-                $token = bin2hex(random_bytes(8)); // 16 chars
+            $existingStmt->execute([$id]);
 
-                $exists = $db->prepare('SELECT id FROM reports WHERE share_token = ?');
+            $token = (string)($existingStmt->fetchColumn() ?: '');
 
-                $exists->execute([$token]);
+            if ($token === '') {
 
-            } while ($exists->fetch());
+                do {
 
-            $db->prepare('UPDATE reports SET share_token=? WHERE id=?')->execute([$token, $id]);
+                    $token = bin2hex(random_bytes(8)); // 16 chars
+
+                    $exists = $db->prepare('SELECT id FROM reports WHERE share_token = ?');
+
+                    $exists->execute([$token]);
+
+                } while ($exists->fetch());
+
+                $db->prepare('UPDATE reports SET share_token=? WHERE id=?')->execute([$token, $id]);
+
+            }
 
             json_out(['shareToken' => $token]);
 

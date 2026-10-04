@@ -268,6 +268,14 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if (preg_match('#^/api/v1/reports/(\d+)/share$#', $uri, $m)) {
+
+        $_GET['id'] = $m[1];
+
+        require __DIR__ . '/api/v1_share.php'; exit;
+
+    }
+
     if ($uri === '/api/tokens' || preg_match('#^/api/tokens/\d+$#', $uri)) {
 
         require __DIR__ . '/api/tokens.php'; exit;

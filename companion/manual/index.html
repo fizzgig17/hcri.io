@@ -241,15 +241,38 @@
 
     <section id="account">
       <h2><span class="num">04</span> Connecting your hCRI.io account</h2>
-      <p>You only need to do this once. From the <code>Settings</code> tab:</p>
+      <p>You only need to do this once. From the <code>Settings</code> tab, there are two ways to get a
+        token into the app.</p>
+
+      <h3>Option A: Generate a token in the app</h3>
+      <ol class="steps">
+        <li><strong>Tap the 🔑 button next to Save</strong><span>Opens the Generate API Token dialog.</span></li>
+        <li><strong>Enter your hCRI.io username or email, and your password</strong><span>Used once to
+          sign in — your password is never stored on the device and never sent anywhere else.</span></li>
+        <li><strong>Review the token name</strong><span>Defaults to "hCRI Companion Data Upload Token" —
+          this is the name you'll see later if you list or revoke tokens from Profile → API on the
+          website. Change it if you'd like something more specific.</span></li>
+        <li><strong>Tap Generate &amp; Save</strong><span>The app signs in, creates a brand-new token under
+          that name, and saves it — same as entering one by hand (Option B, step 3 below).</span></li>
+      </ol>
+
+      <h3>Option B: Paste in an existing token</h3>
       <ol class="steps">
         <li><strong>Enter your hCRI.io username</strong><span>The same username you sign in with at hcri.io.</span></li>
-        <li><strong>Enter your hCRI.io API token</strong><span>Find or generate this from your hCRI.io account. The field is masked while typing.</span></li>
+        <li><strong>Enter your hCRI.io API token</strong><span>Find or generate this from Profile → API on
+          hcri.io. The field is masked while typing.</span></li>
         <li><strong>Tap Save</strong><span>The token is stored in your device's secure keychain (Android Keystore) — not in plain text, and not readable by any other app.</span></li>
       </ol>
-      <p>Once saved, the fields switch to a locked, read-only view with a <code>Forget Credentials</code>
-        button — a deliberate extra step before replacing a saved key, so a stray keystroke can't silently
-        overwrite a working token.</p>
+
+      <p>Either way, once saved, the fields switch to a locked, read-only view with a
+        <code>Forget Credentials</code> button — a deliberate extra step before replacing a saved key, so
+        a stray keystroke can't silently overwrite a working token.</p>
+      <div class="card tip">
+        <h4>Why generate instead of paste?</h4>
+        <p>It skips a trip to the website — sign in once in the app and you're done. Each token you
+          generate (in the app or on the website) is independent and can be revoked on its own from
+          Profile → API without affecting any other device or token.</p>
+      </div>
     </section>
 
     <section id="pairing">
@@ -421,7 +444,9 @@
       <p>hCRI Companion doesn't collect, store, or transmit anything about you on its own — no analytics,
         no tracking, no third-party server in the loop. A reading lives only on your device until you tap
         Upload, which sends it straight to your own hCRI.io account over an encrypted connection and
-        nowhere else. Full details are in the
+        nowhere else. If you use <code>Generate Token</code> in Settings, your password is sent once,
+        over that same encrypted connection, to sign in and create the token — it's never stored on the
+        device. Full details are in the
         <a href="../#privacy-policy">Privacy Policy</a> on the Companion page.</p>
     </section>
 
