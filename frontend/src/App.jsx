@@ -303,7 +303,7 @@ export default function App() {
       <>
         <TopNotices theme={T} />
         <GlobalHelp />
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: T.bg, overflow: 'hidden' }}>
+        <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: T.bg, overflow: 'hidden' }}>
           <div style={{ background: T.surface2, borderBottom: `1px solid ${T.border}`, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div style={{ fontWeight: 900, fontSize: 18, color: T.white, fontFamily: 'monospace' }}>
               hCRI<span style={{ color: T.accent }}>.io</span>

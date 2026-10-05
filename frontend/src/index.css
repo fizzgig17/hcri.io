@@ -16,6 +16,14 @@ html.app-locked,
 html.app-locked body,
 html.app-locked #root { height: 100% !important; overflow: hidden !important; }
 
+/* Full-screen mobile layouts (Explore / My Reports / report detail) are a fixed-height
+   flex column with their own inner scroller. `100vh` on mobile browsers is the LARGE
+   viewport (URL/toolbar collapsed), so with the toolbar showing, the bottom of that
+   column sits behind it and the last card can't be reached or tapped without dragging
+   the toolbar away. `100dvh` tracks the visible viewport; the 100vh line is the
+   fallback for browsers without dvh support. */
+.vh-full { height: 100vh; height: 100dvh; }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a4a6a; border-radius: 3px; }

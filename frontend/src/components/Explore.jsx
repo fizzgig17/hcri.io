@@ -2617,9 +2617,9 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     // layer, which is a known source of exactly this kind of bug (content
     // outside that layer rendering then vanishing as the browser promotes
     // it shortly after first paint).
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace', overflow: 'hidden' }}>
+    <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: r.bg, color: r.text, fontFamily: 'monospace', overflow: 'hidden' }}>
       {pageHeader}
-      <div ref={scrollAreaRef} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <div ref={scrollAreaRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {tabContent}
       </div>
     </div>
@@ -2677,9 +2677,9 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   // ── Mobile/tablet: full-screen single-pane report view ─────────────────
   const mobileDetailView = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: r.bg, overflow: 'hidden' }}>
+    <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: r.bg, overflow: 'hidden' }}>
       {detailToolbar}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{reportDetailView}</div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}</div>
     </div>
   );
 
