@@ -20,7 +20,7 @@
 // contact/feedback modal used elsewhere in the app, reconstructed as
 // FeedbackModal (named export of AuthScreen.jsx).
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
@@ -57,6 +57,46 @@ export default function CategoryEditor({ report, isGuest }) {
   const [busy, setBusy] = useState('');
   const [openK, setOpenK] = useState(null);
   const [hi, setHi] = useState(0);
+  // Where the open suggestion list floats. The list is position:fixed and placed
+  // from the VISUAL viewport, so on phones it flips above the field / shrinks when
+  // the on-screen keyboard would otherwise cover it, instead of being clipped by
+  // (or scrolled under) the keyboard and the page header.
+  const anchorRefs = useRef({});
+  const [listPos, setListPos] = useState(null);
+  useEffect(() => {
+    if (!openK) { setListPos(null); return undefined; }
+    const place = () => {
+      const el = anchorRefs.current[openK];
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const vv = window.visualViewport;
+      const vTop = vv ? vv.offsetTop : 0;
+      const vH = vv ? vv.height : window.innerHeight;
+      const vLeft = vv ? vv.offsetLeft : 0;
+      const vW = vv ? vv.width : window.innerWidth;
+      const gap = 6, margin = 8;
+      const below = vTop + vH - r.bottom - gap - margin;
+      const above = r.top - vTop - gap - margin;
+      const up = below < 150 && above > below;
+      const maxHeight = Math.max(90, Math.min(260, up ? above : below));
+      const width = Math.max(170, r.width);
+      const left = Math.max(vLeft + margin, Math.min(r.left, vLeft + vW - width - margin));
+      setListPos(up ? { left, width, maxHeight, bottom: window.innerHeight - r.top + gap } : { left, width, maxHeight, top: r.bottom + gap });
+    };
+    place();
+    // Keyboard animation changes the visual viewport a beat after focus.
+    const t = setTimeout(place, 300);
+    const vv = window.visualViewport;
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    if (vv) { vv.addEventListener('resize', place); vv.addEventListener('scroll', place); }
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+      if (vv) { vv.removeEventListener('resize', place); vv.removeEventListener('scroll', place); }
+    };
+  }, [openK, vals]);
   const [reqOpen, setReqOpen] = useState(false);
   usePanelBackClose(reqOpen, () => setReqOpen(false));
 
@@ -231,7 +271,7 @@ export default function CategoryEditor({ report, isGuest }) {
               </button>
             </span>
           ))}
-          <div style={{ flex: 1, minWidth: 90, position: 'relative' }}>
+          <div ref={(el) => { anchorRefs.current[k] = el; }} style={{ flex: 1, minWidth: 90, position: 'relative' }}>
             <input
               value={draft[k] || ''}
               placeholder={chips.length ? '+ add…' : 'select…'}
@@ -276,15 +316,17 @@ export default function CategoryEditor({ report, isGuest }) {
             {openK === k && (
               <div onClick={() => { setOpenK(null); setDraft((s) => ({ ...s, [k]: '' })); }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
             )}
-            {openK === k && (
+            {openK === k && listPos && (
               <div
                 style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 6px)',
-                  left: 0,
-                  minWidth: 170,
-                  maxHeight: 260,
+                  position: 'fixed',
+                  top: listPos.top,
+                  bottom: listPos.bottom,
+                  left: listPos.left,
+                  minWidth: listPos.width,
+                  maxHeight: listPos.maxHeight,
                   overflowY: 'auto',
+                  overscrollBehavior: 'contain',
                   background: o.surface2 || o.surface,
                   border: `1px solid ${o.border}`,
                   borderRadius: 8,
