@@ -152,9 +152,9 @@ if ($uri !== '/' && is_file($staticFile)) {
 
 // ── Legal pages (clean URLs) ──────────────────────────────────────────────────
 
-if ($uri === '/privacy' || $uri === '/privacy.html' || $uri === '/terms' || $uri === '/terms.html') {
+if ($uri === '/privacy' || $uri === '/privacy.html' || $uri === '/terms' || $uri === '/terms.html' || $uri === '/licenses' || $uri === '/licenses.html') {
 
-    $page = (strpos($uri, 'terms') !== false) ? 'terms.html' : 'privacy.html';
+    $page = (strpos($uri, 'terms') !== false) ? 'terms.html' : ((strpos($uri, 'licenses') !== false) ? 'licenses.html' : 'privacy.html');
 
     header('Content-Type: text/html; charset=utf-8');
 

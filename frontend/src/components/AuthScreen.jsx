@@ -612,11 +612,15 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
         <span style={{ fontSize:12, color:T.dim, opacity:0.4 }}>·</span>
         <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Terms</a>
         <span style={{ fontSize:12, color:T.dim, opacity:0.4 }}>·</span>
+        <a href="/licenses" target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Licenses &amp; source</a>
+        <span style={{ fontSize:12, color:T.dim, opacity:0.4 }}>·</span>
         <button onClick={() => setFeedbackOpen(true)}
           style={{ fontSize:12, color:T.dim, background:'none', border:'none', cursor:'pointer', fontFamily:'monospace', padding:0, opacity:0.7 }}>
           Contact
         </button>
       </div>
+
+      <div style={{ textAlign:'center', fontSize:11, color:T.dim, fontFamily:'monospace', opacity:0.55, paddingBottom:10 }}>© 2026 Marc Getter · AGPL-3.0</div>
 
       {/* Related-sites footer strip, populated by a global the app sets outside React (see index.html) */}
       {!!(window.__hcriRelated && window.__hcriRelated.length) && (
