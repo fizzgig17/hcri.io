@@ -620,7 +620,7 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
         </button>
       </div>
 
-      <div style={{ textAlign:'center', fontSize:11, color:T.dim, fontFamily:'monospace', opacity:0.55, paddingBottom:10 }}>© 2026 Marc Getter · AGPL-3.0</div>
+      <div style={{ textAlign:'center', fontSize:11, color:T.dim, fontFamily:'monospace', opacity:0.55, paddingBottom:10 }}>© 2026 fizzgig · AGPL-3.0</div>
 
       {/* Related-sites footer strip, populated by a global the app sets outside React (see index.html) */}
       {!!(window.__hcriRelated && window.__hcriRelated.length) && (
