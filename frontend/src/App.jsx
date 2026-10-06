@@ -59,6 +59,23 @@ import { handlePanelPopState } from './lib/panelHistory';
 import usePanelBackClose from './hooks/usePanelBackClose';
 
 export default function App() {
+  // On-screen keyboard: iOS Safari doesn't shrink the layout viewport, it just pans the
+  // visual viewport -- which slides the locked mobile layouts up under the browser's
+  // URL bar and hides the bottom of long lists behind the keys. While the keyboard is
+  // up, publish the visible height as --vvh so full-screen layouts (.vh-full) shrink to
+  // fit above the keyboard instead (so there's nothing for Safari to pan).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    const root = document.documentElement;
+    const update = () => {
+      if (window.innerHeight - vv.height > 120) root.style.setProperty('--vvh', vv.height + 'px');
+      else root.style.removeProperty('--vvh');
+    };
+    update();
+    vv.addEventListener('resize', update);
+    return () => { vv.removeEventListener('resize', update); root.style.removeProperty('--vvh'); };
+  }, []);
   const { theme: T, themeName, toggleTheme } = useTheme();
   const { user, checking, tryAutoLogin, login, register, logout } = useAuth();
 

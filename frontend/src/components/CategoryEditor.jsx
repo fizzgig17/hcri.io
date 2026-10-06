@@ -290,7 +290,13 @@ export default function CategoryEditor({ report, isGuest }) {
               value={draft[k] || ''}
               placeholder={chips.length ? '+ add…' : 'select…'}
               autoComplete="off"
-              onFocus={() => { setOpenK(k); setHi(0); }}
+              onFocus={(ev) => {
+                setOpenK(k); setHi(0);
+                // Once the keyboard has finished sliding in (the layout shrinks above it),
+                // bring this field to the middle of the visible scroll area.
+                const el = ev.currentTarget;
+                setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* ignore */ } }, 350);
+              }}
               onChange={(ev) => { setDraft((s) => ({ ...s, [k]: ev.target.value })); setOpenK(k); setHi(0); }}
               onKeyDown={(ev) => {
                 if (ev.key === 'ArrowDown') {
