@@ -21,7 +21,7 @@
 // FeedbackModal (named export of AuthScreen.jsx).
 
 import { useState, useEffect, useRef } from 'react';
-import { flushSync } from 'react-dom';
+import { flushSync, createPortal } from 'react-dom';
 import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
@@ -448,9 +448,9 @@ export default function CategoryEditor({ report, isGuest }) {
         const q = (draft[k] || '').toLowerCase();
         const flt = avail.filter((it) => it.value.toLowerCase().includes(q));
         const close = () => { setOpenK(null); setDraft((st) => ({ ...st, [k]: '' })); };
-        return (
-          <div style={{ position: 'fixed', top: sheetBox.top, left: 0, right: 0, height: sheetBox.height, zIndex: 3500, touchAction: 'pan-y', background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: isIOS ? 112 : 8, boxSizing: 'border-box', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${o.border}`, flexShrink: 0 }}>
+        return createPortal(
+          <div style={{ position: 'fixed', top: sheetBox.top, left: 0, right: 0, height: sheetBox.height, zIndex: 3500, touchAction: 'none', background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: isIOS ? 112 : 8, boxSizing: 'border-box', overflow: 'hidden' }}>
+            <div onTouchMove={(ev) => ev.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${o.border}`, flexShrink: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{lab}</div>
               <input
                 ref={sheetInputRef}
@@ -470,7 +470,7 @@ export default function CategoryEditor({ report, isGuest }) {
               />
               <button type="button" onClick={close} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.accent, borderRadius: 6, padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>Done</button>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: 6, WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: 6, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
               {flt.length ? flt.map((it) => (
                 <div
                   key={it.id}
@@ -483,7 +483,8 @@ export default function CategoryEditor({ report, isGuest }) {
                 <div style={{ padding: '12px', fontSize: 13, color: o.dim, fontFamily: 'monospace' }}>{avail.length ? 'No matches' : 'No more options'}</div>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
       <button
