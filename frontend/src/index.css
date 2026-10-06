@@ -40,3 +40,13 @@ body { font-family: 'Courier New', Courier, monospace; -webkit-font-smoothing: a
   select,
   textarea { font-size: 16px !important; }
 }
+
+/* Help & Reference modal. `100vh`/`90vh` on mobile browsers is the LARGE viewport (toolbars
+   collapsed), so with the URL/bottom bars showing, the card's header and its Prev/Next/close
+   row ended up off-screen. Size it to the visible viewport (dvh) so it always fits, and keep
+   the header and footer rows in view while only the article scrolls. */
+.help-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; height: 100dvh; }
+.help-card { max-height: 90vh; max-height: calc(100dvh - 32px); }
+@media (max-width: 768px) {
+  .help-card { height: calc(100dvh - 32px); }
+}

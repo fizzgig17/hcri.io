@@ -152,9 +152,9 @@ if ($uri !== '/' && is_file($staticFile)) {
 
 // ── Legal pages (clean URLs) ──────────────────────────────────────────────────
 
-if ($uri === '/privacy' || $uri === '/privacy.html' || $uri === '/terms' || $uri === '/terms.html') {
+if ($uri === '/privacy' || $uri === '/privacy.html' || $uri === '/terms' || $uri === '/terms.html' || $uri === '/licenses' || $uri === '/licenses.html') {
 
-    $page = (strpos($uri, 'terms') !== false) ? 'terms.html' : 'privacy.html';
+    $page = (strpos($uri, 'terms') !== false) ? 'terms.html' : ((strpos($uri, 'licenses') !== false) ? 'licenses.html' : 'privacy.html');
 
     header('Content-Type: text/html; charset=utf-8');
 
@@ -1005,6 +1005,32 @@ header('Content-Type: text/html; charset=utf-8');
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 <meta name="theme-color" content="#060a0f">
+
+<!-- color-scheme tells the browser what its own default canvas should be while the stylesheet is still
+     downloading (rendering is blocked until then); without it Safari shows plain white on a cold first load.
+     The script below flips it to "light" for light-theme visitors. -->
+<meta name="color-scheme" content="dark">
+
+<style id="boot-bg">html,body,#root{background:#060a0f}</style>
+
+<script>
+  // Paint the right background immediately (before the stylesheet and the React app load) so a
+  // dark-mode visitor never sees a white flash, and a light-mode visitor never sees a dark one.
+  // Same key and palette the app itself uses (hcri_theme; see frontend/src/lib/theme.js).
+  (function(){
+    var bg = '#060a0f', scheme = 'dark';
+    try { if (localStorage.getItem('hcri_theme') === 'light') { bg = '#eef2f7'; scheme = 'light'; } } catch (e) {}
+    var d = document.documentElement;
+    d.style.background = bg;
+    var bs = document.getElementById('boot-bg');
+    if (bs) bs.textContent = 'html,body,#root{background:' + bg + '}';
+    d.style.colorScheme = scheme;
+    var cs = document.querySelector('meta[name="color-scheme"]');
+    if (cs) cs.setAttribute('content', scheme);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', bg);
+  })();
+</script>
 
 <style>
 

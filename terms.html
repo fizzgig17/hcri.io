@@ -5,8 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Terms of Service · hCRI.io</title>
 <meta name="robots" content="all">
+<script>
+  // Match the theme chosen on the main app (hcri_theme, shared across this origin);
+  // runs before first paint so there's no flash of the wrong theme. Default is dark, like the app.
+  (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('hcri_theme') || 'dark'); } catch (e) {} })();
+</script>
 <style>
   :root{ --bg:#eef2f7; --surface:#fff; --text:#0d1f30; --dim:#4a6480; --border:#d4deea; --accent:#005baa; }
+  :root[data-theme="dark"]{ --bg:#060a0f; --surface:#0a1628; --text:#e8f4ff; --dim:#7aaccc; --border:rgba(80,160,220,0.25); --accent:#00d4ff; color-scheme:dark; }
+  :root[data-theme="dark"] .note{background:rgba(255,204,51,.1);border-color:rgba(255,204,51,.45);color:#ffd866}
+  :root[data-theme="dark"] .ph{background:rgba(80,160,220,.15);color:#ffb35c}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
   .bar{height:5px;background:linear-gradient(90deg,#6a3df0,#2a6df0,#13b3d6,#23c552,#c9d22a,#f0922a,#e0392a);}
@@ -24,13 +32,16 @@
   .back{display:inline-block;margin-top:30px;color:var(--accent);text-decoration:none;font-weight:600}
   footer{margin-top:40px;color:var(--dim);font-size:13px;border-top:1px solid var(--border);padding-top:14px}
 </style>
+<link rel="stylesheet" href="/assets/site-pages.css">
+<script defer src="/assets/site-pages.js"></script>
 </head>
 <body>
-<div class="bar"></div>
 <div class="wrap">
-  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a></header>
+  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme">🌙</button></header>
+<div class="bar"></div>
   <h1>Terms of Service</h1>
-  <div class="meta">Version 2025-06-26 · Last updated 26 June 2026</div>
+  <div class="meta">Version 2026-10-05 · Last updated 5 October 2026</div>
 
   <p>These terms govern your use of hCRI.io. By creating an account or using the service you agree to them. If you do not agree, please do not use the service.</p>
 
@@ -50,7 +61,11 @@
   <h2>4. Your content</h2>
   <p>You keep ownership of the files and reports you upload. By using the service you grant us the limited license needed to store, process, and display that content to operate the service — including showing it publicly in Explore if you mark a report public. You are responsible for ensuring you have the right to upload what you upload, and that it does not infringe anyone's rights or any law.</p>
 
-  <h2>5. Acceptable use</h2>
+  <h2>5. Open-source software, our name, and copyright complaints</h2>
+  <p>The software that runs hCRI.io and the hCRI Companion app is open source: the website under the GNU Affero General Public License v3 or later, and the app under the GNU General Public License v3 or later. Those licenses cover the <em>code</em> only. They do not cover your uploaded content (which stays yours, as described in section 4), other users' content, or the hCRI.io name and logo, which may not be used in a way that suggests affiliation or endorsement without permission. Source code and third-party notices are available on the <a href="/licenses">Licenses &amp; source</a> page.</p>
+  <p>If you believe content on the service infringes your copyright, email <a href="mailto:fizzgig@hcri.io">fizzgig@hcri.io</a> with the report link, what you believe is infringed, and your contact details, and we will review it and remove content where appropriate.</p>
+
+  <h2>6. Acceptable use</h2>
   <p>You agree not to:</p>
   <ul>
     <li>break the law or infringe others' rights;</li>
@@ -59,26 +74,40 @@
     <li>misrepresent the origin or accuracy of data.</li>
   </ul>
 
-  <h2>6. Removal and termination</h2>
+  <h2>7. Removal and termination</h2>
   <p>You may delete your account at any time from Account settings. We may suspend or remove content or accounts that violate these terms or harm the service or its users. You can stop using the service at any time.</p>
 
-  <h2>7. Disclaimers</h2>
+  <h2>8. Disclaimers</h2>
   <p>To the fullest extent permitted by law, the service is provided without warranties of any kind, express or implied, including fitness for a particular purpose and accuracy of results.</p>
 
-  <h2>8. Limitation of liability</h2>
+  <h2>9. Limitation of liability</h2>
   <p>To the fullest extent permitted by law, we are not liable for indirect, incidental, or consequential damages, or for any loss arising from your use of, or reliance on, the service or its results. <span class="ph">$0</span></p>
 
-  <h2>9. Changes</h2>
+  <h2>10. Changes</h2>
   <p>We may update the service or these terms. If changes are material we will update the version and date above. Continued use after changes means you accept them.</p>
 
-  <h2>10. Governing law</h2>
+  <h2>11. Governing law</h2>
   <p>These terms are governed by the laws of <span class="ph">the State of North Carolina, United States</span>, without regard to conflict-of-law rules.</p>
 
-  <h2>11. Contact</h2>
+  <h2>12. Contact</h2>
   <p>Questions about these terms: <a href="mailto:fizzgig@hcri.io">fizzgig@hcri.io</a>.</p>
 
   <a class="back" href="/">← Back to hCRI.io</a>
-  <footer>hCRI.io · <a href="/privacy">Privacy Policy</a></footer>
+  <footer>© 2026 fizzgig · hCRI.io · <a href="/privacy">Privacy Policy</a> · <a href="/licenses">Licenses &amp; source</a></footer>
 </div>
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
 </body>
 </html>

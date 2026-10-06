@@ -26,6 +26,10 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     document.body.style.background = theme.bg;
     document.documentElement.style.background = theme.bg;
+    // The pre-load background rule in index.php (#boot-bg) has done its job once the app is
+    // running; drop it so a later theme toggle isn't fighting a stale hard-coded colour.
+    const boot = document.getElementById('boot-bg');
+    if (boot) boot.remove();
   }, [theme.bg]);
 
   return (

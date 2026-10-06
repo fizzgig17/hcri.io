@@ -14,9 +14,17 @@
 
 <meta name="robots" content="all">
 
+<script>
+  // Match the theme chosen on the main app (hcri_theme, shared across this origin);
+  // runs before first paint so there's no flash of the wrong theme. Default is dark, like the app.
+  (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('hcri_theme') || 'dark'); } catch (e) {} })();
+</script>
 <style>
 
   :root{ --bg:#eef2f7; --surface:#fff; --text:#0d1f30; --dim:#4a6480; --border:#d4deea; --accent:#005baa; }
+  :root[data-theme="dark"]{ --bg:#060a0f; --surface:#0a1628; --text:#e8f4ff; --dim:#7aaccc; --border:rgba(80,160,220,0.25); --accent:#00d4ff; color-scheme:dark; }
+  :root[data-theme="dark"] .note{background:rgba(255,204,51,.1);border-color:rgba(255,204,51,.45);color:#ffd866}
+  :root[data-theme="dark"] .ph{background:rgba(80,160,220,.15);color:#ffb35c}
 
   *{box-sizing:border-box}
 
@@ -47,16 +55,19 @@
   footer{margin-top:40px;color:var(--dim);font-size:13px;border-top:1px solid var(--border);padding-top:14px}
 
 </style>
+<link rel="stylesheet" href="/assets/site-pages.css">
+<script defer src="/assets/site-pages.js"></script>
 
 </head>
 
 <body>
 
-<div class="bar"></div>
 
 <div class="wrap">
 
-  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a></header>
+  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme">🌙</button></header>
+<div class="bar"></div>
 
   <h1>Privacy Policy</h1>
 
@@ -188,10 +199,24 @@
 
   <a class="back" href="/">← Back to hCRI.io</a>
 
-  <footer>hCRI.io · <a href="/terms">Terms of Service</a></footer>
+  <footer>© 2026 fizzgig · hCRI.io · <a href="/terms">Terms of Service</a> · <a href="/licenses">Licenses &amp; source</a></footer>
 
 </div>
 
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
 </body>
 
 </html>

@@ -4,7 +4,7 @@ declare(strict_types=1);
 // ── GDPR / privacy helpers ───────────────────────────────────────────────────
 // The version string of the Privacy Policy + Terms a user agreed to at signup.
 // Bump this whenever the policy materially changes (and consider re-prompting).
-const CONSENT_VERSION = '2025-06-26';
+const CONSENT_VERSION = '2026-10-05';
 
 /**
  * Best-effort: make sure the consent columns exist on the users table.

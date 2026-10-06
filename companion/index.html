@@ -46,9 +46,9 @@
     /* Same tokens hCRI.io's own dark UI runs on (see index.php's :root block) --
        this page is meant to feel like a room in the same house, not a
        reinterpretation of it. */
-    --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2d3645;
-    --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --accent-dim:rgba(88,166,255,.14);
-    --good:#3fb978; --warn:#d29922; --bad:#f85149;
+    --bg:#060a0f; --surface:#0a1628; --surface2:#0b1929; --border:#2d3645;
+    --text:#e8f4ff; --dim:#7aaccc; --accent:#00d4ff; --accent-dim:rgba(0,212,255,.14);
+    --good:#3dff9a; --warn:#ffcc33; --bad:#ff4466;
     color-scheme: dark;
   }
   /* Light tokens pulled directly from the main app's own light palette
@@ -105,13 +105,13 @@
   .cta-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .btn{
     height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
-    background:var(--accent-dim);border:1.5px solid rgba(88,166,255,.45);color:var(--accent);
+    background:var(--accent-dim);border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent);
     border-radius:8px;padding:0 20px;font:inherit;font-size:14px;font-weight:700;
     cursor:pointer;white-space:nowrap;
   }
-  .btn:hover{background:rgba(88,166,255,.22);text-decoration:none}
-  .btn.solid{background:var(--accent);color:#04101f;border-color:var(--accent)}
-  .btn.solid:hover{background:#7ab8ff}
+  .btn:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
+  .btn.solid{background:var(--accent);color:#060a0f;border-color:var(--accent)}
+  .btn.solid:hover{background:#5ce6ff}
   /* Light theme's accent (#005baa) is a mid-dark blue -- dark text loses
      contrast there, so switch to a light label instead. */
   :root[data-theme="light"] .btn.solid{color:#fff}
@@ -132,7 +132,7 @@
   .device .devsub{font-size:10px;color:var(--dim);margin-top:1px}
   .device .tabs{display:flex;gap:6px;margin:12px 0 14px;flex-wrap:wrap}
   .device .tab{font-size:10px;color:var(--dim);border:1px solid var(--border);border-radius:999px;padding:3px 8px}
-  .device .tab.active{color:var(--good);border-color:rgba(63,185,120,.5);background:rgba(63,185,120,.1)}
+  .device .tab.active{color:var(--good);border-color:rgba(61,255,154,.5);background:rgba(61,255,154,.1)}
   .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center}
   .stat .v{font-size:14px;font-weight:800}
@@ -176,7 +176,7 @@
   .step:first-child{border-top:none}
   .step .num{
     counter-increment:step;font-size:13px;font-weight:800;color:var(--accent);
-    width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(88,166,255,.4);
+    width:34px;height:34px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--accent) 40%,transparent);
     display:flex;align-items:center;justify-content:center;
   }
   .step .num::before{content:counter(step)}
@@ -229,11 +229,9 @@
   #back-to-top:hover{background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
   #back-to-top svg{width:18px;height:18px}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
-
-<div class="wrap">
+<link rel="stylesheet" href="/assets/site-pages.css">
+<script defer src="/assets/site-pages.js"></script>
+<div class="wrap wide">
 
   <header class="top">
     <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
@@ -249,6 +247,7 @@
       <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme" style="background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text);padding:0">🌙</button>
     </nav>
   </header>
+<div class="bar"></div>
 
   <section class="hero" style="border-top:none">
     <div>
@@ -291,15 +290,15 @@
         <svg class="spd" viewBox="0 0 300 110" preserveAspectRatio="none">
           <defs>
             <linearGradient id="spdfill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#58a6ff" stop-opacity=".35"/>
-              <stop offset="1" stop-color="#58a6ff" stop-opacity="0"/>
+              <stop offset="0" stop-color="#00d4ff" stop-opacity=".35"/>
+              <stop offset="1" stop-color="#00d4ff" stop-opacity="0"/>
             </linearGradient>
             <linearGradient id="spdline" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0" stop-color="#7b5cff"/>
-              <stop offset="0.35" stop-color="#3fb978"/>
+              <stop offset="0.35" stop-color="#3dff9a"/>
               <stop offset="0.6" stop-color="#e8d84a"/>
               <stop offset="0.8" stop-color="#f08a3c"/>
-              <stop offset="1" stop-color="#f85149"/>
+              <stop offset="1" stop-color="#ff4466"/>
             </linearGradient>
           </defs>
           <path d="M0,100 L10,92 L28,70 L42,60 L55,66 L70,48 L88,20 L108,8 L128,14 L150,28 L172,38 L195,44 L220,56 L245,70 L270,84 L300,96 L300,110 L0,110 Z" fill="url(#spdfill)"/>
@@ -643,11 +642,12 @@
 
   <footer>
     <div class="foot-row">
-      <div>hCRI Companion is an independent client for <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io</a>.</div>
+      <div>© 2026 fizzgig. hCRI Companion is free software (GPL v3) and an independent client for <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io</a>.</div>
       <div class="foot-links">
         <a href="manual/">Manual</a>
         <a href="manual/hCRI-Companion-Manual.pdf" download>Manual (PDF)</a>
         <a href="#privacy-policy">Privacy Policy</a>
+        <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source &amp; licenses ↗</a>
         <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a>
         <a class="tip-link" href="https://buymeacoffee.com/fizzgig" target="_blank" rel="noopener" title="Buy me a coffee" aria-label="Support this project on Buy Me a Coffee">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

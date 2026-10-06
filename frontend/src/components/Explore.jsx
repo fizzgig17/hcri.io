@@ -88,6 +88,7 @@
 
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
+import SiteFooter from './SiteFooter.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { getToken } from '../lib/api';
 import { fmtTZ } from '../lib/tz';
@@ -2621,6 +2622,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       {pageHeader}
       <div ref={scrollAreaRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {tabContent}
+        <SiteFooter />
       </div>
     </div>
   );
@@ -2679,7 +2681,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const mobileDetailView = (
     <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: r.bg, overflow: 'hidden' }}>
       {detailToolbar}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}</div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}<SiteFooter /></div>
     </div>
   );
 
