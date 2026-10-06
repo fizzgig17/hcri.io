@@ -96,6 +96,8 @@ export function GlobalHelp() {
 export default function HelpModal({ onClose, initialTitle, initialSlug }) {
   const { theme: T } = useTheme();
   const [index, setIndex] = useState(0);
+  // Phones: show the full topic list instead of the article (opened with the "All topics" button).
+  const [listOpen, setListOpen] = useState(false);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -163,12 +165,13 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
         </a>
 
         <div style={{ display:'flex', flexDirection: isMobile ? 'column' : 'row', flex:1, overflow:'hidden' }}>
+          {(!isMobile || listOpen) && (
           <div style={ isMobile
-            ? { width:'100%', maxHeight:128, flexShrink:0, borderBottom:`1px solid ${T.border}`, overflowY:'auto', background:T.surface2 }
+            ? { width:'100%', flex:1, minHeight:0, overflowY:'auto', background:T.surface2 }
             : { width:200, flexShrink:0, borderRight:`1px solid ${T.border}`, overflowY:'auto', background:T.surface2 }
           }>
             {topics.map((tp, i) => (
-              <div key={i} onClick={() => setIndex(i)}
+              <div key={i} onClick={() => { setIndex(i); setListOpen(false); }}
                 style={{
                   padding:'9px 14px', fontSize:12, cursor:'pointer',
                   borderLeft: `3px solid ${i === index ? T.accent : 'transparent'}`,
@@ -181,8 +184,16 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
               </div>
             ))}
           </div>
+          )}
 
+          {(!isMobile || !listOpen) && (
           <div style={{ flex:1, minHeight:0, overflowY:'auto', padding: isMobile ? '16px 16px' : '24px 28px' }}>
+            {isMobile && (
+              <button onClick={() => setListOpen(true)}
+                style={{ display:'block', marginBottom:12, background:'none', border:`1px solid ${T.accent}50`, color:T.accent, borderRadius:6, padding:'6px 12px', fontSize:12, fontFamily:'monospace', cursor:'pointer' }}>
+                ☰ All topics
+              </button>
+            )}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, marginBottom:16 }}>
               <div style={{ fontSize:18, fontWeight:900, color:T.white, fontFamily:'monospace' }}>{topics[index].title}</div>
               <button
@@ -203,11 +214,12 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
               {linkifyHelp(topics[index].content, topics, index, setIndex)}
             </div>
           </div>
+          )}
         </div>
 
         <div style={{ padding:'10px 20px', borderTop:`1px solid ${T.border}`, background:T.surface2, flexShrink:0, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ fontSize:11, color:T.dim, fontFamily:'monospace' }}>IES TM-30-18 · CIE 13.3-1995 · hcri.io</div>
-          <div style={{ display:'flex', gap:8 }}>
+          <div style={{ display: isMobile && listOpen ? 'none' : 'flex', gap:8 }}>
             <button onClick={() => setIndex(i => Math.max(0, i - 1))} disabled={index === 0}
               style={{ background:`${T.accent}15`, border:`1px solid ${T.accent}40`, color:T.accent, borderRadius:5, padding:'5px 14px', fontSize:12, cursor:'pointer', fontFamily:'monospace', opacity: index === 0 ? 0.4 : 1 }}>
               ← Prev
