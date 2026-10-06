@@ -21,6 +21,7 @@
 // FeedbackModal (named export of AuthScreen.jsx).
 
 import { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
@@ -62,9 +63,25 @@ export default function CategoryEditor({ report, isGuest }) {
   // the on-screen keyboard would otherwise cover it, instead of being clipped by
   // (or scrolled under) the keyboard and the page header.
   const anchorRefs = useRef({});
+  // Phones: editing a category opens a full-width sheet pinned to the top of the screen
+  // (search box + list) instead of a dropdown under the field. The field being edited is
+  // then never behind the on-screen keyboard, so the browser has nothing to pan/zoom and
+  // the page underneath can stay perfectly still.
+  const isTouch = typeof window !== 'undefined' && !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const sheetInputRef = useRef(null);
+  const [sheetH, setSheetH] = useState(typeof window !== 'undefined' ? window.innerHeight : 600);
+  useEffect(() => {
+    if (!isTouch || !openK) return undefined;
+    const vv = window.visualViewport;
+    const upd = () => setSheetH(vv ? vv.height : window.innerHeight);
+    upd();
+    if (vv) vv.addEventListener('resize', upd);
+    return () => { if (vv) vv.removeEventListener('resize', upd); };
+  }, [isTouch, openK]);
   const [listPos, setListPos] = useState(null);
   useEffect(() => {
-    if (!openK) { setListPos(null); return undefined; }
+    if (!openK || isTouch) { setListPos(null); return undefined; }
     const place = () => {
       const el = anchorRefs.current[openK];
       if (!el) return;
@@ -301,11 +318,14 @@ export default function CategoryEditor({ report, isGuest }) {
               placeholder={chips.length ? '+ add…' : 'select…'}
               autoComplete="off"
               onFocus={(ev) => {
+                if (isTouch) {
+                  // Hand the keyboard to the sheet's own search box (same tap, so iOS allows it).
+                  ev.currentTarget.blur();
+                  flushSync(() => { setOpenK(k); setHi(0); });
+                  if (sheetInputRef.current) sheetInputRef.current.focus();
+                  return;
+                }
                 setOpenK(k); setHi(0);
-                // Once the keyboard has finished sliding in (the layout shrinks above it),
-                // bring this field to the middle of the visible scroll area.
-                const el = ev.currentTarget;
-                setTimeout(() => { try { el.scrollIntoView({ block: 'center' }); } catch (e) { /* ignore */ } }, 250);
               }}
               onChange={(ev) => { setDraft((s) => ({ ...s, [k]: ev.target.value })); setOpenK(k); setHi(0); }}
               onKeyDown={(ev) => {
@@ -343,10 +363,10 @@ export default function CategoryEditor({ report, isGuest }) {
                 padding: 2,
               }}
             />
-            {openK === k && (
+            {!isTouch && openK === k && (
               <div onClick={() => { setOpenK(null); setDraft((s) => ({ ...s, [k]: '' })); }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
             )}
-            {openK === k && listPos && (
+            {!isTouch && openK === k && listPos && (
               <div
                 style={{
                   position: 'fixed',
@@ -412,6 +432,53 @@ export default function CategoryEditor({ report, isGuest }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
         {KINDS.map(field)}
       </div>
+      {isTouch && openK && (() => {
+        const k = openK;
+        const lab = (KINDS.find((x) => x[0] === k) || [k, k])[1];
+        const list = (opts && opts[k]) || [];
+        const chips = vals[k] || [];
+        const avail = list.filter((it) => !chips.includes(it.value));
+        const q = (draft[k] || '').toLowerCase();
+        const flt = avail.filter((it) => it.value.toLowerCase().includes(q));
+        const close = () => { setOpenK(null); setDraft((st) => ({ ...st, [k]: '' })); };
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: sheetH, zIndex: 3500, background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: isIOS ? 118 : 8, boxSizing: 'border-box', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${o.border}`, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{lab}</div>
+              <input
+                ref={sheetInputRef}
+                value={draft[k] || ''}
+                placeholder="search…"
+                autoComplete="off"
+                autoCapitalize="off"
+                onChange={(ev) => setDraft((st) => ({ ...st, [k]: ev.target.value }))}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    const pick = flt[0];
+                    if (pick) { add(k, pick.value); close(); }
+                  }
+                }}
+                style={{ flex: 1, minWidth: 0, background: o.surface2 || o.surface, border: `1px solid ${o.border}`, borderRadius: 6, color: o.text, fontFamily: 'monospace', padding: '7px 8px', outline: 'none' }}
+              />
+              <button type="button" onClick={close} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.accent, borderRadius: 6, padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>Done</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: 6, WebkitOverflowScrolling: 'touch' }}>
+              {flt.length ? flt.map((it) => (
+                <div
+                  key={it.id}
+                  onClick={() => { add(k, it.value); close(); }}
+                  style={{ padding: '11px 12px', fontSize: 15, fontFamily: 'monospace', color: o.text, borderRadius: 6, borderBottom: `1px solid ${o.border}33`, cursor: 'pointer' }}
+                >
+                  {it.value}
+                </div>
+              )) : (
+                <div style={{ padding: '12px', fontSize: 13, color: o.dim, fontFamily: 'monospace' }}>{avail.length ? 'No matches' : 'No more options'}</div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       <button
         type="button"
         onClick={() => setReqOpen(true)}

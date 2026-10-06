@@ -59,52 +59,6 @@ import { handlePanelPopState } from './lib/panelHistory';
 import usePanelBackClose from './hooks/usePanelBackClose';
 
 export default function App() {
-  // On-screen keyboard: iOS Safari doesn't shrink the layout viewport, it just pans the
-  // visual viewport -- which slides the locked mobile layouts up under the browser's
-  // URL bar and hides the bottom of long lists behind the keys. While the keyboard is
-  // up, publish the visible height as --vvh so full-screen layouts (.vh-full) shrink to
-  // fit above the keyboard instead (so there's nothing for Safari to pan).
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return undefined;
-    const root = document.documentElement;
-    const editing = () => {
-      const a = document.activeElement;
-      return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable);
-    };
-    const update = () => {
-      // Only while a field is focused AND the keyboard is really up; otherwise a stale
-      // value (e.g. captured mid-animation, or left over after the app was backgrounded
-      // with the keyboard open) would leave the layout stuck short with a gap below it.
-      if (editing() && window.innerHeight - vv.height > 120) root.style.setProperty('--vvh', Math.round(vv.height + vv.offsetTop) + 'px'); // bottom edge of the visible area, in layout coordinates
-      else root.style.removeProperty('--vvh');
-    };
-    const timers = [];
-    const settle = () => {
-      update();
-      timers.splice(0).forEach(clearTimeout);
-      [150, 400, 800].forEach((ms) => timers.push(setTimeout(update, ms)));
-    };
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    document.addEventListener('focusin', settle);
-    document.addEventListener('focusout', settle);
-    document.addEventListener('visibilitychange', settle);
-    window.addEventListener('pageshow', settle);
-    window.addEventListener('focus', settle);
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      document.removeEventListener('focusin', settle);
-      document.removeEventListener('focusout', settle);
-      document.removeEventListener('visibilitychange', settle);
-      window.removeEventListener('pageshow', settle);
-      window.removeEventListener('focus', settle);
-      timers.forEach(clearTimeout);
-      root.style.removeProperty('--vvh');
-    };
-  }, []);
   const { theme: T, themeName, toggleTheme } = useTheme();
   const { user, checking, tryAutoLogin, login, register, logout } = useAuth();
 
