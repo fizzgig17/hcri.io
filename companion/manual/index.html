@@ -12,9 +12,9 @@
 </script>
 <style>
   :root{
-    --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2d3645;
-    --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --accent-dim:rgba(88,166,255,.14);
-    --good:#3fb978; --warn:#d29922; --bad:#f85149;
+    --bg:#060a0f; --surface:#0a1628; --surface2:#0b1929; --border:#2d3645;
+    --text:#e8f4ff; --dim:#7aaccc; --accent:#00d4ff; --accent-dim:rgba(0,212,255,.14);
+    --good:#3dff9a; --warn:#ffcc33; --bad:#ff4466;
     color-scheme: dark;
   }
   :root[data-theme="light"]{
@@ -50,10 +50,10 @@
   nav.links a:hover{color:var(--text)}
   .btn-sm{
     display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
-    border:1.5px solid rgba(88,166,255,.45);background:var(--accent-dim);color:var(--accent);
+    border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);
     border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;
   }
-  .btn-sm:hover{background:rgba(88,166,255,.22);text-decoration:none}
+  .btn-sm:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
   .btn-sm svg{width:14px;height:14px}
 
   .page{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:48px;padding-block:36px 72px}
@@ -104,7 +104,7 @@
   }
   .steps li::before{
     content:counter(step);position:absolute;left:0;top:-1px;
-    width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(88,166,255,.4);
+    width:26px;height:26px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--accent) 40%,transparent);
     color:var(--accent);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;
   }
   .steps li strong{display:block;margin-bottom:2px}

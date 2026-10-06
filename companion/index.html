@@ -46,9 +46,9 @@
     /* Same tokens hCRI.io's own dark UI runs on (see index.php's :root block) --
        this page is meant to feel like a room in the same house, not a
        reinterpretation of it. */
-    --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2d3645;
-    --text:#e6edf3; --dim:#8b949e; --accent:#58a6ff; --accent-dim:rgba(88,166,255,.14);
-    --good:#3fb978; --warn:#d29922; --bad:#f85149;
+    --bg:#060a0f; --surface:#0a1628; --surface2:#0b1929; --border:#2d3645;
+    --text:#e8f4ff; --dim:#7aaccc; --accent:#00d4ff; --accent-dim:rgba(0,212,255,.14);
+    --good:#3dff9a; --warn:#ffcc33; --bad:#ff4466;
     color-scheme: dark;
   }
   /* Light tokens pulled directly from the main app's own light palette
@@ -105,13 +105,13 @@
   .cta-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .btn{
     height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
-    background:var(--accent-dim);border:1.5px solid rgba(88,166,255,.45);color:var(--accent);
+    background:var(--accent-dim);border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent);
     border-radius:8px;padding:0 20px;font:inherit;font-size:14px;font-weight:700;
     cursor:pointer;white-space:nowrap;
   }
-  .btn:hover{background:rgba(88,166,255,.22);text-decoration:none}
-  .btn.solid{background:var(--accent);color:#04101f;border-color:var(--accent)}
-  .btn.solid:hover{background:#7ab8ff}
+  .btn:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
+  .btn.solid{background:var(--accent);color:#060a0f;border-color:var(--accent)}
+  .btn.solid:hover{background:#5ce6ff}
   /* Light theme's accent (#005baa) is a mid-dark blue -- dark text loses
      contrast there, so switch to a light label instead. */
   :root[data-theme="light"] .btn.solid{color:#fff}
@@ -132,7 +132,7 @@
   .device .devsub{font-size:10px;color:var(--dim);margin-top:1px}
   .device .tabs{display:flex;gap:6px;margin:12px 0 14px;flex-wrap:wrap}
   .device .tab{font-size:10px;color:var(--dim);border:1px solid var(--border);border-radius:999px;padding:3px 8px}
-  .device .tab.active{color:var(--good);border-color:rgba(63,185,120,.5);background:rgba(63,185,120,.1)}
+  .device .tab.active{color:var(--good);border-color:rgba(61,255,154,.5);background:rgba(61,255,154,.1)}
   .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 6px;text-align:center}
   .stat .v{font-size:14px;font-weight:800}
@@ -176,7 +176,7 @@
   .step:first-child{border-top:none}
   .step .num{
     counter-increment:step;font-size:13px;font-weight:800;color:var(--accent);
-    width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(88,166,255,.4);
+    width:34px;height:34px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--accent) 40%,transparent);
     display:flex;align-items:center;justify-content:center;
   }
   .step .num::before{content:counter(step)}
@@ -289,15 +289,15 @@
         <svg class="spd" viewBox="0 0 300 110" preserveAspectRatio="none">
           <defs>
             <linearGradient id="spdfill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#58a6ff" stop-opacity=".35"/>
-              <stop offset="1" stop-color="#58a6ff" stop-opacity="0"/>
+              <stop offset="0" stop-color="#00d4ff" stop-opacity=".35"/>
+              <stop offset="1" stop-color="#00d4ff" stop-opacity="0"/>
             </linearGradient>
             <linearGradient id="spdline" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0" stop-color="#7b5cff"/>
-              <stop offset="0.35" stop-color="#3fb978"/>
+              <stop offset="0.35" stop-color="#3dff9a"/>
               <stop offset="0.6" stop-color="#e8d84a"/>
               <stop offset="0.8" stop-color="#f08a3c"/>
-              <stop offset="1" stop-color="#f85149"/>
+              <stop offset="1" stop-color="#ff4466"/>
             </linearGradient>
           </defs>
           <path d="M0,100 L10,92 L28,70 L42,60 L55,66 L70,48 L88,20 L108,8 L128,14 L150,28 L172,38 L195,44 L220,56 L245,70 L270,84 L300,96 L300,110 L0,110 Z" fill="url(#spdfill)"/>
