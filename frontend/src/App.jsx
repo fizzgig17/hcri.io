@@ -76,7 +76,7 @@ export default function App() {
       // Only while a field is focused AND the keyboard is really up; otherwise a stale
       // value (e.g. captured mid-animation, or left over after the app was backgrounded
       // with the keyboard open) would leave the layout stuck short with a gap below it.
-      if (editing() && window.innerHeight - vv.height > 120) root.style.setProperty('--vvh', vv.height + 'px');
+      if (editing() && window.innerHeight - vv.height > 120) root.style.setProperty('--vvh', Math.round(vv.height + vv.offsetTop) + 'px'); // bottom edge of the visible area, in layout coordinates
       else root.style.removeProperty('--vvh');
     };
     const timers = [];
@@ -87,6 +87,7 @@ export default function App() {
     };
     update();
     vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
     document.addEventListener('focusin', settle);
     document.addEventListener('focusout', settle);
     document.addEventListener('visibilitychange', settle);
@@ -94,6 +95,7 @@ export default function App() {
     window.addEventListener('focus', settle);
     return () => {
       vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
       document.removeEventListener('focusin', settle);
       document.removeEventListener('focusout', settle);
       document.removeEventListener('visibilitychange', settle);
