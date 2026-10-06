@@ -1006,6 +1006,11 @@ header('Content-Type: text/html; charset=utf-8');
 
 <meta name="theme-color" content="#060a0f">
 
+<!-- color-scheme tells the browser what its own default canvas should be while the stylesheet is still
+     downloading (rendering is blocked until then); without it Safari shows plain white on a cold first load.
+     The script below flips it to "light" for light-theme visitors. -->
+<meta name="color-scheme" content="dark">
+
 <script>
   // Paint the right background immediately (before the stylesheet and the React app load) so a
   // dark-mode visitor never sees a white flash, and a light-mode visitor never sees a dark one.
@@ -1016,6 +1021,8 @@ header('Content-Type: text/html; charset=utf-8');
     var d = document.documentElement;
     d.style.background = bg;
     d.style.colorScheme = scheme;
+    var cs = document.querySelector('meta[name="color-scheme"]');
+    if (cs) cs.setAttribute('content', scheme);
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', bg);
   })();
