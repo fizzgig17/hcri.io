@@ -1006,6 +1006,21 @@ header('Content-Type: text/html; charset=utf-8');
 
 <meta name="theme-color" content="#060a0f">
 
+<script>
+  // Paint the right background immediately (before the stylesheet and the React app load) so a
+  // dark-mode visitor never sees a white flash, and a light-mode visitor never sees a dark one.
+  // Same key and palette the app itself uses (hcri_theme; see frontend/src/lib/theme.js).
+  (function(){
+    var bg = '#060a0f', scheme = 'dark';
+    try { if (localStorage.getItem('hcri_theme') === 'light') { bg = '#eef2f7'; scheme = 'light'; } } catch (e) {}
+    var d = document.documentElement;
+    d.style.background = bg;
+    d.style.colorScheme = scheme;
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', bg);
+  })();
+</script>
+
 <style>
 
 @media (max-width: 768px) {
