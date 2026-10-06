@@ -73,8 +73,7 @@ export default function CategoryEditor({ report, isGuest }) {
   // iOS pans the visual viewport when the keyboard opens, and `position: fixed` follows the
   // LAYOUT viewport, so a plain top:0 sheet can end up offset. Pin the sheet to the visual
   // viewport's own top edge and height instead.
-  const sheetRef = useRef(null);
-  const [sheetBox, setSheetBox] = useState({ kb: 0, dbg: '' });
+  const [sheetBox, setSheetBox] = useState({ kb: 0 });
   useEffect(() => {
     if (!isTouch || !openK) return undefined;
     const vv = window.visualViewport;
@@ -83,8 +82,7 @@ export default function CategoryEditor({ report, isGuest }) {
       const vh = vv ? vv.height : ih;
       const ot = vv ? vv.offsetTop : 0;
       const kb = Math.max(0, Math.round(ih - (vh + ot)));
-      const top = sheetRef.current ? Math.round(sheetRef.current.getBoundingClientRect().top) : -1;
-      setSheetBox({ kb, dbg: `ot=${Math.round(ot)} vh=${Math.round(vh)} ih=${ih} kb=${kb} top=${top} sy=${Math.round(window.scrollY)}` });
+      setSheetBox({ kb });
     };
     upd();
     const timers = [100, 300, 600, 1000].map((ms) => setTimeout(upd, ms));
@@ -457,8 +455,7 @@ export default function CategoryEditor({ report, isGuest }) {
         const flt = avail.filter((it) => it.value.toLowerCase().includes(q));
         const close = () => { setOpenK(null); setDraft((st) => ({ ...st, [k]: '' })); };
         return createPortal(
-          <div ref={sheetRef} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3500, touchAction: 'none', background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: 8, paddingBottom: sheetBox.kb, boxSizing: 'border-box', overflow: 'hidden' }}>
-            <div style={{ fontSize: 10, color: o.dim, fontFamily: 'monospace', padding: '0 12px' }}>{sheetBox.dbg}</div>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3500, touchAction: 'none', background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: 8, paddingBottom: sheetBox.kb, boxSizing: 'border-box', overflow: 'hidden' }}>
             <div onTouchMove={(ev) => ev.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${o.border}`, flexShrink: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{lab}</div>
               <input
