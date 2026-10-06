@@ -52,6 +52,7 @@ import { setTZ } from './lib/tz';
 import { TopNotices } from './components/Notices';
 import { GlobalHelp } from './components/HelpModal';
 import AuthScreen from './components/AuthScreen';
+import SiteFooter from './components/SiteFooter.jsx';
 import ReportDetail from './components/ReportDetail';
 import Explore from './components/Explore';
 import PasswordReset from './components/PasswordReset';
@@ -343,6 +344,7 @@ export default function App() {
               isGuest={!user || Number(sharedReport.userId) !== Number(user.id)}
               isShared
             />
+            <SiteFooter />
           </div>
         </div>
       </>
