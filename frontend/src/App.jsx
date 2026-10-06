@@ -68,13 +68,40 @@ export default function App() {
     const vv = window.visualViewport;
     if (!vv) return undefined;
     const root = document.documentElement;
+    const editing = () => {
+      const a = document.activeElement;
+      return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable);
+    };
     const update = () => {
-      if (window.innerHeight - vv.height > 120) root.style.setProperty('--vvh', vv.height + 'px');
+      // Only while a field is focused AND the keyboard is really up; otherwise a stale
+      // value (e.g. captured mid-animation, or left over after the app was backgrounded
+      // with the keyboard open) would leave the layout stuck short with a gap below it.
+      if (editing() && window.innerHeight - vv.height > 120) root.style.setProperty('--vvh', vv.height + 'px');
       else root.style.removeProperty('--vvh');
+    };
+    const timers = [];
+    const settle = () => {
+      update();
+      timers.splice(0).forEach(clearTimeout);
+      [150, 400, 800].forEach((ms) => timers.push(setTimeout(update, ms)));
     };
     update();
     vv.addEventListener('resize', update);
-    return () => { vv.removeEventListener('resize', update); root.style.removeProperty('--vvh'); };
+    document.addEventListener('focusin', settle);
+    document.addEventListener('focusout', settle);
+    document.addEventListener('visibilitychange', settle);
+    window.addEventListener('pageshow', settle);
+    window.addEventListener('focus', settle);
+    return () => {
+      vv.removeEventListener('resize', update);
+      document.removeEventListener('focusin', settle);
+      document.removeEventListener('focusout', settle);
+      document.removeEventListener('visibilitychange', settle);
+      window.removeEventListener('pageshow', settle);
+      window.removeEventListener('focus', settle);
+      timers.forEach(clearTimeout);
+      root.style.removeProperty('--vvh');
+    };
   }, []);
   const { theme: T, themeName, toggleTheme } = useTheme();
   const { user, checking, tryAutoLogin, login, register, logout } = useAuth();
