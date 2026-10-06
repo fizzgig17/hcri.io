@@ -636,7 +636,11 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [downloading, setDownloading] = useState(false); // unused in the current UI; kept for fidelity
   const [helpOpen, setHelpOpenLocal] = useState(() => __helpOpenShared);
   const setHelpOpen = (v) => { __helpOpenShared = v; setHelpOpenLocal(v); };
-  const [tm30Open, setTm30Open] = useState(false);
+  // ?tm30=1 on the link opens the TM-30 report straight away -- used by the
+  // companion app's History "TM-30" shortcut. Read once, on first render.
+  const [tm30Open, setTm30Open] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('tm30') === '1'; } catch (e) { return false; }
+  });
   const isMobile = useIsMobile(768);
   const [shareCardOpen, setShareCardOpen] = useState(false);
   // Verified against the bundle: setShareRowOpen is never called anywhere in
