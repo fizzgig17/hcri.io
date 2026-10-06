@@ -1,30 +1,41 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Licenses · hCRI.io</title>
 <script>
-  // Match the theme chosen on the main app (hcri_theme, shared across this origin);
-  // runs before first paint so there's no flash of the wrong theme. Default is dark, like the app.
   (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('hcri_theme') || 'dark'); } catch (e) {} })();
 </script>
 <style>
-  :root{--bg:#eef2f7;--text:#0d1f30;--dim:#4a6480;--border:#d4deea;--accent:#005baa}
-  :root[data-theme="dark"]{--bg:#060a0f;--text:#e8f4ff;--dim:#7aaccc;--border:rgba(80,160,220,.25);--accent:#00d4ff;color-scheme:dark}
-  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 ui-monospace,Menlo,Consolas,monospace}
-  main{max-width:820px;margin:0 auto;padding:28px 16px 60px}
-  a{color:var(--accent)} h1{font-size:22px} h2{font-size:16px;margin-top:28px}
-  pre{white-space:pre-wrap;word-wrap:break-word;font-size:12px;border:1px solid var(--border);padding:12px;border-radius:6px}
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--text);font-size:16px;line-height:1.65}
+  .wrap{max-width:780px;margin:0 auto;padding:28px 20px 80px}
+  header a.brand{font-weight:900;font-size:20px;color:var(--text);text-decoration:none}
+  header a.brand .io{color:var(--accent)}
+  h1{font-size:28px;margin:18px 0 4px}
+  h2{font-size:19px;margin:34px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px}
+  a{color:var(--accent)}
+  pre{white-space:pre-wrap;word-wrap:break-word;font-size:12px;border:1px solid var(--border);background:var(--surface);padding:12px;border-radius:6px}
+  code{font-size:.92em}
+  .back{display:inline-block;margin-top:30px;color:var(--accent);text-decoration:none;font-weight:600}
   footer{margin-top:40px;color:var(--dim);font-size:13px;border-top:1px solid var(--border);padding-top:14px}
-</style></head><body><main>
-<h1>Licenses &amp; source code</h1>
+</style>
+<link rel="stylesheet" href="/assets/site-pages.css">
+</head>
+<body>
+<div class="bar"></div>
+<div class="wrap">
+  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a></header>
+  <h1>Licenses &amp; source code</h1>
+
 <p>hCRI.io is free software: © 2026 fizzgig, licensed under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU Affero General Public License v3</a> or later. Source code: <a href="https://github.com/fizzgig17/hcri.io" target="_blank" rel="noopener">github.com/fizzgig17/hcri.io</a>. The hCRI Companion Android app is licensed under the GNU GPL v3 or later: <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">github.com/fizzgig17/hcri-companion</a>.</p>
 <p>The hCRI.io name and logo are not licensed for reuse.</p>
-<h1>Third-party notices</h1>
-<pre>hCRI.io is licensed under the GNU AGPL v3 (see `LICENSE`). It includes or bundles the following third-party software, each under its own license.
 
-## React and React DOM — MIT
-
-```
-MIT License
+  <h1>Third-party notices</h1>
+<p>hCRI.io is licensed under the GNU AGPL v3 (see <code>LICENSE</code>). It includes or bundles the following third-party software, each under its own license.</p>
+<h2>React and React DOM — MIT</h2>
+<pre>MIT License
 
 Copyright (c) Meta Platforms, Inc. and affiliates.
 
@@ -44,13 +55,9 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-## three.js — MIT
-
-```
-The MIT License
+SOFTWARE.</pre>
+<h2>three.js — MIT</h2>
+<pre>The MIT License
 
 Copyright © 2010-2026 three.js authors
 
@@ -70,13 +77,9 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
-## Chart.js 4.4.3 — MIT
-
-```
-The MIT License (MIT)
+THE SOFTWARE.</pre>
+<h2>Chart.js 4.4.3 — MIT</h2>
+<pre>The MIT License (MIT)
 
 Copyright (c) 2014-2024 Chart.js Contributors
 
@@ -84,20 +87,14 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-## Fonts — SIL Open Font License 1.1
-
-JetBrains Mono and Work Sans are bundled in `assets/fonts/`; their full license texts are alongside the font files (`JetBrainsMono-OFL.txt`, `WorkSans-OFL.txt`).
-
-## FPDF — permissive license
-
-Bundled in `vendor/fpdf/`; see `vendor/fpdf/license.txt`.
-
-## PHPMailer — GNU LGPL 2.1
-
-Bundled unmodified in `vendor/phpmailer/`; full license text in `vendor/phpmailer/LICENSE`. Source: https://github.com/PHPMailer/PHPMailer
-</pre>
-<footer>hCRI.io · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></footer>
-</main></body></html>
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</pre>
+<h2>Fonts — SIL Open Font License 1.1</h2>
+<p>JetBrains Mono and Work Sans are bundled in <code>assets/fonts/</code>; their full license texts are alongside the font files (<code>JetBrainsMono-OFL.txt</code>, <code>WorkSans-OFL.txt</code>).</p>
+<h2>FPDF — permissive license</h2>
+<p>Bundled in <code>vendor/fpdf/</code>; see <code>vendor/fpdf/license.txt</code>.</p>
+<h2>PHPMailer — GNU LGPL 2.1</h2>
+<p>Bundled unmodified in <code>vendor/phpmailer/</code>; full license text in <code>vendor/phpmailer/LICENSE</code>. Source: https://github.com/PHPMailer/PHPMailer</p>
+  <a class="back" href="/">← Back to hCRI.io</a>
+</div>
+</body>
+</html>

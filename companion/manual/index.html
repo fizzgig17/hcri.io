@@ -23,6 +23,7 @@
     --good:#0a6e2e; --warn:#8a5a00; --bad:#aa1133;
     color-scheme: light;
   }
+  .bar{margin-inline:-16px}
   *{box-sizing:border-box}
   html,body{background:var(--bg);transition:background-color .15s,color .15s}
   body{
@@ -144,13 +145,12 @@
   #back-to-top:hover{background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
   #back-to-top svg{width:18px;height:18px}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site-pages.css">
 </head><body>
+<div class="bar"></div>
 
 <header class="top">
-  <div class="brand">hCRI<span class="dot">.io</span> <span style="font-weight:600;color:var(--dim)">Companion</span>
+  <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
     <span class="tag">Manual</span>
   </div>
   <nav class="links">
