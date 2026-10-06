@@ -1,9 +1,14 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Licenses · hCRI.io</title>
+<script>
+  // Match the theme chosen on the main app (hcri_theme, shared across this origin);
+  // runs before first paint so there's no flash of the wrong theme. Default is dark, like the app.
+  (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('hcri_theme') || 'dark'); } catch (e) {} })();
+</script>
 <style>
-  :root{--bg:#060a0f;--text:#e8f4ff;--dim:#7aacce;--border:rgba(80,160,220,.25);--accent:#00d4ff}
-  @media (prefers-color-scheme: light){:root{--bg:#f6f9fc;--text:#10202e;--dim:#4a6a85;--border:rgba(20,80,130,.25);--accent:#0a6fa0}}
+  :root{--bg:#eef2f7;--text:#0d1f30;--dim:#4a6480;--border:#d4deea;--accent:#005baa}
+  :root[data-theme="dark"]{--bg:#060a0f;--text:#e8f4ff;--dim:#7aaccc;--border:rgba(80,160,220,.25);--accent:#00d4ff;color-scheme:dark}
   body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 ui-monospace,Menlo,Consolas,monospace}
   main{max-width:820px;margin:0 auto;padding:28px 16px 60px}
   a{color:var(--accent)} h1{font-size:22px} h2{font-size:16px;margin-top:28px}

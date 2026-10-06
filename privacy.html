@@ -14,9 +14,17 @@
 
 <meta name="robots" content="all">
 
+<script>
+  // Match the theme chosen on the main app (hcri_theme, shared across this origin);
+  // runs before first paint so there's no flash of the wrong theme. Default is dark, like the app.
+  (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('hcri_theme') || 'dark'); } catch (e) {} })();
+</script>
 <style>
 
   :root{ --bg:#eef2f7; --surface:#fff; --text:#0d1f30; --dim:#4a6480; --border:#d4deea; --accent:#005baa; }
+  :root[data-theme="dark"]{ --bg:#060a0f; --surface:#0a1628; --text:#e8f4ff; --dim:#7aaccc; --border:rgba(80,160,220,0.25); --accent:#00d4ff; color-scheme:dark; }
+  :root[data-theme="dark"] .note{background:rgba(255,204,51,.1);border-color:rgba(255,204,51,.45);color:#ffd866}
+  :root[data-theme="dark"] .ph{background:rgba(80,160,220,.15);color:#ffb35c}
 
   *{box-sizing:border-box}
 
