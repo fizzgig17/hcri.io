@@ -75,8 +75,22 @@ export default function CategoryEditor({ report, isGuest }) {
       const vLeft = vv ? vv.offsetLeft : 0;
       const vW = vv ? vv.width : window.innerWidth;
       const gap = 6, margin = 8;
-      const below = vTop + vH - r.bottom - gap - margin;
-      const above = r.top - vTop - gap - margin;
+      // The usable band is the visible viewport clipped to the page's own scroll area:
+      // mobile browsers draw their (translucent) URL bar over the top of the visual
+      // viewport, but the app header always sits below it, so the scroll area's top
+      // edge is a reliable "below the browser chrome" line.
+      let bandTop = vTop, bandBottom = vTop + vH;
+      for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const oy = getComputedStyle(n).overflowY;
+        if (oy === 'auto' || oy === 'scroll') {
+          const nr = n.getBoundingClientRect();
+          bandTop = Math.max(bandTop, nr.top);
+          bandBottom = Math.min(bandBottom, nr.bottom);
+          break;
+        }
+      }
+      const below = bandBottom - r.bottom - gap - margin;
+      const above = r.top - bandTop - gap - margin;
       const up = below < 150 && above > below;
       const maxHeight = Math.max(90, Math.min(260, up ? above : below));
       const width = Math.max(170, r.width);
