@@ -30,3 +30,13 @@ html.app-locked #root { height: 100% !important; overflow: hidden !important; }
 input[type=range] { accent-color: #00d4ff; }
 button { font-family: 'Courier New', Courier, monospace; }
 body { font-family: 'Courier New', Courier, monospace; -webkit-font-smoothing: antialiased; }
+
+/* iOS Safari auto-zooms the page when a focused text field's font-size is under 16px.
+   In the locked (no-page-scroll) mobile layouts that leaves the view zoomed and
+   "floating" while editing categories / titles / notes. Keep every editable control at
+   16px on touch devices so focus never triggers the zoom. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea { font-size: 16px !important; }
+}

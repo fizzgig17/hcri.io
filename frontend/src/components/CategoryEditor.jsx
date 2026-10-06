@@ -20,7 +20,8 @@
 // contact/feedback modal used elsewhere in the app, reconstructed as
 // FeedbackModal (named export of AuthScreen.jsx).
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { flushSync, createPortal } from 'react-dom';
 import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
@@ -57,6 +58,99 @@ export default function CategoryEditor({ report, isGuest }) {
   const [busy, setBusy] = useState('');
   const [openK, setOpenK] = useState(null);
   const [hi, setHi] = useState(0);
+  // Where the open suggestion list floats. The list is position:fixed and placed
+  // from the VISUAL viewport, so on phones it flips above the field / shrinks when
+  // the on-screen keyboard would otherwise cover it, instead of being clipped by
+  // (or scrolled under) the keyboard and the page header.
+  const anchorRefs = useRef({});
+  // Phones: editing a category opens a full-width sheet pinned to the top of the screen
+  // (search box + list) instead of a dropdown under the field. The field being edited is
+  // then never behind the on-screen keyboard, so the browser has nothing to pan/zoom and
+  // the page underneath can stay perfectly still.
+  const isTouch = typeof window !== 'undefined' && !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const sheetInputRef = useRef(null);
+  // iOS pans the visual viewport when the keyboard opens, and `position: fixed` follows the
+  // LAYOUT viewport, so a plain top:0 sheet can end up offset. Pin the sheet to the visual
+  // viewport's own top edge and height instead.
+  const [sheetBox, setSheetBox] = useState({ kb: 0 });
+  useEffect(() => {
+    if (!isTouch || !openK) return undefined;
+    const vv = window.visualViewport;
+    const upd = () => {
+      const ih = window.innerHeight;
+      const vh = vv ? vv.height : ih;
+      const ot = vv ? vv.offsetTop : 0;
+      const kb = Math.max(0, Math.round(ih - (vh + ot)));
+      setSheetBox({ kb });
+    };
+    upd();
+    const timers = [100, 300, 600, 1000].map((ms) => setTimeout(upd, ms));
+    if (vv) { vv.addEventListener('resize', upd); vv.addEventListener('scroll', upd); }
+    return () => {
+      timers.forEach(clearTimeout);
+      if (vv) { vv.removeEventListener('resize', upd); vv.removeEventListener('scroll', upd); }
+    };
+  }, [isTouch, openK]);
+  const [listPos, setListPos] = useState(null);
+  useEffect(() => {
+    if (!openK || isTouch) { setListPos(null); return undefined; }
+    const place = () => {
+      const el = anchorRefs.current[openK];
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const vv = window.visualViewport;
+      const vTop = vv ? vv.offsetTop : 0;
+      const vH = vv ? vv.height : window.innerHeight;
+      const vLeft = vv ? vv.offsetLeft : 0;
+      const vW = vv ? vv.width : window.innerWidth;
+      const gap = 6, margin = 8;
+      // The usable band is the visible viewport clipped to the page's own scroll area:
+      // mobile browsers draw their (translucent) URL bar over the top of the visual
+      // viewport, but the app header always sits below it, so the scroll area's top
+      // edge is a reliable "below the browser chrome" line.
+      let bandTop = vTop, bandBottom = vTop + vH;
+      for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const oy = getComputedStyle(n).overflowY;
+        if (oy === 'auto' || oy === 'scroll') {
+          const nr = n.getBoundingClientRect();
+          bandTop = Math.max(bandTop, nr.top);
+          bandBottom = Math.min(bandBottom, nr.bottom);
+          break;
+        }
+      }
+      const below = bandBottom - r.bottom - gap - margin;
+      const above = r.top - bandTop - gap - margin;
+      const up = below < 150 && above > below;
+      const maxHeight = Math.max(90, Math.min(260, up ? above : below));
+      const width = Math.max(170, r.width);
+      const left = Math.max(vLeft + margin, Math.min(r.left, vLeft + vW - width - margin));
+      setListPos(up ? { left, width, maxHeight, bottom: window.innerHeight - r.top + gap } : { left, width, maxHeight, top: r.bottom + gap });
+    };
+    // On touch devices the keyboard slides in and the field is scrolled into view a few
+    // hundred ms after focus; placing the list during that animation made it jump. Wait
+    // for the layout to settle, then show it, and coalesce later updates into one per frame.
+    const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    let ready = !coarse;
+    let raf = 0;
+    const schedule = () => {
+      if (!ready || raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; place(); });
+    };
+    if (ready) place();
+    const t = coarse ? setTimeout(() => { ready = true; place(); }, 500) : 0;
+    const vv = window.visualViewport;
+    window.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule);
+    if (vv) { vv.addEventListener('resize', schedule); vv.addEventListener('scroll', schedule); }
+    return () => {
+      clearTimeout(t);
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+      if (vv) { vv.removeEventListener('resize', schedule); vv.removeEventListener('scroll', schedule); }
+    };
+  }, [openK, vals]);
   const [reqOpen, setReqOpen] = useState(false);
   usePanelBackClose(reqOpen, () => setReqOpen(false));
 
@@ -231,12 +325,21 @@ export default function CategoryEditor({ report, isGuest }) {
               </button>
             </span>
           ))}
-          <div style={{ flex: 1, minWidth: 90, position: 'relative' }}>
+          <div ref={(el) => { anchorRefs.current[k] = el; }} style={{ flex: 1, minWidth: 90, position: 'relative' }}>
             <input
               value={draft[k] || ''}
               placeholder={chips.length ? '+ add…' : 'select…'}
               autoComplete="off"
-              onFocus={() => { setOpenK(k); setHi(0); }}
+              onFocus={(ev) => {
+                if (isTouch) {
+                  // Hand the keyboard to the sheet's own search box (same tap, so iOS allows it).
+                  ev.currentTarget.blur();
+                  flushSync(() => { setOpenK(k); setHi(0); });
+                  if (sheetInputRef.current) sheetInputRef.current.focus();
+                  return;
+                }
+                setOpenK(k); setHi(0);
+              }}
               onChange={(ev) => { setDraft((s) => ({ ...s, [k]: ev.target.value })); setOpenK(k); setHi(0); }}
               onKeyDown={(ev) => {
                 if (ev.key === 'ArrowDown') {
@@ -273,18 +376,20 @@ export default function CategoryEditor({ report, isGuest }) {
                 padding: 2,
               }}
             />
-            {openK === k && (
+            {!isTouch && openK === k && (
               <div onClick={() => { setOpenK(null); setDraft((s) => ({ ...s, [k]: '' })); }} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
             )}
-            {openK === k && (
+            {!isTouch && openK === k && listPos && (
               <div
                 style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 6px)',
-                  left: 0,
-                  minWidth: 170,
-                  maxHeight: 260,
+                  position: 'fixed',
+                  top: listPos.top,
+                  bottom: listPos.bottom,
+                  left: listPos.left,
+                  minWidth: listPos.width,
+                  maxHeight: listPos.maxHeight,
                   overflowY: 'auto',
+                  overscrollBehavior: 'contain',
                   background: o.surface2 || o.surface,
                   border: `1px solid ${o.border}`,
                   borderRadius: 8,
@@ -340,6 +445,54 @@ export default function CategoryEditor({ report, isGuest }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
         {KINDS.map(field)}
       </div>
+      {isTouch && openK && (() => {
+        const k = openK;
+        const lab = (KINDS.find((x) => x[0] === k) || [k, k])[1];
+        const list = (opts && opts[k]) || [];
+        const chips = vals[k] || [];
+        const avail = list.filter((it) => !chips.includes(it.value));
+        const q = (draft[k] || '').toLowerCase();
+        const flt = avail.filter((it) => it.value.toLowerCase().includes(q));
+        const close = () => { setOpenK(null); setDraft((st) => ({ ...st, [k]: '' })); };
+        return createPortal(
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3500, touchAction: 'none', background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: 8, paddingBottom: sheetBox.kb, boxSizing: 'border-box', overflow: 'hidden' }}>
+            <div onTouchMove={(ev) => ev.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${o.border}`, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{lab}</div>
+              <input
+                ref={sheetInputRef}
+                value={draft[k] || ''}
+                placeholder="search…"
+                autoComplete="off"
+                autoCapitalize="off"
+                onChange={(ev) => setDraft((st) => ({ ...st, [k]: ev.target.value }))}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    const pick = flt[0];
+                    if (pick) { add(k, pick.value); close(); }
+                  }
+                }}
+                style={{ flex: 1, minWidth: 0, background: o.surface2 || o.surface, border: `1px solid ${o.border}`, borderRadius: 6, color: o.text, fontFamily: 'monospace', padding: '7px 8px', outline: 'none' }}
+              />
+              <button type="button" onClick={close} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.accent, borderRadius: 6, padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>Done</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: 6, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+              {flt.length ? flt.map((it) => (
+                <div
+                  key={it.id}
+                  onClick={() => { add(k, it.value); close(); }}
+                  style={{ padding: '11px 12px', fontSize: 15, fontFamily: 'monospace', color: o.text, borderRadius: 6, borderBottom: `1px solid ${o.border}33`, cursor: 'pointer' }}
+                >
+                  {it.value}
+                </div>
+              )) : (
+                <div style={{ padding: '12px', fontSize: 13, color: o.dim, fontFamily: 'monospace' }}>{avail.length ? 'No matches' : 'No more options'}</div>
+              )}
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
       <button
         type="button"
         onClick={() => setReqOpen(true)}
