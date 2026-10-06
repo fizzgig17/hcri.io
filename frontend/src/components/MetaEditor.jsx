@@ -83,7 +83,8 @@ export function EditableField({ label, value, placeholder, isGuest, multiline, o
       ) : (
         <div style={{
           fontSize: 13, color: isEmpty ? T.dim + '70' : T.text, fontWeight: 500, overflow: 'hidden',
-          textOverflow: 'ellipsis', whiteSpace: multiline ? 'pre-wrap' : 'nowrap',
+          // Wrap long titles/values instead of ellipsizing (and never widen the page).
+          whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
           fontStyle: isEmpty ? 'italic' : 'normal', minHeight: 18,
         }}>
           {shown}
@@ -126,7 +127,7 @@ export function RenameField({ value, onSave, disabled }) {
           style={{
             fontSize: 18, fontWeight: 700, background: 'transparent', border: 'none',
             borderBottom: `2px solid ${T.accent}`, color: T.text, outline: 'none',
-            fontFamily: 'monospace', padding: '0 2px', minWidth: 200, maxWidth: 400,
+            fontFamily: 'monospace', padding: '0 2px', minWidth: 0, width: 400, maxWidth: '100%',
           }}
         />
         {saving && <span style={{ fontSize: 12, color: T.dim }}>Saving…</span>}
@@ -139,7 +140,7 @@ export function RenameField({ value, onSave, disabled }) {
       title={disabled ? '' : 'Click to rename'}
       style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: disabled ? 'default' : 'text', marginBottom: 4 }}
     >
-      <div style={{ fontSize: 18, fontWeight: 700, color: T.text }}>{value}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: T.text, minWidth: 0, overflowWrap: 'anywhere' }}>{value}</div>
       {!disabled && (
         <span
           style={{ fontSize: 12, color: `${T.accent}70`, opacity: 0, transition: 'opacity .15s' }}
@@ -181,7 +182,7 @@ export default function MetaEditor({ report, isGuest, onSave }) {
           )}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: isMobile ? 6 : 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: isMobile ? 6 : 8 }}>
         <EditableField label="Title" value={report.label} placeholder="click to name…" isGuest={isGuest} onSave={save('label')} />
         <div style={{ gridColumn: '1/-1' }}>
           <EditableField label="Notes" value={report.notes} placeholder="click to add notes…" isGuest={isGuest} multiline onSave={save('notes')} />
