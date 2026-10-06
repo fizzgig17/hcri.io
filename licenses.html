@@ -24,9 +24,10 @@
 <link rel="stylesheet" href="/assets/site-pages.css">
 </head>
 <body>
-<div class="bar"></div>
 <div class="wrap">
-  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a></header>
+  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme">🌙</button></header>
+<div class="bar"></div>
   <h1>Licenses &amp; source code</h1>
 
 <p>hCRI.io is free software: © 2026 fizzgig, licensed under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU Affero General Public License v3</a> or later. Source code: <a href="https://github.com/fizzgig17/hcri.io" target="_blank" rel="noopener">github.com/fizzgig17/hcri.io</a>. The hCRI Companion Android app is licensed under the GNU GPL v3 or later: <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">github.com/fizzgig17/hcri-companion</a>.</p>
@@ -96,5 +97,19 @@ THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRES
 <p>Bundled unmodified in <code>vendor/phpmailer/</code>; full license text in <code>vendor/phpmailer/LICENSE</code>. Source: https://github.com/PHPMailer/PHPMailer</p>
   <a class="back" href="/">← Back to hCRI.io</a>
 </div>
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
 </body>
 </html>

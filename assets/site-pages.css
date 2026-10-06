@@ -19,3 +19,21 @@
 html, body { background:var(--bg); }
 body, button, input, select, textarea, header a.brand { font-family:var(--site-font); }
 .bar { height:5px; background:linear-gradient(90deg,#6a3df0,#2a6df0,#13b3d6,#23c552,#c9d22a,#f0922a,#e0392a); }
+
+/* ---- shared page chrome: header row, then the rounded rainbow bar (same as the main site) ---- */
+.bar { height:8px; border-radius:8px; margin:6px 0 20px;
+  background:linear-gradient(90deg,#7c3aed,#2563eb,#06b6d4,#22c55e,#eab308,#f97316,#ef4444);
+  box-shadow:0 3px 22px rgba(0,212,255,.25); }
+:root[data-theme="light"] .bar { box-shadow:0 3px 22px rgba(0,91,170,.25); }
+body { padding:12px 12px 0; margin:0; }
+.wrap { max-width:860px; margin:0 auto; padding:0 0 80px; }
+.wrap.wide { max-width:1080px; }
+body > .bar { max-width:1080px; margin-inline:auto; }
+header, header.top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;
+  padding:12px 0 0; border-bottom:none; margin:0 auto; }
+.brand, header a.brand { font-size:20px; font-weight:900; letter-spacing:1px; color:var(--text); text-decoration:none; }
+.brand .dot, .brand .io, header a.brand .io { color:var(--accent); }
+#theme-toggle { width:38px !important; height:34px !important; border-radius:8px !important; background:var(--surface) !important;
+  border:1px solid var(--border) !important; color:var(--text) !important; font-size:16px !important; padding:0 !important;
+  display:inline-flex !important; align-items:center; justify-content:center; cursor:pointer; box-sizing:border-box; }
+h1, h2 { line-height:1.2; }

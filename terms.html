@@ -35,9 +35,10 @@
 <link rel="stylesheet" href="/assets/site-pages.css">
 </head>
 <body>
-<div class="bar"></div>
 <div class="wrap">
-  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a></header>
+  <header><a class="brand" href="/">hCRI<span class="io">.io</span></a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme">🌙</button></header>
+<div class="bar"></div>
   <h1>Terms of Service</h1>
   <div class="meta">Version 2026-10-05 · Last updated 5 October 2026</div>
 
@@ -93,5 +94,19 @@
   <a class="back" href="/">← Back to hCRI.io</a>
   <footer>© 2026 fizzgig · hCRI.io · <a href="/privacy">Privacy Policy</a> · <a href="/licenses">Licenses &amp; source</a></footer>
 </div>
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
 </body>
 </html>
