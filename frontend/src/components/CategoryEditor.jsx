@@ -70,14 +70,21 @@ export default function CategoryEditor({ report, isGuest }) {
   const isTouch = typeof window !== 'undefined' && !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
   const sheetInputRef = useRef(null);
-  const [sheetH, setSheetH] = useState(typeof window !== 'undefined' ? window.innerHeight : 600);
+  // iOS pans the visual viewport when the keyboard opens, and `position: fixed` follows the
+  // LAYOUT viewport, so a plain top:0 sheet can end up offset. Pin the sheet to the visual
+  // viewport's own top edge and height instead.
+  const [sheetBox, setSheetBox] = useState({ top: 0, height: typeof window !== 'undefined' ? window.innerHeight : 600 });
   useEffect(() => {
     if (!isTouch || !openK) return undefined;
     const vv = window.visualViewport;
-    const upd = () => setSheetH(vv ? vv.height : window.innerHeight);
+    const upd = () => setSheetBox(vv ? { top: Math.round(vv.offsetTop), height: Math.round(vv.height) } : { top: 0, height: window.innerHeight });
     upd();
-    if (vv) vv.addEventListener('resize', upd);
-    return () => { if (vv) vv.removeEventListener('resize', upd); };
+    const timers = [100, 300, 600, 1000].map((ms) => setTimeout(upd, ms));
+    if (vv) { vv.addEventListener('resize', upd); vv.addEventListener('scroll', upd); }
+    return () => {
+      timers.forEach(clearTimeout);
+      if (vv) { vv.removeEventListener('resize', upd); vv.removeEventListener('scroll', upd); }
+    };
   }, [isTouch, openK]);
   const [listPos, setListPos] = useState(null);
   useEffect(() => {
@@ -442,7 +449,7 @@ export default function CategoryEditor({ report, isGuest }) {
         const flt = avail.filter((it) => it.value.toLowerCase().includes(q));
         const close = () => { setOpenK(null); setDraft((st) => ({ ...st, [k]: '' })); };
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: sheetH, zIndex: 3500, background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: isIOS ? 118 : 8, boxSizing: 'border-box', overflow: 'hidden' }}>
+          <div style={{ position: 'fixed', top: sheetBox.top, left: 0, right: 0, height: sheetBox.height, zIndex: 3500, touchAction: 'pan-y', background: o.bg || o.surface, display: 'flex', flexDirection: 'column', paddingTop: isIOS ? 112 : 8, boxSizing: 'border-box', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${o.border}`, flexShrink: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, whiteSpace: 'nowrap' }}>{lab}</div>
               <input
