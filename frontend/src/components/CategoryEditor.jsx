@@ -97,18 +97,28 @@ export default function CategoryEditor({ report, isGuest }) {
       const left = Math.max(vLeft + margin, Math.min(r.left, vLeft + vW - width - margin));
       setListPos(up ? { left, width, maxHeight, bottom: window.innerHeight - r.top + gap } : { left, width, maxHeight, top: r.bottom + gap });
     };
-    place();
-    // Keyboard animation changes the visual viewport a beat after focus.
-    const t = setTimeout(place, 300);
+    // On touch devices the keyboard slides in and the field is scrolled into view a few
+    // hundred ms after focus; placing the list during that animation made it jump. Wait
+    // for the layout to settle, then show it, and coalesce later updates into one per frame.
+    const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    let ready = !coarse;
+    let raf = 0;
+    const schedule = () => {
+      if (!ready || raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; place(); });
+    };
+    if (ready) place();
+    const t = coarse ? setTimeout(() => { ready = true; place(); }, 500) : 0;
     const vv = window.visualViewport;
-    window.addEventListener('scroll', place, true);
-    window.addEventListener('resize', place);
-    if (vv) { vv.addEventListener('resize', place); vv.addEventListener('scroll', place); }
+    window.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule);
+    if (vv) { vv.addEventListener('resize', schedule); vv.addEventListener('scroll', schedule); }
     return () => {
       clearTimeout(t);
-      window.removeEventListener('scroll', place, true);
-      window.removeEventListener('resize', place);
-      if (vv) { vv.removeEventListener('resize', place); vv.removeEventListener('scroll', place); }
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+      if (vv) { vv.removeEventListener('resize', schedule); vv.removeEventListener('scroll', schedule); }
     };
   }, [openK, vals]);
   const [reqOpen, setReqOpen] = useState(false);
@@ -295,7 +305,7 @@ export default function CategoryEditor({ report, isGuest }) {
                 // Once the keyboard has finished sliding in (the layout shrinks above it),
                 // bring this field to the middle of the visible scroll area.
                 const el = ev.currentTarget;
-                setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* ignore */ } }, 350);
+                setTimeout(() => { try { el.scrollIntoView({ block: 'center' }); } catch (e) { /* ignore */ } }, 250);
               }}
               onChange={(ev) => { setDraft((s) => ({ ...s, [k]: ev.target.value })); setOpenK(k); setHi(0); }}
               onKeyDown={(ev) => {
