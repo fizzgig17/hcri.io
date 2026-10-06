@@ -10,11 +10,11 @@ export default function SiteFooter() {
     <div style={{ padding: '22px 16px 26px', textAlign: 'center', fontSize: 11, fontFamily: 'monospace', color: T.dim, opacity: 0.7, lineHeight: 1.9 }}>
       <div>© 2026 fizzgig · AGPL-3.0</div>
       <div>
-        <a href="/privacy" target="_blank" rel="noopener noreferrer" style={link}>Privacy</a>
+        <a href="/privacy" target="_blank" rel="opener" style={link}>Privacy</a>
         {' · '}
-        <a href="/terms" target="_blank" rel="noopener noreferrer" style={link}>Terms</a>
+        <a href="/terms" target="_blank" rel="opener" style={link}>Terms</a>
         {' · '}
-        <a href="/licenses" target="_blank" rel="noopener noreferrer" style={link}>Licenses &amp; source</a>
+        <a href="/licenses" target="_blank" rel="opener" style={link}>Licenses &amp; source</a>
       </div>
     </div>
   );

@@ -581,9 +581,9 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
               )}
 
               <div style={{ marginTop:14, fontSize:12, color:T.dim }}>
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color:T.accent, textDecoration:'none' }}>Privacy Policy</a>
+                <a href="/privacy" target="_blank" rel="opener" style={{ color:T.accent, textDecoration:'none' }}>Privacy Policy</a>
                 {' · '}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:T.accent, textDecoration:'none' }}>Terms</a>
+                <a href="/terms" target="_blank" rel="opener" style={{ color:T.accent, textDecoration:'none' }}>Terms</a>
               </div>
             </>
           )}

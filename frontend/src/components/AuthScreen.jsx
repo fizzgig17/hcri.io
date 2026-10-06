@@ -528,8 +528,8 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
                     <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)}
                       style={{ accentColor:T.accent, width:15, height:15, marginTop:1, flexShrink:0 }} />
                     <span>
-                      I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color:T.accent }}>Privacy Policy</a> and{' '}
-                      <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:T.accent }}>Terms</a>.
+                      I agree to the <a href="/privacy" target="_blank" rel="opener" style={{ color:T.accent }}>Privacy Policy</a> and{' '}
+                      <a href="/terms" target="_blank" rel="opener" style={{ color:T.accent }}>Terms</a>.
                     </span>
                   </label>
                 )}
@@ -608,11 +608,11 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
 
       {/* ── Footer ── */}
       <div style={{ marginTop:24, paddingBottom:16, display:'flex', gap:20, justifyContent:'center', flexWrap:'wrap' }}>
-        <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Privacy Policy</a>
+        <a href="/privacy" target="_blank" rel="opener" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Privacy Policy</a>
         <span style={{ fontSize:12, color:T.dim, opacity:0.4 }}>·</span>
-        <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Terms</a>
+        <a href="/terms" target="_blank" rel="opener" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Terms</a>
         <span style={{ fontSize:12, color:T.dim, opacity:0.4 }}>·</span>
-        <a href="/licenses" target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Licenses &amp; source</a>
+        <a href="/licenses" target="_blank" rel="opener" style={{ fontSize:12, color:T.dim, textDecoration:'none', fontFamily:'monospace', opacity:0.7 }}>Licenses &amp; source</a>
         <span style={{ fontSize:12, color:T.dim, opacity:0.4 }}>·</span>
         <button onClick={() => setFeedbackOpen(true)}
           style={{ fontSize:12, color:T.dim, background:'none', border:'none', cursor:'pointer', fontFamily:'monospace', padding:0, opacity:0.7 }}>
