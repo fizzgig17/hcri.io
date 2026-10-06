@@ -147,8 +147,8 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
   }
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, width:'100%', maxWidth:800, maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div className="help-overlay" style={{ background:'rgba(0,0,0,0.85)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16, boxSizing:'border-box' }}>
+      <div className="help-card" style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, width:'100%', maxWidth:800, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <div style={{ padding:'16px 20px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'space-between', background:T.surface2, flexShrink:0 }}>
           <div style={{ fontWeight:900, fontSize:18, color:T.white, fontFamily:'monospace' }}>
             hCRI<span style={{ color:T.accent }}>.io</span>
