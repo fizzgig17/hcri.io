@@ -337,7 +337,7 @@ export default function CategoryEditor({ report, isGuest }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
         Categories
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
         {KINDS.map(field)}
       </div>
       <button
