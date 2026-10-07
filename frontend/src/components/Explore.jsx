@@ -5,7 +5,7 @@
 // single largest component in the app -- the public "Explore" experience,
 // and it also doubles as the signed-in user's "My Reports" library and the
 // site-wide "Insights" dashboards, all driven by one `tab` state value
-// (`browse` | `myreports` | `insights` | `finsights` | `myinsights`).
+// (`browse` | `myreports` | `insights` | `finsights` | `myinsights` | `flicker`).
 // There was no Explore feature at all in the stale frontend/src this
 // replaces -- folders, pinning results while viewing a report, bulk
 // categorize/delete, drag-and-drop folder assignment, the Compare
@@ -101,6 +101,7 @@ import ReportDetail from './ReportDetail';
 import CompareCard from './CompareCard';
 import OverlaySPD from './OverlaySPD';
 import ExploreStats from './ExploreStats';
+import FlickerTab from './FlickerTab';
 import AdminPanel from './AdminPanel';
 import { FeedbackModal } from './AuthScreen';
 import AccountSettings from './AccountSettings';
@@ -873,6 +874,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     if (val === 'mine') return loggedIn ? 'myreports' : 'browse';
     if (val === 'insights' || val === 'finsights') return val;
     if (val === 'myinsights') return loggedIn ? 'myinsights' : 'browse';
+    if (val === 'flicker') return loggedIn ? 'flicker' : 'browse';
     return 'browse';
   };
 
@@ -2451,9 +2453,10 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     ['insights', 'Insights'],
     ...(filtersTouched ? [['finsights', 'Filtered Insights']] : []),
     ...(n ? [['myinsights', 'My Insights']] : []),
+    ...(n ? [['flicker', 'Flicker']] : []),
   ];
   const tabBar = (
-    <div style={{ display: 'flex', gap: 4, padding: '0 16px', borderTop: `1px solid ${r.border}` }}>
+    <div style={{ display: 'flex', gap: 4, padding: '0 16px', borderTop: `1px solid ${r.border}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
       {tabs.map(([id, lab]) => (
         <button
           key={id}
@@ -2473,7 +2476,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           }}
           style={{
             background: 'none', border: 'none', borderBottom: `2px solid ${tab === id ? r.accent : 'transparent'}`,
-            color: tab === id ? r.text : r.dim, padding: '10px 14px', fontSize: 13, fontWeight: tab === id ? 700 : 600, cursor: 'pointer', fontFamily: 'monospace',
+            color: tab === id ? r.text : r.dim, padding: '10px 14px', fontSize: 13, fontWeight: tab === id ? 700 : 600, cursor: 'pointer', fontFamily: 'monospace', flexShrink: 0, whiteSpace: 'nowrap',
           }}
         >
           {lab}
@@ -2601,6 +2604,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const tabContent =
     tab === 'insights' ? <ExploreStats theme={r} />
     : tab === 'finsights' ? <FilteredInsights q={window.__exploreQ || ''} T={r} heading="Filtered Insights" note="Statistics across every report matching your current Explore filters." />
+    : tab === 'flicker' ? <FlickerTab T={r} onOpenReport={(rid) => { window.location.href = window.location.pathname + '?explore=mine&rid=' + rid; }} />
     : tab === 'myinsights' ? <FilteredInsights q={`userId=${(n && n.id) || 0}`} T={r} heading="My Insights" note="Statistics across your own reports, including private ones." />
     : listingBody;
 

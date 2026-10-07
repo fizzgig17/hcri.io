@@ -388,7 +388,7 @@ if ($m === 'DELETE') {
 
     $r = get_report($db, $id, $user['id']);
 
-    $db->prepare('DELETE FROM reports WHERE id=?')->execute([$id]);
+    try { $db->prepare('UPDATE flicker_readings SET report_id=NULL WHERE report_id=?')->execute([$id]); } catch (\Throwable $e) {} $db->prepare('DELETE FROM reports WHERE id=?')->execute([$id]);
 
     if (!empty($r['file_name'])) { $fp = __DIR__ . '/../../uploads/' . $r['file_name']; if (file_exists($fp)) unlink($fp); }
 

@@ -33,6 +33,7 @@ export async function installMockApi(page, opts = {}) {
   const notices = opts.notices || fixtures.notices;
   const explore = opts.explore || fixtures.explore;
   const adminUsers = opts.adminUsers || fixtures.adminUsers;
+  const flicker = (opts.flicker || fixtures.flicker).map((f) => ({ ...f }));
 
   await page.route('**/index.php/api/**', async (route) => {
     const req = route.request();
@@ -52,6 +53,32 @@ export async function installMockApi(page, opts = {}) {
     }
     if (path === '/auth/logout') {
       return json({ ok: true });
+    }
+
+    // ── Flicker readings (api/flicker.php, api/reports_flicker.php) ─────
+    if (path === '/flicker' && method === 'GET') {
+      if (!loggedIn) return json({ error: 'Sign in required' }, 401);
+      const un = url.searchParams.get('unattached');
+      return json({ readings: flicker.filter((f) => !un || !f.reportId).map(({ waveform, ...rest }) => rest) });
+    }
+    if (/^\/flicker\/\d+$/.test(path)) {
+      const id = Number(path.split('/').pop());
+      const i = flicker.findIndex((f) => f.id === id);
+      if (i < 0) return json({ error: 'Not found' }, 404);
+      if (method === 'PATCH') {
+        const b = JSON.parse(req.postData() || '{}');
+        if ('label' in b) flicker[i].label = b.label;
+        if ('notes' in b) flicker[i].notes = b.notes;
+        if ('reportId' in b) { flicker[i].reportId = b.reportId; flicker[i].reportLabel = b.reportId ? 'HT70 #1' : null; }
+        const { waveform, ...rest } = flicker[i];
+        return json(rest);
+      }
+      if (method === 'DELETE') { flicker.splice(i, 1); return json({ success: true }); }
+      return json(flicker[i]);
+    }
+    if (/^\/reports\/\d+\/flicker$/.test(path) && method === 'GET') {
+      const rid = Number(path.split('/')[2]);
+      return json({ readings: flicker.filter((f) => f.reportId === rid) });
     }
 
     // ── Reports (the logged-in dashboard's sidebar list) ───────────────
