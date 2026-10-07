@@ -29,7 +29,7 @@ const W = 720;
 function Frame({ T, H, children, label, xLabel, yLabel }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}
-      style={{ width: '100%', height: 'auto', display: 'block', background: T.chartBg, borderRadius: 6, border: `1px solid ${T.border}` }}>
+      style={{ width: '100%', maxWidth: 820, height: 'auto', display: 'block', background: T.chartBg, borderRadius: 6, border: `1px solid ${T.border}` }}>
       {children}
       {xLabel && <text x={W / 2} y={H - 4} textAnchor="middle" fontSize="11" fill={T.axisLabel} fontFamily="monospace">{xLabel}</text>}
       {yLabel && <text transform={`translate(11 ${H / 2}) rotate(-90)`} textAnchor="middle" fontSize="11" fill={T.axisLabel} fontFamily="monospace">{yLabel}</text>}
@@ -242,6 +242,7 @@ export function FlickerComparison({ readings, T, onOpen }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <FlickerTable readings={readings} T={T} onOpen={onOpen} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 20, alignItems: 'start' }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: T.dim, fontFamily: 'monospace', fontWeight: 700 }}>WAVEFORMS</span>
@@ -251,9 +252,12 @@ export function FlickerComparison({ readings, T, onOpen }) {
         {unusable > 0 && <div style={{ fontSize: 11.5, color: T.dim, marginTop: 6 }}>{unusable} reading{unusable > 1 ? 's' : ''} without a usable time base {unusable > 1 ? 'are' : 'is'} left out of the overlay.</div>}
       </div>
       <div>
-        <div style={{ fontSize: 12, color: T.dim, fontFamily: 'monospace', fontWeight: 700, marginBottom: 8 }}>RISK</div>
+        <div style={{ display: 'flex', alignItems: 'center', minHeight: 26, marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: T.dim, fontFamily: 'monospace', fontWeight: 700 }}>RISK</span>
+        </div>
         <FlickerRiskChart points={pts} T={T} />
         <div style={{ fontSize: 11.5, color: T.dim, marginTop: 6 }}>Bands follow IEEE 1789-style limits. Indicative only: these readings aren't from a certified flicker meter.</div>
+      </div>
       </div>
     </div>
   );
