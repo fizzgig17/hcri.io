@@ -173,6 +173,8 @@
       <li><a href="#installing">Installing the app</a></li>
       <li><a href="#account">Connecting your hCRI.io account</a></li>
       <li><a href="#pairing">Pairing with your meter</a></li>
+      <li><a href="#torchbearer">Using a Torch Bearer</a></li>
+      <li><a href="#livemodes">Live readings &amp; Flicker</a></li>
       <li><a href="#reading">Taking a reading</a></li>
       <li><a href="#main-tab">The Main tab</a></li>
       <li><a href="#data-tab">The Data tab</a></li>
@@ -188,12 +190,12 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.14 · Last updated October 7, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.15 · Last updated October 7, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
       <p class="lede">hCRI Companion is an independent Android app that connects to a Hopoocolor HPCS-series
-        spectrometer over Bluetooth Low Energy, reads the full spectrum off the sensor, computes the same
+        spectrometer (or a Torch Bearer, via the ESP32 bridge) over Bluetooth Low Energy, reads the full spectrum off the sensor, computes the same
         colorimetric values hCRI.io itself computes, and uploads a reading to your hCRI.io account in one
         tap — no cable, no CSV export, no re-typing numbers off the meter's own tiny screen.</p>
       <p>Every CCT, Duv, Ra, Rf, Rg, and R1–R15 value shown in the app is computed with the exact same
@@ -206,11 +208,29 @@
         <span class="chip">HPCS-330</span>
         <span class="chip">HPCS-330P</span>
         <span class="chip">HPCS330Pro</span>
+        <span class="chip">Torch Bearer (via ESP32 bridge)</span>
       </div>
       <p class="dim">The app detects which model you're connected to from its advertised Bluetooth name and
         reads its data with that model's own field layout automatically — nothing to configure. The full,
         up-to-date list (including which models are independently verified against a real captured
         reading) is always on the app's own Settings → About tab.</p>
+      <div class="card warn">
+        <h4>The Torch Bearer needs the ESP32 bridge</h4>
+        <p>The Torch Bearer has no Bluetooth of its own. A LilyGO T-Display S3 board running the
+          open-source hCRI bridge firmware connects to it by USB and talks to the app over Bluetooth. The
+          <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hcri-esp32-bridge repository</a> lists the hardware you
+          need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
+          no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
+      </div>
+      <h3>What's new in 1.15</h3>
+      <ul>
+        <li>Torch Bearer support, with an optional spectral correction (Settings → Torch Bearer correction).</li>
+        <li>Continuous (Live) readings and Flicker on meters that support them.</li>
+        <li>Device scanning, connecting and switching between meters refined a lot.</li>
+        <li>History: Share selected readings, a restyled top bar, and a title editor whose Save works on the first tap.</li>
+        <li>Shared CSV files now end with a short summary of the computed values.</li>
+        <li><strong>Coming soon:</strong> flicker readings integrated into hCRI.io.</li>
+      </ul>
     </section>
 
     <section id="requirements">
@@ -218,7 +238,7 @@
       <ul>
         <li>Android 8.0 (Oreo) or newer</li>
         <li>Bluetooth Low Energy (BLE) support</li>
-        <li>A paired Hopoocolor HPCS-series meter, powered on and in range</li>
+        <li>A Hopoocolor HPCS-series meter, powered on and in range — or a Torch Bearer connected to the <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hCRI ESP32 bridge</a> (see <a href="#torchbearer">Using a Torch Bearer</a>)</li>
         <li>An hCRI.io account, if you want to upload readings (not required just to take and view them)</li>
       </ul>
     </section>
@@ -286,7 +306,9 @@
         when you tap <code>Connect to Meter</code> — not every time you switch back to the app.</p>
       <p>If more than one matching meter is found, a picker appears so you choose which one — look for its
         advertised name and signal strength. A small <code>⇄ Switch meter</code> icon next to the status
-        row lets you reopen that same list later without a fresh scan.</p>
+        row lets you reopen that same list later without a fresh scan. Device switching has been refined a lot
+        in 1.15: the list stays current while you look at it, a meter that is momentarily busy is retried
+        automatically, and switching to another meter no longer needs a reset.</p>
       <p>No meter handy? See <a href="#test-reading">Try it without a meter</a>.</p>
       <div class="card warn">
         <h4>Meter won't connect?</h4>
@@ -296,8 +318,46 @@
       </div>
     </section>
 
+    <section id="torchbearer">
+      <h2><span class="num">06</span> Using a Torch Bearer</h2>
+      <p>The Torch Bearer spectrometer reaches the app through the hCRI ESP32 bridge. You need:</p>
+      <ul>
+        <li>a LilyGO T-Display S3 board (the standard version, not the Pro, with 16&nbsp;MB flash)</li>
+        <li>a USB-C OTG cable or adapter with a USB-A socket for the Torch Bearer plus a USB-C socket for power</li>
+        <li>a power bank to run the bridge in the field</li>
+        <li>the Torch Bearer spectrometer, and this app on your phone</li>
+      </ul>
+      <p>Full hardware notes, ready-built firmware downloads and the flashing steps are in the
+        <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hcri-esp32-bridge repository</a>. Once the bridge is flashed
+        and powered, it shows up in the app as <code>Torch Bearer</code> and connects like any other meter.</p>
+      <h3>Good to know</h3>
+      <ul>
+        <li>The bridge allows one Bluetooth connection at a time and stops advertising while connected — close
+          other Bluetooth tools (such as nRF Connect) if the app can't see it.</li>
+        <li>Its exposure adapts automatically. Hold the sensor about 25&nbsp;cm from the lamp, ideally behind a
+          diffuser; very close to a bright source it can saturate.</li>
+        <li><strong>Torch Bearer correction</strong> (Settings, on by default) adjusts the spectrum so CCT,
+          Duv, Ra and R9 line up with the HPCS. In our checks on five lamps it cut the CCT error from about
+          208&nbsp;K to 36&nbsp;K. Turn it off for the raw spectrum; every shared CSV records whether it was applied.</li>
+        <li>Lux and PAR are not calibrated yet — treat them as approximate (within about 15 percent of an HPCS).</li>
+        <li>The Torch Bearer takes single readings; Live and Flicker are not available on it.</li>
+      </ul>
+    </section>
+
+    <section id="livemodes">
+      <h2><span class="num">07</span> Live readings &amp; Flicker</h2>
+      <p>On meters that support them, the action bar shows a <code>Live</code> button and a <code>Flicker</code>
+        button. <code>Live</code> keeps measuring and updates the spectrum and values continuously until you tap
+        <code>Stop</code>. <code>Flicker</code> shows the flicker frequency and percent flicker as a running
+        chart. Buttons for modes your meter doesn't support simply don't appear.</p>
+      <div class="card">
+        <h4>Coming soon</h4>
+        <p>Flicker readings are not uploaded yet. Integrating them into hCRI.io is coming soon.</p>
+      </div>
+    </section>
+
     <section id="reading">
-      <h2><span class="num">06</span> Taking a reading</h2>
+      <h2><span class="num">08</span> Taking a reading</h2>
       <p>Once connected, tap <code>Take Reading</code>. The meter takes its exposure, and a short haptic
         buzz confirms the moment it lands (a different pattern if it fails) — handy when you're not looking
         directly at the screen. The spectrum, CCT, Duv, Ra, and the rest of your chosen measurements appear
@@ -307,7 +367,7 @@
     </section>
 
     <section id="main-tab">
-      <h2><span class="num">07</span> The Main tab</h2>
+      <h2><span class="num">09</span> The Main tab</h2>
       <p>Main is where you connect, take readings, and review the latest one. Its result card always shows
         the same layout — a grid of measurements, the three swipeable charts, and the action button
         directly underneath them — whether or not a reading has happened yet (before your first reading,
@@ -348,7 +408,7 @@
     </section>
 
     <section id="data-tab">
-      <h2><span class="num">08</span> The Data tab</h2>
+      <h2><span class="num">10</span> The Data tab</h2>
       <p>A closer look at the current reading, plus the controls for naming and sending it:</p>
       <ul>
         <li><strong>Upload Title</strong> — type a custom title, or leave it blank to use the
@@ -364,7 +424,7 @@
     </section>
 
     <section id="history-tab">
-      <h2><span class="num">09</span> The History tab</h2>
+      <h2><span class="num">11</span> The History tab</h2>
       <p>Every reading you've ever taken, grouped by day, newest first. From here you can:</p>
       <ul>
         <li><strong>View</strong> a past reading's full measurement grid, spectrum, chromaticity, and
@@ -379,14 +439,14 @@
           link can open.</li>
         <li><strong>Select</strong> multiple readings and upload them to hCRI.io in one batch, instead of
           opening and sending each individually.</li>
-        <li><strong>Share</strong> a single reading, or your entire history, as CSV.</li>
+        <li><strong>Share</strong> a single reading, the readings you have selected, or your entire history, as CSV. Shared files end with a short summary of the computed values.</li>
         <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone; a
           copy already uploaded to hCRI.io stays there until you delete it from your account separately.</li>
       </ul>
     </section>
 
     <section id="logs-tab">
-      <h2><span class="num">10</span> The Logs tab</h2>
+      <h2><span class="num">12</span> The Logs tab</h2>
       <p>A running debug log of connect/disconnect/measure/upload activity, each line timestamped in your
         phone's own local time. Useful for troubleshooting, or to attach to a bug report.</p>
       <ul>
@@ -400,7 +460,7 @@
     </section>
 
     <section id="settings">
-      <h2><span class="num">11</span> Settings</h2>
+      <h2><span class="num">13</span> Settings</h2>
       <h3>hCRI.io account</h3>
       <p>Your username and API token — see <a href="#account">Connecting your hCRI.io account</a> above.</p>
       <h3>Appearance</h3>
@@ -418,6 +478,9 @@
       <h3>Verbose logging</h3>
       <p>Adds the full wavelength-by-wavelength and Bluetooth hex detail to the debug log — see
         <a href="#logs-tab">The Logs tab</a>.</p>
+      <h3>Torch Bearer correction</h3>
+      <p><strong>On by default.</strong> Applies the spectral correction to Torch Bearer readings so CCT, Duv,
+        Ra and R9 agree with the HPCS. Turn it off to see the raw spectrum. Does not affect HPCS meters.</p>
       <h3>Main Screen Measurements</h3>
       <p>Check which measurements show on the Main tab's result card, and hold the <code>⠿</code> handle to
         drag a row and reorder it. <code>Reset to Default</code> restores CCT, Ra, Duv, Lux, Rf, R9, Rg in
@@ -431,7 +494,7 @@
     </section>
 
     <section id="background">
-      <h2><span class="num">12</span> Background &amp; reconnect behavior</h2>
+      <h2><span class="num">14</span> Background &amp; reconnect behavior</h2>
       <p>By default, switching away from hCRI Companion — the app switcher, locking your screen, a phone
         call — leaves the meter connected (<code>Stay connected in background</code>, on by default in
         Settings). Coming back to the app picks up right where you left off, with no reconnect delay.</p>
@@ -446,7 +509,7 @@
     </section>
 
     <section id="troubleshooting">
-      <h2><span class="num">13</span> Troubleshooting</h2>
+      <h2><span class="num">15</span> Troubleshooting</h2>
       <h3>Meter won't connect, or seems stuck</h3>
       <p>Tap <code>Meter won't connect? Reset connection</code> on the Main tab (shown while
         disconnected). This clears a leftover Bluetooth connection from a previous session — by far the
@@ -467,7 +530,7 @@
     </section>
 
     <section id="privacy">
-      <h2><span class="num">14</span> Privacy</h2>
+      <h2><span class="num">16</span> Privacy</h2>
       <p>hCRI Companion doesn't collect, store, or transmit anything about you on its own — no analytics,
         no tracking, no third-party server in the loop. A reading lives only on your device until you tap
         Upload, which sends it straight to your own hCRI.io account over an encrypted connection and
@@ -478,7 +541,7 @@
     </section>
 
     <section id="support">
-      <h2><span class="num">15</span> Feedback &amp; support</h2>
+      <h2><span class="num">17</span> Feedback &amp; support</h2>
       <p>Questions, bug reports, or feature requests are always welcome at
         <a href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20Feedback">fizzgig@hcri.io</a> — the
         same address the app's own <code>Send Feedback</code> button (Settings → About) opens for you.</p>
