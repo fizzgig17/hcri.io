@@ -61,6 +61,7 @@ import ShareCardModal from './ShareCardModal.jsx';
 
 import SPDChart from './SPDChart.jsx';
 import { BinBarChart, CESBars, RawDataPanel } from './ReportCharts.jsx';
+import FlickerSection from './FlickerSection.jsx';
 import CVGWheel from './CVGWheel.jsx';
 import ChromaticityPanel, { ChromaticityMini } from './Chromaticity.jsx';
 import HelpTip from './HelpTip.jsx';
@@ -1104,6 +1105,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                     <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                   </div>
                 )}
+
+                <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} pad="0 14px 40px" />
               </div>
             ) : (
               <>
@@ -1156,6 +1159,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
                   <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                 </div>
+
+                <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>
             )}
           </div>

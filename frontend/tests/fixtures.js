@@ -9,6 +9,27 @@
 // Keep these in sync if those handlers' output shape changes -- a test
 // passing against a stale shape is worse than no test.
 
+
+// Synthetic flicker waveforms (400 samples, like the meter sends) for the flicker tests.
+function flickerWave(kind, cycles, depth) {
+  const out = [];
+  for (let i = 0; i < 400; i++) {
+    const t = (i / 400) * cycles;
+    const f = t % 1;
+    let v;
+    if (kind === 'pwm') v = f < depth ? 1 : 0.02;
+    else v = 1 - depth * (0.5 + 0.5 * Math.sin(2 * Math.PI * t));
+    out.push(Math.round(v * 52000));
+  }
+  return out;
+}
+const flickerRow = (id, label, reportId, f, pct, idx, kind, depth) => ({
+  id, label, notes: '', model: 'HPCS-330P', reportId, reportLabel: reportId ? 'HT70 #1' : null,
+  frequencyHz: f, percentFlicker: pct, flickerIndex: idx, cycleMs: 1000 / f, spanMs: (1000 / f) * 6,
+  capturedAt: '2026-10-0' + id + ' 12:00:00', createdAt: '2026-10-0' + id + ' 12:00:00', settings: null,
+  waveform: flickerWave(kind, 6, depth),
+});
+
 export const fixtures = {
   user: {
     id: 1,
@@ -124,4 +145,11 @@ export const fixtures = {
     light_brand: [{ id: 1, value: 'Acebeam', count: 3 }],
     light_model: [{ id: 2, value: 'D7F', count: 1 }],
   },
+
+  flicker: [
+    flickerRow(1, 'Warm LED bulb - no dimming', 101, 120, 55, 0.18, 'sine', 0.55),
+    flickerRow(2, 'Warm LED bulb - dimmed 50%', 101, 1000, 100, 0.5, 'pwm', 0.5),
+    flickerRow(3, 'Incandescent 60W', null, 120, 9, 0.03, 'sine', 0.09),
+    flickerRow(4, 'Flicker-free panel', null, 120, 1.2, 0.004, 'sine', 0.012),
+  ],
 };

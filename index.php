@@ -174,6 +174,14 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if (preg_match('#^/api/reports/(\d+)/flicker/?$#', $uri)) {
+        require __DIR__ . '/api/reports_flicker.php'; exit;
+    }
+
+    if (preg_match('#^/api/(v1/)?flicker(/\d+)?/?$#', $uri)) {
+        require __DIR__ . '/api/flicker.php'; exit;
+    }
+
     if (preg_match('#^/api/reports/(\d+)/pdf$#', $uri)) {
 
         require __DIR__ . '/api/reports_pdf.php'; exit;

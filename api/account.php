@@ -121,6 +121,9 @@ if ($path === '/delete') {
             $deletedReports = $dr->rowCount();
         }
 
+        // Flicker readings (table is created lazily, so it may not exist yet).
+        try { $db->prepare('DELETE FROM flicker_readings WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}
+
         // Tokens & password-reset rows (tables may not exist on older installs).
         try { $db->prepare('DELETE FROM api_tokens WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}
         try { $db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}
