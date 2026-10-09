@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.15 · Last updated October 7, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.16 · Last updated October 8, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -222,6 +222,14 @@
           need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in 1.16</h3>
+      <ul>
+        <li>Flicker readings now upload to hCRI.io: with a reading (attached to its report) or on their own, with a title and notes.</li>
+        <li>A redesigned Flicker tab: <code>New sample</code>, <code>Add to reading</code> / <code>Redo for reading</code>, one shared <code>Stop</code>, a <code>?</code> help button and the flicker settings gear in the top-right of the chart.</li>
+        <li>The bottom Flicker button only opens the Flicker tab; Flicker is hidden while Live is running.</li>
+        <li>History and Data actions are now icons with captions (cloud = upload to hCRI.io, tray = share, eye = view, trash = delete); readings that include flicker show a small waveform icon.</li>
+        <li>On the T-Display-S3 Pro, the bridge firmware shows battery percentage and can power a Torch Bearer from its own battery.</li>
+      </ul>
       <h3>What's new in 1.15</h3>
       <ul>
         <li>Torch Bearer support, with an optional spectral correction (Settings → Torch Bearer correction).</li>
@@ -229,7 +237,7 @@
         <li>Device scanning, connecting and switching between meters refined a lot.</li>
         <li>History: Share selected readings, a restyled top bar, and a title editor whose Save works on the first tap.</li>
         <li>Shared CSV files now end with a short summary of the computed values.</li>
-        <li><strong>Coming soon:</strong> flicker readings integrated into hCRI.io.</li>
+        <li>Flicker readings can now be uploaded to hCRI.io (see 1.16 above).</li>
       </ul>
     </section>
 
@@ -348,12 +356,53 @@
       <h2><span class="num">07</span> Live readings &amp; Flicker</h2>
       <p>On meters that support them, the action bar shows a <code>Live</code> button and a <code>Flicker</code>
         button. <code>Live</code> keeps measuring and updates the spectrum and values continuously until you tap
-        <code>Stop</code>. <code>Flicker</code> shows the flicker frequency and percent flicker as a running
-        chart. Buttons for modes your meter doesn't support simply don't appear.</p>
-      <div class="card">
-        <h4>Coming soon</h4>
-        <p>Flicker readings are not uploaded yet. Integrating them into hCRI.io is coming soon.</p>
-      </div>
+        <code>Stop</code>. Buttons for modes your meter doesn't support simply don't appear. While Live is
+        running the Flicker button and the Flicker chart page are hidden; they return when you stop Live.</p>
+      <h3>The Flicker tab</h3>
+      <p>The <code>Flicker</code> button on the action bar only takes you to the Flicker tab (the fourth chart
+        page on Main); it never starts anything. The tab shows the flicker frequency (Hz), percent flicker,
+        flicker index, cycle time and duty, the captured waveform (or a risk chart, with the Wave / Risk
+        switch) and a risk tip. The <code>?</code> in a circle at the top right explains the options below,
+        and the gear next to it sets the meter's flicker range and sample rate.</p>
+      <p>There are two kinds of flicker sample, each started with its own button under the chart:</p>
+      <ul>
+        <li><strong>New sample</strong> measures flicker on its own, continuously. It
+          <em>clears the current reading</em> from Main — a reading that was saved stays in History, a live
+          reading you had not saved is gone. When you tap <code>Stop</code> you can <code>Share</code> the
+          sample or <code>Upload flicker</code> it to hCRI.io (see below). A New sample is not added to History.</li>
+        <li><strong>Add to reading</strong> (shown as <strong>Redo for reading</strong> when the reading
+          already has a sample) measures flicker for the reading you just took. The last frame when you tap
+          <code>Stop</code> becomes that reading's flicker sample: it is saved with the reading, shown in
+          History, and uploaded together with the reading. It therefore has no Share or Upload of its own.</li>
+      </ul>
+      <p>While a sample runs, its button pulses and says <em>Sampling…</em>, the other button dims, and one
+        red <code>Stop</code> sits between them. A counter shows how many updates have arrived and the elapsed time.</p>
+      <h3>When each option is available</h3>
+      <ul>
+        <li>After a reading that has not been uploaded: both <code>Add to reading</code> / <code>Redo for reading</code> and <code>New sample</code>.</li>
+        <li>After the reading has been uploaded: only <code>New sample</code>, because an uploaded report can't change.</li>
+        <li>No reading on screen (or after a New sample): only <code>New sample</code>, with Share and Upload flicker once a sample exists.</li>
+        <li>Imported or test readings: only <code>New sample</code>.</li>
+        <li>Flicker that came with a reading never shows Share or Upload flicker, and the readings you open from History show their flicker without any controls.</li>
+        <li>A note under the buttons reminds you that New sample clears the current reading, and whether it is saved to History.</li>
+      </ul>
+      <h3>Capture flicker with each reading</h3>
+      <p>Settings → <em>Capture flicker with each reading</em> (off by default) takes a one-shot flicker snapshot
+        automatically after every reading. It adds a few seconds per reading. Even when it is off you can add a
+        sample to a reading yourself with <code>Add to reading</code>, before you upload it.</p>
+      <h3>Uploading flicker to hCRI.io</h3>
+      <ul>
+        <li><strong>With a reading:</strong> when you upload a reading that has a flicker sample, the report goes up
+          first and the flicker is then attached to it automatically. It appears in the flicker section at the
+          bottom of the report on hCRI.io.</li>
+        <li><strong>On its own:</strong> after a New sample, <code>Upload flicker</code> (cloud icon) opens a
+          small window for a title (up to two lines) and optional notes. Both are remembered and pre-filled next
+          time. The flicker then appears under Explore → Flicker on hCRI.io, where it can be viewed,
+          compared with other flicker readings, and attached to a report.</li>
+        <li>The flicker upload is best-effort: if hCRI.io can't take it, the report upload is not affected, and
+          the Logs tab says what happened.</li>
+      </ul>
+      <p>Flicker readings are also included at the end of shared CSV files.</p>
     </section>
 
     <section id="reading">
@@ -431,7 +480,7 @@
           R-values exactly as they looked when it was taken.</li>
         <li><strong>Rename</strong> a reading — renaming before upload sends it to hCRI.io under that new
           title.</li>
-        <li><strong>Re-upload</strong> a reading at any time, including ones already sent.</li>
+        <li><strong>Re-upload</strong> a reading at any time, including ones already sent. Row actions are icons: cloud (upload to hCRI.io), tray (share CSV), eye (view) and trash (delete). A small waveform icon next to the CCT/Ra marks a reading that includes a flicker sample, which goes up with it.</li>
         <li><strong>Copy, Report, TM-30</strong> — for a reading that has been uploaded, three small buttons
           appear under it. <code>Copy</code> puts its hCRI.io link on the clipboard; <code>↗ Report</code>
           opens the report in your browser; <code>◐ TM-30</code> opens the report with its full TM-30 report
