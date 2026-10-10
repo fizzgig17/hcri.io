@@ -46,9 +46,10 @@ try {
         $srcPath = $tmp;
     }
 
-    $response = ingest_spd_upload($db, (int)$user['id'], $srcPath, $origName, $label, true);
+    $replaceId = (int)($_POST['replaceId'] ?? $_GET['replaceId'] ?? ($_SERVER['HTTP_X_REPLACE_ID'] ?? 0));
+    $response = ingest_spd_upload($db, (int)$user['id'], $srcPath, $origName, $label, true, $replaceId);
     if ($tmp) @unlink($tmp);
-    json_out($response, 201);
+    json_out($response, !empty($response['replaced']) ? 200 : 201);
 
 } catch (\Throwable $e) {
     if ($tmp) @unlink($tmp);
