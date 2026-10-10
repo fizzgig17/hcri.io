@@ -22,7 +22,8 @@ require_once __DIR__ . '/_core/auth.php';
 
 
 
-require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/completeness.php';
 
 
 
@@ -1514,6 +1515,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
+    // Completeness score + flicker flag for the cards (scores and field names only).
+    try {
+        $cmap = completeness_for($db, array_map(fn($r) => $r['id'], $reports));
+        foreach ($reports as &$rep) {
+            $c = $cmap[$rep['id']] ?? null;
+            $rep['completeness'] = $c ? $c['score'] : null;
+            $rep['missing']      = $c ? $c['missing'] : [];
+            $rep['hasFlicker']   = $c ? $c['hasFlicker'] : false;
+        }
+        unset($rep);
+    } catch (\Throwable $e) {}
+
         // Attach thumbs up/down counts (graceful if the votes table doesn't exist yet).
 
 

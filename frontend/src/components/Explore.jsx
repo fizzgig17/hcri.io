@@ -102,6 +102,7 @@ import CompareCard from './CompareCard';
 import OverlaySPD from './OverlaySPD';
 import ExploreStats from './ExploreStats';
 import FlickerTab from './FlickerTab';
+import QuickFieldsModal from './QuickFieldsModal';
 import AdminPanel from './AdminPanel';
 import { FeedbackModal } from './AuthScreen';
 import AccountSettings from './AccountSettings';
@@ -192,7 +193,7 @@ function MetricBadge({ label, value, color }) {
 }
 
 // The grid card for a single report, used by both Explore and My Reports.
-function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, full, onDragStart }) {
+function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, full, onDragStart, onQuickFields }) {
   const dark = n.name === 'dark';
   const gradeColor = (v) => (v == null ? n.dim : v >= 90 ? n.good : v >= 80 ? n.warn : n.bad);
   const rgColor = (v) => (Math.abs((v || 100) - 100) <= 8 ? n.good : n.warn);
@@ -275,6 +276,32 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
         <MetricBadge label="Rg" value={e.Rg} color={rgColor(e.Rg)} />
       </div>
 
+      {e.completeness != null && (() => {
+        const sc = e.completeness;
+        const col = sc >= 80 ? n.good : sc >= 50 ? n.warn : n.bad;
+        const KEY = ['led_brand', 'led_model', 'led_cct'];
+        const missingKey = (e.missing || []).filter((k) => KEY.includes(k));
+        const NAMES = { led_brand: 'LED brand', led_model: 'LED model', led_cct: 'LED CCT', light_brand: 'light brand', light_model: 'light model', current: 'current', lumens: 'lumens', optic: 'optic', notes: 'notes' };
+        const tip = (e.missing && e.missing.length) ? `Missing: ${e.missing.map((k) => NAMES[k] || k).join(', ')}` : 'All details filled in';
+        return (
+          <div title={tip} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, height: 5, borderRadius: 3, background: `${n.dim}30`, overflow: 'hidden', minWidth: 30 }}>
+              <div style={{ width: `${sc}%`, height: '100%', background: col }} />
+            </div>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: col }}>{sc}%</span>
+            {mine && onQuickFields && (
+              <button
+                onClick={(ev) => { ev.stopPropagation(); onQuickFields(e); }}
+                title={missingKey.length ? `Fill in: ${missingKey.map((k) => NAMES[k]).join(', ')}` : 'Edit LED details'}
+                style={{ background: missingKey.length ? `${n.accent}18` : 'none', border: `1px solid ${n.accent}60`, color: n.accent, borderRadius: 5, fontSize: 11, fontWeight: 700, padding: '2px 8px', cursor: 'pointer' }}
+              >
+                {missingKey.length ? 'Fill in' : 'Edit'}
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {e.userName && (
         <div style={{ fontSize: 11, color: n.dim, fontFamily: 'monospace', borderTop: `1px solid ${n.border}`, paddingTop: 6, marginTop: 2 }}>
           by <span style={{ color: n.text, fontWeight: 700 }}>{e.userName}</span> · {fmtTZ(e.createdAt.replace(' ', 'T'), undefined, true)}
@@ -285,6 +312,12 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {e.private && <span title="Private — only you can see this" style={{ fontSize: 14, lineHeight: 1, opacity: 0.75 }}>🔒</span>}
           <span title="Report ID" style={{ fontSize: 10, color: n.dim, opacity: 0.5, fontFamily: 'monospace', lineHeight: 1 }}>#{e.id}</span>
+          {e.hasFlicker && (
+            <svg title="Has a flicker reading" width="16" height="12" viewBox="0 0 16 12" fill="none" stroke={n.accent} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
+              <title>Has a flicker reading</title>
+              <polyline points="1,6 3,6 4.5,1.5 7,10.5 9.5,1.5 12,10.5 13.5,6 15,6" />
+            </svg>
+          )}
         </div>
         {VOTING_ENABLED && <Votes reportId={e.id} theme={n} initialUp={e.up} initialDown={e.down} />}
       </div>
@@ -689,7 +722,7 @@ function ResultsPanel({
   cmpSel, onSelectAllVisible, onClearSel, onToggleSel,
   sortBy, onSortBy, sortOrder, onToggleSortOrder,
   page: k, pages: j, onPage,
-  onOpenReport, onDeleteReport, onDragStartReport,
+  onOpenReport, onDeleteReport, onDragStartReport, onQuickFields,
 }) {
   return (
     <div style={{
@@ -795,6 +828,7 @@ function ResultsPanel({
             selected={cmpSel.some((x) => x.id === e.id)}
             onToggle={() => onToggleSel(e)}
             onDragStart={isMyReportsTab && currentUserId && e.userId == currentUserId ? (ev, rep) => onDragStartReport(ev, rep) : undefined}
+            onQuickFields={(currentUserId && e.userId == currentUserId) ? onQuickFields : undefined}
             onClick={() => onOpenReport(e)}
           />
         ))}
@@ -959,6 +993,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   // My Reports: uploads
   const [mrPasteOpen, setMrPasteOpen] = useState(false);
+  const [quickFor, setQuickFor] = useState(null);
   const [mrBusy, setMrBusy] = useState(false);
   const [mrDrag, setMrDrag] = useState(false);
   const [mrStatus, setMrStatus] = useState(null);
@@ -1809,6 +1844,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     sortBy, onSortBy: (val) => { setSortBy(val); A(1); }, sortOrder, onToggleSortOrder: () => { setSortOrder((ord) => (ord === 'asc' ? 'desc' : 'asc')); A(1); },
     page: k, pages: j, onPage: (p2) => L(p2),
     onOpenReport: openReport, onDeleteReport: mrDel, onDragStartReport,
+    onQuickFields: (rep) => setQuickFor(rep),
   };
 
   // Shared header-bar buttons (profile / theme / admin / related / help / feedback / sign out).
@@ -2404,6 +2440,15 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       <button onClick={() => setMrPasteOpen(true)} style={{ flexShrink: 0, background: `${r.accent}12`, border: `1px solid ${r.accent}40`, color: r.accent, borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>
         📋 Paste
       </button>
+      {quickFor && (
+        <QuickFieldsModal
+          reportId={quickFor.id}
+          label={quickFor.label}
+          T={r}
+          onClose={() => { setQuickFor(null); L(k); }}
+          onOpenFull={() => { const rep = quickFor; setQuickFor(null); openReport(rep); }}
+        />
+      )}
       {mrPasteOpen && <PasteSPDModal user={n} onResult={() => { setMrPasteOpen(false); L(1); }} onClose={() => setMrPasteOpen(false)} />}
       <details style={{ width: '100%', marginTop: 6, marginBottom: 2 }}>
         <summary style={{ fontSize: 12, color: r.accent, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>How do I get a file to upload?</summary>
