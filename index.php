@@ -276,6 +276,26 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/v1/led_lists') {
+
+        require __DIR__ . '/api/v1_led_lists.php'; exit;
+
+    }
+
+    if ($uri === '/api/v1/led_suggest') {
+
+        require __DIR__ . '/api/v1_led_suggest.php'; exit;
+
+    }
+
+    if (preg_match('#^/api/v1/reports/(\d+)/led$#', $uri, $m)) {
+
+        $_GET['id'] = $m[1];
+
+        require __DIR__ . '/api/v1_report_led.php'; exit;
+
+    }
+
     if (preg_match('#^/api/v1/reports/(\d+)/share$#', $uri, $m)) {
 
         $_GET['id'] = $m[1];
