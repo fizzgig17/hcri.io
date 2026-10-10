@@ -13,6 +13,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/api_token.php';
 require_once __DIR__ . '/_core/led_lists.php';
+require_once __DIR__ . '/_core/categories.php';
 
 cors_headers();
 header('Cache-Control: no-store');
@@ -33,9 +34,16 @@ if (!$row) json_error('Report not found', 404);
 if ((int)$row['user_id'] !== (int)$user['id']) json_error('Forbidden', 403);
 
 $b = body();
-$result = led_save_report_details($db, $reportId, $user, [
-    'led_brand' => (string)($b['brand'] ?? ''),
-    'led_model' => (string)($b['model'] ?? ''),
-    'led_cct'   => (string)($b['cct']   ?? ''),
-]);
+$map = ['brand' => 'led_brand', 'model' => 'led_model', 'cct' => 'led_cct',
+        'light_brand' => 'light_brand', 'light_model' => 'light_model', 'optic' => 'optic',
+        'lumens' => 'lumens', 'current' => 'current'];
+$details = [];
+foreach ($map as $field => $kind) if (isset($b[$field])) $details[$kind] = (string)$b[$field];
+$result = led_save_report_details($db, $reportId, $user, $details);
+if (array_key_exists('notes', $b)) {
+    $notes = trim((string)$b['notes']);
+    if (mb_strlen($notes) > 10000) json_error('Notes too long (max 10000 characters)', 400);
+    $db->prepare('UPDATE reports SET notes = ? WHERE id = ?')->execute([$notes === '' ? null : $notes, $reportId]);
+    $result['notes'] = $notes === '' ? null : $notes;
+}
 json_out($result);
