@@ -26,6 +26,7 @@ import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
 import usePanelBackClose from '../hooks/usePanelBackClose';
+import LedGroupsEditor, { ledsFromReport } from './LedGroupsEditor.jsx';
 
 const ALL_KINDS = [
   ['light_brand', 'Light Brand'],
@@ -41,7 +42,11 @@ const ALL_KINDS = [
 export default function CategoryEditor({ report, isGuest, kinds }) {
   const { theme: o } = useTheme();
   // `kinds` (optional list of kind ids) limits the editor to those fields, e.g. the quick-edit dialog on report cards.
-  const KINDS = kinds ? ALL_KINDS.filter(([k]) => kinds.includes(k)) : ALL_KINDS;
+  // The three LED kinds (brand, LED, CCT) are edited together as LED groups by LedGroupsEditor, so each LED keeps its own
+  // values paired; everything else stays a per-kind field.
+  const LED_KIND_IDS = ['led_brand', 'led_model', 'led_cct'];
+  const showLeds = !kinds || LED_KIND_IDS.some((k) => kinds.includes(k));
+  const KINDS = (kinds ? ALL_KINDS.filter(([k]) => kinds.includes(k)) : ALL_KINDS).filter(([k]) => !LED_KIND_IDS.includes(k));
 
   const curValues = (k) =>
     ((report && report.categories && report.categories[k]) || [])
@@ -218,13 +223,17 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
       );
     }).filter(Boolean);
 
-    if (!blocks.length) return null;
+    const hasLeds = showLeds && ledsFromReport(report).some((l) => l.brand || l.led || l.cct);
+    if (!blocks.length && !hasLeds) return null;
     return (
       <div style={{ gridColumn: '1/-1', marginTop: 4 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
           Categories
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>{blocks}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
+          {hasLeds && <LedGroupsEditor report={report} isGuest />}
+          {blocks}
+        </div>
       </div>
     );
   }
@@ -441,9 +450,12 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
 
   return (
     <div style={{ gridColumn: '1/-1', marginTop: 4 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
-        Categories
-      </div>
+      {KINDS.length > 0 && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: o.accent, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+          Categories
+        </div>
+      )}
+      {showLeds && <div style={{ marginBottom: KINDS.length ? 12 : 0 }}><LedGroupsEditor report={report} isGuest={false} /></div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 12 }}>
         {KINDS.map(field)}
       </div>

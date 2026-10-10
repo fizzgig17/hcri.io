@@ -10,6 +10,7 @@
 // Backend: GET /api/categories (value suggestions), PATCH /api/admin/reports/:id
 // (api/admin.php) -- body { label, notes, categories: { kind: [values] }, isPublic }
 
+import LedGroupsEditor from './LedGroupsEditor.jsx';
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 
@@ -23,6 +24,7 @@ async function adminFetch(path, opts = {}) {
   return data;
 }
 
+const LED_IDS = ['led_brand', 'led_model', 'led_cct'];
 const FIELDS = [
   ['light_brand', 'Light Brand'],
   ['light_model', 'Light Model'],
@@ -72,7 +74,8 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
     try {
       const r = await adminFetch(`/reports/${report.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ label, notes, categories: cats, isPublic: !excluded }),
+        // LED brand / LED / CCT are saved as LED groups by the editor below, not through the per-kind chips.
+        body: JSON.stringify({ label, notes, categories: Object.fromEntries(Object.entries(cats).filter(([k]) => !LED_IDS.includes(k))), isPublic: !excluded }),
       });
       setMsg('Saved ✓');
       if (onSaved) onSaved(r);
@@ -122,8 +125,18 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
         </div>
       </div>
+      <div style={{ marginBottom: 12 }}>
+        <LedGroupsEditor
+          report={report}
+          isGuest={false}
+          saveFn={async (leds) => {
+            const r = await adminFetch(`/reports/${report.id}`, { method: 'PATCH', body: JSON.stringify({ leds }) });
+            return { leds: (r && r.leds) || [] };
+          }}
+        />
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 12 }}>
-        {FIELDS.map(([k, lab]) => {
+        {FIELDS.filter(([k]) => !LED_IDS.includes(k)).map(([k, lab]) => {
           if (k === 'lumens' || k === 'current') {
             return (
               <div key={k}>
