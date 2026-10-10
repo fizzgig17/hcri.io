@@ -58,9 +58,11 @@ function led_lists_payload(PDO $db): array {
         // Real pairs first: each LED group carries its own brand and model.
         report_leds_ensure($db);
         $rows = $db->query(
-            "SELECT brand, model, COUNT(*) AS n FROM report_leds
-              WHERE brand IS NOT NULL AND model IS NOT NULL
-              GROUP BY brand, model ORDER BY brand, n DESC, model"
+            "SELECT b.value AS brand, m.value AS model, COUNT(*) AS n
+               FROM report_leds l
+               JOIN categories b ON b.id = l.brand_id
+               JOIN categories m ON m.id = l.model_id
+              GROUP BY b.value, m.value ORDER BY b.value, n DESC, m.value"
         )->fetchAll();
         foreach ($rows as $r) $modelsByBrand[(string)$r['brand']][] = (string)$r['model'];
     } catch (\Throwable $e) { /* table absent */ }

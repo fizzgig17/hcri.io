@@ -1,6 +1,7 @@
 <?php
 // api/_core/categories_csv.php
 declare(strict_types=1);
+require_once __DIR__ . '/report_leds.php';
 
 // Shared logic for category CSV export/import, duplicate audit/merge, and case
 // normalization. Used by both the admin API (api/admin.php) and the CLI tool
@@ -201,6 +202,7 @@ function categories_merge(PDO $db, int $keepId, int $dropId, bool $dryRun): arra
                     ) x)'
         )->execute([$dropId, $keepId]);
         $db->prepare('UPDATE report_categories SET category_id = ? WHERE category_id = ?')->execute([$keepId, $dropId]);
+        report_leds_repoint($db, $dropId, $keepId, (string)$keep['kind']);
         $db->prepare('DELETE FROM categories WHERE id = ?')->execute([$dropId]);
         $db->commit();
     } catch (\Throwable $e) {

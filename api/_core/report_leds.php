@@ -6,7 +6,8 @@ declare(strict_types=1);
 // A report's LEDs, stored as groups: each LED has its own brand, model (the LED) and CCT, so a light with two
 // different LEDs keeps them paired. The older per-kind category rows (led_brand / led_model / led_cct) stay as the
 // flattened index that Explore, filters and the annex read; report_leds_set() rebuilds them from the groups, so
-// the two never disagree.
+// the two never disagree. The groups store category ids (not text), so renaming, normalizing or merging a value in
+// the admin tools carries through on its own; report_leds_forget()/report_leds_repoint() cover delete and merge.
 
 require_once __DIR__ . '/categories.php';
 
@@ -22,10 +23,11 @@ function report_leds_ensure(PDO $db): void {
             id        INT AUTO_INCREMENT PRIMARY KEY,
             report_id INT NOT NULL,
             pos       TINYINT NOT NULL,
-            brand     VARCHAR(255) NULL,
-            model     VARCHAR(255) NULL,
-            cct       VARCHAR(255) NULL,
-            UNIQUE KEY uq_report_pos (report_id, pos)
+            brand_id  INT NULL,
+            model_id  INT NULL,
+            cct_id    INT NULL,
+            UNIQUE KEY uq_report_pos (report_id, pos),
+            KEY idx_brand (brand_id), KEY idx_model (model_id), KEY idx_cct (cct_id)
         )');
     } catch (\Throwable $e) { /* no CREATE privilege: run sql/report_leds.sql */ }
 }
@@ -34,7 +36,12 @@ function report_leds_ensure(PDO $db): void {
 function report_leds_get(PDO $db, int $reportId): array {
     report_leds_ensure($db);
     try {
-        $s = $db->prepare('SELECT brand, model, cct FROM report_leds WHERE report_id = ? ORDER BY pos');
+        $s = $db->prepare('SELECT b.value AS brand, m.value AS model, c.value AS cct
+                             FROM report_leds l
+                             LEFT JOIN categories b ON b.id = l.brand_id
+                             LEFT JOIN categories m ON m.id = l.model_id
+                             LEFT JOIN categories c ON c.id = l.cct_id
+                            WHERE l.report_id = ? ORDER BY l.pos');
         $s->execute([$reportId]);
         return array_map(fn($r) => ['brand' => $r['brand'], 'model' => $r['model'], 'cct' => $r['cct']], $s->fetchAll());
     } catch (\Throwable $e) { return []; }
@@ -83,12 +90,35 @@ function report_leds_set(PDO $db, int $reportId, array $user, array $leds): arra
         if (count($clean) >= REPORT_LED_MAX) break;
     }
     $db->prepare('DELETE FROM report_leds WHERE report_id = ?')->execute([$reportId]);
-    $ins = $db->prepare('INSERT INTO report_leds (report_id, pos, brand, model, cct) VALUES (?, ?, ?, ?, ?)');
-    foreach ($clean as $i => $row) $ins->execute([$reportId, $i + 1, $row['brand'], $row['model'], $row['cct']]);
+    $ins = $db->prepare('INSERT INTO report_leds (report_id, pos, brand_id, model_id, cct_id) VALUES (?, ?, ?, ?, ?)');
+    foreach ($clean as $i => $row) {
+        $ids = [];
+        foreach (REPORT_LED_FIELDS as $field => $kind) {
+            $cat = $row[$field] === null ? null : find_category($db, $kind, $row[$field]);
+            $ids[] = $cat ? $cat['id'] : null;
+        }
+        $ins->execute([$reportId, $i + 1, $ids[0], $ids[1], $ids[2]]);
+    }
     // Flat category index = every distinct value used by any LED.
     foreach (REPORT_LED_FIELDS as $field => $kind) {
         $vals = array_values(array_filter(array_column($clean, $field), fn($v) => $v !== null));
         set_report_categories($db, $reportId, $kind, $vals, (int)$user['id'], false);
     }
     return ['leds' => $clean, 'requested' => (object)$requested];
+}
+
+const REPORT_LED_COLUMN = ['led_brand' => 'brand_id', 'led_model' => 'model_id', 'led_cct' => 'cct_id'];
+
+/** A category value is being deleted with nothing to move it to: blank it in every LED that used it. */
+function report_leds_forget(PDO $db, int $categoryId, string $kind): void {
+    $col = REPORT_LED_COLUMN[$kind] ?? null;
+    if (!$col) return;
+    try { $db->prepare("UPDATE report_leds SET $col = NULL WHERE $col = ?")->execute([$categoryId]); } catch (\Throwable $e) { /* no table yet */ }
+}
+
+/** A category value is being merged / reassigned into another: point every LED that used it at the new one. */
+function report_leds_repoint(PDO $db, int $fromId, int $toId, string $kind): void {
+    $col = REPORT_LED_COLUMN[$kind] ?? null;
+    if (!$col) return;
+    try { $db->prepare("UPDATE report_leds SET $col = ? WHERE $col = ?")->execute([$toId, $fromId]); } catch (\Throwable $e) { /* no table yet */ }
 }

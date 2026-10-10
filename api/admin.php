@@ -5,6 +5,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/report_leds.php';
 require_once __DIR__ . '/_core/categories_csv.php';
 require_once __DIR__ . '/_core/settings.php';
 require_once __DIR__ . '/_core/spd.php';
@@ -66,6 +67,9 @@ if ($m === 'POST' && $path === '/categories/delete') {
                              ) x)')->execute([$id, $to]);
         $db->prepare('UPDATE report_categories SET category_id = ? WHERE category_id = ?')
            ->execute([$to, $id]);
+        report_leds_repoint($db, $id, $to, (string)$cat['kind']);
+    } else {
+        report_leds_forget($db, $id, (string)$cat['kind']);
     }
     $db->prepare('DELETE FROM categories WHERE id = ?')->execute([$id]);
     json_out(['ok' => true]);
