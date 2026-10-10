@@ -299,11 +299,15 @@ function led_save_report_details(PDO $db, int $reportId, array $user, array $det
     led_ensure_tables($db);
     $saved = []; $requested = [];
     $isAdmin = !empty($user['is_admin']);
-    foreach (LED_KINDS as $kind) {
+    // LED kinds always; plus any other report category kind the caller passes (light_brand, light_model, optic, lumens, current).
+    $kinds = array_values(array_unique(array_merge(LED_KINDS, array_filter(array_keys($details), 'is_category_kind'))));
+    foreach ($kinds as $kind) {
         $value = trim((string)($details[$kind] ?? ''));
         if ($value === '' || mb_strlen($value) > 255) continue;
         $cat = find_category($db, $kind, $value);
-        if (!$cat && $isAdmin) $cat = get_or_create_category($db, $kind, $value, (int)$user['id']);
+        // Free-form numeric kinds (lumens, current) are created on the fly for everyone, as in /api/categories/assign.
+        $free = in_array($kind, ['lumens', 'current'], true);
+        if (!$cat && ($isAdmin || $free)) $cat = get_or_create_category($db, $kind, $value, (int)$user['id']);
         if ($cat) {
             set_report_categories($db, $reportId, $kind, [$cat['value']], (int)$user['id'], false);
             $saved[$kind] = $cat['value'];
