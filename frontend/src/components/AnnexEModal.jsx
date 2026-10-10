@@ -270,15 +270,18 @@ export default function AnnexEModal({ report, onClose }) {
         values.forEach((raw, i) => {
           const [rr, gg, bb] = hueToRGB(i * 22.5 + 11.25);
           const clamped = Math.max(lo, Math.min(hi, raw));
+          // Positive bars rise from the zero line (or the baseline for fidelity); negative bars hang below it.
+          // (They used to be drawn 1px tall, so the negative chroma/hue shifts showed as a number with no bar.)
           const top = clamped >= 0 ? p1 - (clamped / (hi - lo)) * (p1 - p0) : zeroY;
+          const bottom = clamped >= 0 ? p1 : zeroY + (Math.abs(clamped) / (hi - lo)) * (p1 - p0);
           const x = 336 + i * binW + 1;
           c.fillStyle = `rgba(${rr},${gg},${bb},0.88)`;
-          c.fillRect(x, clamped >= 0 ? top : zeroY, binW - 2, clamped >= 0 ? p1 - top : top - zeroY || 1);
+          c.fillRect(x, top, binW - 2, Math.max(1, bottom - top));
           const lab = barLabelFmt(raw);
           if (lab) {
             c.fillStyle = colStrong; c.font = 'bold 7px sans-serif'; c.textAlign = 'center';
             c.textBaseline = clamped >= 0 ? 'bottom' : 'top';
-            c.fillText(lab, x + binW / 2 - 0.5, clamped >= 0 ? top - 1 : top + Math.abs(top - zeroY) + 1);
+            c.fillText(lab, x + binW / 2 - 0.5, clamped >= 0 ? top - 1 : bottom + 1);
           }
           c.fillStyle = colDim; c.font = '7px sans-serif'; c.textBaseline = 'top'; c.textAlign = 'center';
           c.fillText(i + 1, x + binW / 2 - 0.5, p1 + 2);
