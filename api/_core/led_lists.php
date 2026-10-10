@@ -6,7 +6,8 @@ declare(strict_types=1);
 // Helpers for the hCRI Companion app's "what LED is this?" feature:
 //   - led_lists_payload():  the LED brand / model / CCT dropdown values, plus which models go with
 //                           which brand (worked out from reports that already carry both tags)
-//   - led_suggest():        nearest-neighbour match of a spectrum against public, tagged reports
+//   - led_suggest():        nearest-neighbour match of a spectrum against ALL tagged reports (private ones
+//                           included, since they make the match better), returning only brand/model/CCT text
 //   - led_save_report_details(): sets a report's LED brand/model/CCT, queueing unknown values for
 //                           admin review instead of inventing new category values (only admins may)
 //
@@ -98,11 +99,16 @@ function led_overlap(array $a, array $b): float {
 }
 
 /**
- * Best LED match for a spectrum from public reports that already have an LED brand AND model.
+ * Best LED match for a spectrum from every report that already has an LED brand AND model, public or private.
  * Returns ['suggestion' => {...}|null, 'alternatives' => [...]]. A suggestion is only returned when
  * it is clearly ahead of the other candidates; a wrong confident guess is worse than none.
+ *
+ * Privacy: nothing about any report leaves this function, only the winning brand / model / CCT strings
+ * (values from the curated, public category lists) and aggregate numbers. A group of matches that rests only
+ * on private reports from a SINGLE other person is never returned, so a suggestion can't point at one
+ * identifiable owner's light. The requester's own reports always count.
  */
-function led_suggest(PDO $db, array $wls, array $vals): array {
+function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0): array {
     $none = ['suggestion' => null, 'alternatives' => []];
     $fp = led_fingerprint($wls, $vals);
     if (!$fp) return $none;
@@ -110,7 +116,7 @@ function led_suggest(PDO $db, array $wls, array $vals): array {
 
     try {
         $rows = $db->query(
-            "SELECT r.id, bc.value AS brand, mc.value AS model, cc.value AS cct, r.spd_data, fp.vec
+            "SELECT r.id, r.user_id, r.is_public, bc.value AS brand, mc.value AS model, cc.value AS cct, r.spd_data, fp.vec
                FROM reports r
                JOIN report_categories rb ON rb.report_id = r.id AND rb.kind = 'led_brand'
                JOIN categories bc ON bc.id = rb.category_id
@@ -119,7 +125,7 @@ function led_suggest(PDO $db, array $wls, array $vals): array {
                LEFT JOIN report_categories rc ON rc.report_id = r.id AND rc.kind = 'led_cct'
                LEFT JOIN categories cc ON cc.id = rc.category_id
                LEFT JOIN spd_fingerprints fp ON fp.report_id = r.id
-              WHERE r.is_public = 1 AND r.spd_data IS NOT NULL"
+              WHERE r.spd_data IS NOT NULL"
         )->fetchAll();
     } catch (\Throwable $e) { return $none; }
 
@@ -141,7 +147,13 @@ function led_suggest(PDO $db, array $wls, array $vals): array {
             $built++;
         }
         if (!is_array($vec) || count($vec) !== count($fp)) continue;
-        $scored[] = ['brand' => (string)$r['brand'], 'model' => (string)$r['model'], 'cct' => $r['cct'] !== null ? (string)$r['cct'] : null, 'score' => led_overlap($fp, $vec)];
+        $scored[] = [
+            'brand' => (string)$r['brand'], 'model' => (string)$r['model'],
+            'cct'   => $r['cct'] !== null ? (string)$r['cct'] : null,
+            'score' => led_overlap($fp, $vec),
+            'owner' => $r['user_id'] !== null ? (int)$r['user_id'] : 0,
+            'pub'   => !empty($r['is_public']),
+        ];
     }
     if (!$scored) return $none;
 
@@ -153,16 +165,24 @@ function led_suggest(PDO $db, array $wls, array $vals): array {
     foreach ($top as $c) {
         $key = mb_strtolower($c['brand'] . '|' . $c['model']);
         $g =& $groups[$key];
-        if (!isset($g)) $g = ['brand' => $c['brand'], 'model' => $c['model'], 'best' => 0.0, 'weight' => 0.0, 'close' => 0, 'ccts' => []];
+        if (!isset($g)) $g = ['brand' => $c['brand'], 'model' => $c['model'], 'best' => 0.0, 'weight' => 0.0, 'close' => 0, 'ccts' => [], 'owners' => [], 'public' => false, 'own' => false];
         $g['best']    = max($g['best'], $c['score']);
         $g['weight'] += exp(60 * ($c['score'] - 1));
-        if ($c['score'] >= 0.93) $g['close']++;
+        if ($c['score'] >= 0.93) {
+            $g['close']++;
+            $g['owners'][$c['owner']] = true;
+            if ($c['pub']) $g['public'] = true;
+            if ($requesterId > 0 && $c['owner'] === $requesterId) $g['own'] = true;
+        }
         if ($c['cct'] !== null) $g['ccts'][$c['cct']] = ($g['ccts'][$c['cct']] ?? 0) + 1;
         unset($g);
     }
     $total = array_sum(array_column($groups, 'weight'));
     $out = [];
     foreach ($groups as $g) {
+        // Only report a group that doesn't rest solely on one other person's private reports.
+        // (Still counted in $total above, so a strong private competitor lowers confidence instead of vanishing.)
+        if (!($g['own'] || $g['public'] || count($g['owners']) >= 2)) continue;
         arsort($g['ccts']);
         $out[] = [
             'brand'      => $g['brand'],
@@ -173,6 +193,7 @@ function led_suggest(PDO $db, array $wls, array $vals): array {
             'support'    => $g['close'],
         ];
     }
+    if (!$out) return $none;
     usort($out, fn($a, $b) => [$b['confidence'], $b['score']] <=> [$a['confidence'], $a['score']]);
 
     $first = $out[0];

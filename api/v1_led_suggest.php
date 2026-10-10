@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 // POST /api/v1/led_suggest      body: {"wls":[...], "vals":[...]}
 //
-// "Looks like Nichia 519A, 4000 K": compares the spectrum with public reports that already have an LED
-// brand and model, and answers with the clear winner (or `suggestion: null` when nothing is clearly ahead).
-// Needs a personal API token, the same one the app uploads with. Only PUBLIC reports are ever compared, and
-// only brand / model / CCT strings come back, never anything about the report or its owner.
+// "Looks like Nichia 519A, 4000 K": compares the spectrum with reports that already have an LED
+// brand and model (public AND private ones, so the match uses all the data on the site), and answers with the
+// clear winner, or `suggestion: null` when nothing is clearly ahead. Needs a personal API token, the same one
+// the app uploads with. Only brand / model / CCT strings and aggregate numbers come back, never a report id,
+// label, owner or spectrum; see led_suggest() for the single-owner safeguard.
 
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
@@ -30,4 +31,4 @@ if (!is_array($wls) || !is_array($vals) || count($wls) < 10 || count($wls) !== c
     json_error('Send {"wls": [...], "vals": [...]} with matching arrays of at least 10 points.', 400);
 }
 
-json_out(led_suggest($db, $wls, $vals));
+json_out(led_suggest($db, $wls, $vals, (int)$user['id']));
