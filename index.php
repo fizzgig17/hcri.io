@@ -174,6 +174,10 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if (preg_match('#^/api/reports/(\d+)/led_suggest/?$#', $uri)) {
+        require __DIR__ . '/api/reports_led_suggest.php'; exit;
+    }
+
     if (preg_match('#^/api/reports/(\d+)/flicker/?$#', $uri)) {
         require __DIR__ . '/api/reports_flicker.php'; exit;
     }
@@ -273,6 +277,26 @@ if (str_starts_with($uri, '/api/')) {
     if ($uri === '/api/v1/upload') {
 
         require __DIR__ . '/api/v1_upload.php'; exit;
+
+    }
+
+    if ($uri === '/api/v1/led_lists') {
+
+        require __DIR__ . '/api/v1_led_lists.php'; exit;
+
+    }
+
+    if ($uri === '/api/v1/led_suggest') {
+
+        require __DIR__ . '/api/v1_led_suggest.php'; exit;
+
+    }
+
+    if (preg_match('#^/api/v1/reports/(\d+)/led$#', $uri, $m)) {
+
+        $_GET['id'] = $m[1];
+
+        require __DIR__ . '/api/v1_report_led.php'; exit;
 
     }
 

@@ -27,7 +27,7 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { FeedbackModal as RequestValueModal } from './AuthScreen';
 import usePanelBackClose from '../hooks/usePanelBackClose';
 
-const KINDS = [
+const ALL_KINDS = [
   ['light_brand', 'Light Brand'],
   ['light_model', 'Light Model'],
   ['led_cct', 'LED CCT'],
@@ -38,8 +38,10 @@ const KINDS = [
   ['current', 'Current (A)'],
 ];
 
-export default function CategoryEditor({ report, isGuest }) {
+export default function CategoryEditor({ report, isGuest, kinds }) {
   const { theme: o } = useTheme();
+  // `kinds` (optional list of kind ids) limits the editor to those fields, e.g. the quick-edit dialog on report cards.
+  const KINDS = kinds ? ALL_KINDS.filter(([k]) => kinds.includes(k)) : ALL_KINDS;
 
   const curValues = (k) =>
     ((report && report.categories && report.categories[k]) || [])

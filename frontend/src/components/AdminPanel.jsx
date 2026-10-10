@@ -299,6 +299,11 @@ export default function AdminPanel({ onClose, me }) {
                         )}
                         <span style={{ fontSize: 11, color: t.dim }}>{usr.reportCount} rpt{usr.reportCount === 1 ? '' : 's'}</span>
                         {usr.apiReportCount > 0 && <span style={{ fontSize: 11, color: t.accent }}>{usr.apiReportCount} via API</span>}
+                        {usr.avgCompleteness != null && (
+                          <span title="Average completeness score of this user's reports" style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: usr.avgCompleteness >= 80 ? t.good : usr.avgCompleteness >= 50 ? t.warn : t.bad }}>
+                            avg {Math.round(usr.avgCompleteness)}%
+                          </span>
+                        )}
                       </div>
                     </div>
                     <span style={{ fontSize: 11, color: t.dim }}>{usr.email}</span>
@@ -327,6 +332,7 @@ export default function AdminPanel({ onClose, me }) {
                       <div style={{ fontSize: 12, color: `${t.dim}80`, marginTop: 2 }}>
                         Joined {fmtTZ(u.createdAt.replace(' ', 'T'), undefined, true)} · {u.reportCount} saved report{u.reportCount === 1 ? '' : 's'}
                         {u.apiReportCount > 0 ? ` (${u.apiReportCount} via API)` : ''}
+                        {u.avgCompleteness != null ? ` · avg completeness ${Math.round(u.avgCompleteness)}%` : ''}
                       </div>
                       <div style={{ fontSize: 12, color: `${t.dim}80`, marginTop: 2 }}>
                         Last login: {u.lastLoginAt ? fmtTZ(u.lastLoginAt.replace(' ', 'T')) : 'never'}  ·  Last active: {u.lastActiveAt ? fmtTZ(u.lastActiveAt.replace(' ', 'T')) : 'never'}

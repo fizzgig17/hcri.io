@@ -139,6 +139,12 @@ export function ApiTokens({ theme: t, onClose: closeSettings }) {
       <div style={box}>
         {`curl -X POST "${endpoint}" \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -F "file=@measurement.csv" \\\n  -F "label=My Light"`}
       </div>
+      <div style={{ marginTop:12 }}>
+        <a href={`${window.location.origin}${basePathForTokens().replace(/index\.php\/$/, '')}assets/hcri-api-spec.pdf`} target="_blank" rel="noopener" download="hcri-api-spec.pdf"
+           style={{ color:t.accent, fontSize:12, fontWeight:700, textDecoration:'none' }}>
+          ⬇ Download the API reference (PDF)
+        </a>
+      </div>
     </div>
   );
 }
