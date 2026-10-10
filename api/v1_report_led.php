@@ -45,7 +45,7 @@ $saved = (array)$result['saved'];
 $requested = (array)$result['requested'];
 
 if (isset($b['leds']) && is_array($b['leds'])) {
-    // A list of LEDs: [{"brand":"Nichia","model":"519A","cct":"3000K"}, {...}]. Replaces the report's LEDs.
+    // A list of LEDs: [{"brand":"Nichia","led":"519A","cct":"3000K"}, {...}]. Replaces the report's LEDs.
     $r = report_leds_set($db, $reportId, $user, array_values($b['leds']));
     $result['leds'] = $r['leds'];
     foreach ((array)$r['requested'] as $k => $vals) $requested[$k] = $vals;
@@ -56,14 +56,14 @@ if (isset($b['leds']) && is_array($b['leds'])) {
     if (!$leds) {
         $cm = report_categories_map($db, $reportId);
         $one = fn($k) => count($cm[$k] ?? []) === 1 ? (string)$cm[$k][0]['value'] : null;
-        $leds = [['brand' => $one('led_brand'), 'model' => $one('led_model'), 'cct' => $one('led_cct')]];
+        $leds = [['brand' => $one('led_brand'), 'led' => $one('led_model'), 'cct' => $one('led_cct')]];
     }
     $rq = [];
     foreach (REPORT_LED_FIELDS as $field => $kind) {
         $v = trim((string)($b[$field] ?? ''));
         if ($v === '') continue;
         $canon = report_led_resolve($db, $kind, $v, $user, $reportId, $rq);
-        if ($canon !== null) { $leds[0][$field] = $canon; $saved[$kind] = $canon; }
+        if ($canon !== null) { $leds[0][$field === 'model' ? 'led' : $field] = $canon; unset($leds[0]['model']); $saved[$kind] = $canon; }
     }
     foreach ($rq as $k => $vals) $requested[$k] = $vals[0];
     $r = report_leds_set($db, $reportId, $user, $leds);

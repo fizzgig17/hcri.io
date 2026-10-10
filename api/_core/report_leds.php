@@ -43,7 +43,7 @@ function report_leds_get(PDO $db, int $reportId): array {
                              LEFT JOIN categories c ON c.id = l.cct_id
                             WHERE l.report_id = ? ORDER BY l.pos');
         $s->execute([$reportId]);
-        return array_map(fn($r) => ['brand' => $r['brand'], 'model' => $r['model'], 'cct' => $r['cct']], $s->fetchAll());
+        return array_map(fn($r) => ['brand' => $r['brand'], 'led' => $r['model'], 'model' => $r['model'], 'cct' => $r['cct']], $s->fetchAll());
     } catch (\Throwable $e) { return []; }
 }
 
@@ -71,7 +71,7 @@ function report_led_resolve(PDO $db, string $kind, string $value, array $user, i
 }
 
 /**
- * Replaces the report's LEDs with $leds ([['brand','model','cct'], ...]; blank LEDs are dropped, at most REPORT_LED_MAX)
+ * Replaces the report's LEDs with $leds ([['brand','led','cct'], ...]; blank LEDs are dropped, at most REPORT_LED_MAX)
  * and rebuilds the flat led_* category rows from them. Values are resolved as in report_led_resolve().
  * Returns ['leds' => [...as stored...], 'requested' => [kind => [values]]].
  */
@@ -83,7 +83,9 @@ function report_leds_set(PDO $db, int $reportId, array $user, array $leds): arra
         if (!is_array($l)) continue;
         $row = [];
         foreach (REPORT_LED_FIELDS as $field => $kind) {
-            $row[$field] = report_led_resolve($db, $kind, (string)($l[$field] ?? ''), $user, $reportId, $requested);
+            // "led" is the preferred name for the model; "model" is accepted too.
+            $in = $field === 'model' ? ($l['led'] ?? $l['model'] ?? '') : ($l[$field] ?? '');
+            $row[$field] = report_led_resolve($db, $kind, (string)$in, $user, $reportId, $requested);
         }
         if ($row['brand'] === null && $row['model'] === null && $row['cct'] === null) continue;
         $clean[] = $row;
@@ -104,7 +106,7 @@ function report_leds_set(PDO $db, int $reportId, array $user, array $leds): arra
         $vals = array_values(array_filter(array_column($clean, $field), fn($v) => $v !== null));
         set_report_categories($db, $reportId, $kind, $vals, (int)$user['id'], false);
     }
-    return ['leds' => $clean, 'requested' => (object)$requested];
+    return ['leds' => array_map(fn($r) => ['brand' => $r['brand'], 'led' => $r['model'], 'model' => $r['model'], 'cct' => $r['cct']], $clean), 'requested' => (object)$requested];
 }
 
 const REPORT_LED_COLUMN = ['led_brand' => 'brand_id', 'led_model' => 'model_id', 'led_cct' => 'cct_id'];
