@@ -5,6 +5,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/report_leds.php';
 
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -60,12 +61,14 @@ if ($m === 'POST' && $path === '/assign') {
         // other kinds stay select-only from admin-curated lists.
         $allowCreate = in_array($kind, ['lumens', 'current'], true);
         $cats = set_report_categories($db, $reportId, $kind, $b['values'], $user['id'], $allowCreate);
+        if (in_array($kind, LED_KINDS_FLAT, true)) report_leds_resync($db, $reportId);
         json_out(['categories' => $cats]);
     }
 
     if ($value === '') {
         $db->prepare('DELETE FROM report_categories WHERE report_id = ? AND kind = ?')
            ->execute([$reportId, $kind]);
+        if (in_array($kind, LED_KINDS_FLAT, true)) report_leds_resync($db, $reportId);
         json_out(['category' => null]);
     }
 
@@ -75,7 +78,31 @@ if ($m === 'POST' && $path === '/assign') {
         'INSERT INTO report_categories (report_id, kind, category_id) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE category_id = VALUES(category_id)'
     )->execute([$reportId, $kind, $cat['id']]);
+    if (in_array($kind, LED_KINDS_FLAT, true)) report_leds_resync($db, $reportId);
     json_out(['category' => ['id' => $cat['id'], 'value' => $cat['value']]]);
+}
+
+// ── POST /api/categories/leds — set a report's LEDs (each with its own brand, LED and CCT) ─────────────────
+// body: { reportId, leds: [{ brand, led, cct }, ...] }   ("model" is accepted for "led")
+// Owner only. Values must come from the curated lists; an unknown value is queued for admin review (admins add it
+// straight away) and left blank in that LED. Returns { leds, requested }.
+if ($m === 'POST' && $path === '/leds') {
+    $b        = body();
+    $reportId = (int)($b['reportId'] ?? 0);
+    if (!$reportId) json_error('reportId required', 400);
+    if (!isset($b['leds']) || !is_array($b['leds'])) json_error("'leds' list required", 400);
+    $own = $db->prepare('SELECT user_id FROM reports WHERE id = ?');
+    $own->execute([$reportId]);
+    $row = $own->fetch();
+    if (!$row) json_error('Report not found', 404);
+    if ((int)$row['user_id'] !== $user['id']) json_error('Forbidden', 403);
+    $isAdmin = !empty($user['is_admin']);
+    if (!$isAdmin) {
+        $chk = $db->prepare('SELECT is_admin FROM users WHERE id = ?'); $chk->execute([$user['id']]);
+        $r = $chk->fetch();
+        $isAdmin = $r && (int)$r['is_admin'] === 1;
+    }
+    json_out(report_leds_set($db, $reportId, ['id' => $user['id'], 'is_admin' => $isAdmin ? 1 : 0], array_values($b['leds'])));
 }
 
 // ── POST /api/categories/bulk_assign — categorize many reports at once ────────
@@ -120,6 +147,7 @@ if ($m === 'POST' && $path === '/bulk_assign') {
             set_report_categories($db, $reportId, $kind, $vals, $user['id'], $allowCreate);
             $touchedKinds[] = $kind;
         }
+        if (array_intersect($touchedKinds, LED_KINDS_FLAT)) report_leds_resync($db, $reportId);
         if ($touchedKinds) $updated[] = ['id' => $reportId, 'kinds' => $touchedKinds];
     }
 

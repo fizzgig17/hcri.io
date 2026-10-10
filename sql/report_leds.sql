@@ -2,7 +2,8 @@
 -- Safe to run more than once. Run in phpMyAdmin (SQL tab) on the hCRI.io database.
 -- The API also creates the table on first use (report_leds_ensure()), so step 1 is optional there.
 
--- 1. The table. It stores category ids, so renaming or merging a value in the admin tools carries through.
+-- 1. The table. It stores category ids, so renaming or merging a value in the admin tools carries through, and it
+--    cascades with reports and categories the same way report_categories does.
 CREATE TABLE IF NOT EXISTS report_leds (
   id        INT AUTO_INCREMENT PRIMARY KEY,
   report_id INT NOT NULL,
@@ -11,7 +12,11 @@ CREATE TABLE IF NOT EXISTS report_leds (
   model_id  INT NULL,
   cct_id    INT NULL,
   UNIQUE KEY uq_report_pos (report_id, pos),
-  KEY idx_brand (brand_id), KEY idx_model (model_id), KEY idx_cct (cct_id)
+  KEY idx_brand (brand_id), KEY idx_model (model_id), KEY idx_cct (cct_id),
+  CONSTRAINT fk_rl_report FOREIGN KEY (report_id) REFERENCES reports (id) ON DELETE CASCADE,
+  CONSTRAINT fk_rl_brand  FOREIGN KEY (brand_id)  REFERENCES categories (id) ON DELETE SET NULL,
+  CONSTRAINT fk_rl_model  FOREIGN KEY (model_id)  REFERENCES categories (id) ON DELETE SET NULL,
+  CONSTRAINT fk_rl_cct    FOREIGN KEY (cct_id)    REFERENCES categories (id) ON DELETE SET NULL
 );
 
 -- 2. The seven reports that carry two LEDs (pairings checked by hand). The values are looked up by name in the curated
