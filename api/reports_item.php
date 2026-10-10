@@ -35,6 +35,7 @@ require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 
 require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/report_leds.php';
 
 cors_headers();
 
@@ -377,6 +378,7 @@ function fmt(array $r, bool $spd): array {
     }
 
     $out['categories'] = report_categories_map(get_db(), (int)$r['id']);
+    $out['leds'] = report_leds_get(get_db(), (int)$r['id']);
 
     return $out;
 

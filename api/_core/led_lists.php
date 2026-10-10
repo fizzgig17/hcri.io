@@ -15,6 +15,7 @@ declare(strict_types=1);
 // the SQL in sql/led_suggest.sql has been run.
 
 require_once __DIR__ . '/categories.php';
+require_once __DIR__ . '/report_leds.php';
 require_once __DIR__ . '/spd.php';
 
 const LED_KINDS = ['led_brand', 'led_model', 'led_cct'];
@@ -54,6 +55,18 @@ function led_lists_payload(PDO $db): array {
 
     $modelsByBrand = [];
     try {
+        // Real pairs first: each LED group carries its own brand and model.
+        report_leds_ensure($db);
+        $rows = $db->query(
+            "SELECT brand, model, COUNT(*) AS n FROM report_leds
+              WHERE brand IS NOT NULL AND model IS NOT NULL
+              GROUP BY brand, model ORDER BY brand, n DESC, model"
+        )->fetchAll();
+        foreach ($rows as $r) $modelsByBrand[(string)$r['brand']][] = (string)$r['model'];
+    } catch (\Throwable $e) { /* table absent */ }
+    if (!$modelsByBrand) try {
+        // Before the LED groups exist: infer from reports with exactly one brand and one model, so a multi-LED
+        // light can't pair one LED's brand with the other's model.
         $rows = $db->query(
             "SELECT bc.value AS brand, mc.value AS model, COUNT(*) AS n
                FROM report_categories rb
@@ -61,6 +74,9 @@ function led_lists_payload(PDO $db): array {
                JOIN report_categories rm ON rm.report_id = rb.report_id AND rm.kind = 'led_model'
                JOIN categories mc ON mc.id = rm.category_id
               WHERE rb.kind = 'led_brand'
+                AND rb.report_id IN (
+                      SELECT report_id FROM report_categories WHERE kind IN ('led_brand', 'led_model')
+                      GROUP BY report_id HAVING SUM(kind = 'led_brand') = 1 AND SUM(kind = 'led_model') = 1)
               GROUP BY bc.value, mc.value
               ORDER BY bc.value, n DESC, mc.value"
         )->fetchAll();
