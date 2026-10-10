@@ -2,7 +2,7 @@
 // api/v1_led_suggest.php
 declare(strict_types=1);
 
-// POST /api/v1/led_suggest      body: {"wls":[...], "vals":[...]}
+// POST /api/v1/led_suggest      body: {"wls":[...], "vals":[...], "title":"optional reading title"}
 //
 // "Looks like Nichia 519A, 4000 K": compares the spectrum with reports that already have an LED
 // brand and model (public AND private ones, so the match uses all the data on the site), and answers with the
@@ -31,4 +31,5 @@ if (!is_array($wls) || !is_array($vals) || count($wls) < 10 || count($wls) !== c
     json_error('Send {"wls": [...], "vals": [...]} with matching arrays of at least 10 points.', 400);
 }
 
-json_out(led_suggest($db, $wls, $vals, (int)$user['id']));
+$title = mb_substr(trim((string)($b['title'] ?? '')), 0, 300);
+json_out(led_suggest($db, $wls, $vals, (int)$user['id'], $title));

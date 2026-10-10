@@ -108,7 +108,14 @@ function led_overlap(array $a, array $b): float {
  * on private reports from a SINGLE other person is never returned, so a suggestion can't point at one
  * identifiable owner's light. The requester's own reports always count.
  */
-function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0): array {
+function led_title_has(string $title, string $value): bool {
+    $parts = preg_split('/[^A-Za-z0-9]+/', trim($value), -1, PREG_SPLIT_NO_EMPTY);
+    if (!$parts || strlen(implode('', $parts)) < 3) return false;   // too short to be a reliable name
+    $re = '/(?<![A-Za-z0-9])' . implode('[^A-Za-z0-9]*', array_map(fn($x) => preg_quote($x, '/'), $parts)) . '(?![A-Za-z0-9])/i';
+    return (bool)preg_match($re, $title);
+}
+
+function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0, string $title = ''): array {
     $none = ['suggestion' => null, 'alternatives' => []];
     $fp = led_fingerprint($wls, $vals);
     if (!$fp) return $none;
@@ -177,6 +184,15 @@ function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0): ar
         if ($c['cct'] !== null) $g['ccts'][$c['cct']] = ($g['ccts'][$c['cct']] ?? 0) + 1;
         unset($g);
     }
+    // The reading's own title can settle a near-tie: a group whose model (or just brand) is named in it counts more.
+    $title = trim($title);
+    if ($title !== '') {
+        foreach ($groups as &$g) {
+            if (led_title_has($title, $g['model']))      $g['weight'] *= 3;
+            elseif (led_title_has($title, $g['brand']))  $g['weight'] *= 1.5;
+        }
+        unset($g);
+    }
     $total = array_sum(array_column($groups, 'weight'));
     $out = [];
     foreach ($groups as $g) {
@@ -193,16 +209,50 @@ function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0): ar
             'support'    => $g['close'],
         ];
     }
-    if (!$out) return $none;
+    $titleFallback = $title !== '' ? led_title_fallback($scored, $title, $requesterId) : null;
+    if (!$out) return $titleFallback ? ['suggestion' => $titleFallback, 'alternatives' => []] : $none;
     usort($out, fn($a, $b) => [$b['confidence'], $b['score']] <=> [$a['confidence'], $a['score']]);
 
     $first = $out[0];
     $confident = $first['score'] >= 0.94 && $first['confidence'] >= 0.55;
+    if ($confident) $out[0]['source'] = 'spectrum';
+    $first = $out[0];
     // Alternatives are only worth showing if they are genuinely close.
     $alts = array_values(array_filter(array_slice($out, $confident ? 1 : 0, 3), fn($g) => $g['score'] >= 0.85));
     return [
-        'suggestion'   => $confident ? $first : null,
+        'suggestion'   => $confident ? $first : $titleFallback,
         'alternatives' => $alts,
+    ];
+}
+
+/**
+ * Lower-confidence suggestion from the reading's title: the title names an LED model that already exists in
+ * tagged reports, and the spectrum is at least in the same neighbourhood as them (so a wrong title can't
+ * override a clearly different curve). Same single-owner safeguard as the spectrum match.
+ */
+function led_title_fallback(array $scored, string $title, int $requesterId): ?array {
+    $groups = [];
+    foreach ($scored as $c) {
+        if ($c['score'] < 0.85 || !led_title_has($title, $c['model'])) continue;
+        $key = mb_strtolower($c['brand'] . '|' . $c['model']);
+        $g =& $groups[$key];
+        if (!isset($g)) $g = ['brand' => $c['brand'], 'model' => $c['model'], 'best' => 0.0, 'ccts' => [], 'owners' => [], 'public' => false, 'own' => false];
+        $g['best'] = max($g['best'], $c['score']);
+        $g['owners'][$c['owner']] = true;
+        if ($c['pub']) $g['public'] = true;
+        if ($requesterId > 0 && $c['owner'] === $requesterId) $g['own'] = true;
+        if ($c['cct'] !== null) $g['ccts'][$c['cct']] = ($g['ccts'][$c['cct']] ?? 0) + 1;
+        unset($g);
+    }
+    $groups = array_filter($groups, fn($g) => $g['own'] || $g['public'] || count($g['owners']) >= 2);
+    if (!$groups) return null;
+    usort($groups, fn($a, $b) => $b['best'] <=> $a['best']);
+    $g = $groups[0];
+    arsort($g['ccts']);
+    return [
+        'brand' => $g['brand'], 'model' => $g['model'],
+        'cct' => $g['ccts'] ? (string)array_key_first($g['ccts']) : null,
+        'score' => round($g['best'], 4), 'confidence' => 0.0, 'support' => 0, 'source' => 'title',
     ];
 }
 

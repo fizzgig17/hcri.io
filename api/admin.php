@@ -364,6 +364,22 @@ if ($m === 'GET' && $section === '/users' && $userId === null) {
             )->fetchAll();
         }
     }
+    // Average completeness (see api/_core/completeness.php) of each user's reports.
+    $avgScore = [];
+    try {
+        require_once __DIR__ . '/_core/completeness.php';
+        $own = [];
+        foreach ($db->query('SELECT id, user_id FROM reports')->fetchAll() as $x) $own[(int)$x['id']] = (int)$x['user_id'];
+        $sum = []; $cnt = [];
+        foreach (array_chunk(array_keys($own), 500) as $chunk) {
+            foreach (completeness_for($db, $chunk) as $rid => $c) {
+                $u = $own[$rid];
+                $sum[$u] = ($sum[$u] ?? 0) + $c['score'];
+                $cnt[$u] = ($cnt[$u] ?? 0) + 1;
+            }
+        }
+        foreach ($sum as $u => $t) $avgScore[$u] = round($t / $cnt[$u], 1);
+    } catch (\Throwable $e) {}
     json_out(array_map(fn($r) => [
         'id'            => (int)$r['id'],
         'name'          => $r['name'],
@@ -373,6 +389,7 @@ if ($m === 'GET' && $section === '/users' && $userId === null) {
         'disabled'      => (bool)($r['disabled'] ?? 0),
         'nameMasked'    => (bool)($r['name_masked'] ?? 0),
         'reportCount'   => (int)$r['report_count'],
+        'avgCompleteness' => $avgScore[(int)$r['id']] ?? null,
         'apiReportCount'=> (int)($r['api_report_count'] ?? 0),
         'createdAt'     => $r['created_at'],
         'lastLoginAt'   => $r['last_login_at']  ?? null,
