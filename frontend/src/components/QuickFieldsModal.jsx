@@ -25,7 +25,12 @@ export default function QuickFieldsModal({ reportId, label, T: t, onClose, onOpe
     // "Looks like ...": matched on this report's curve (and title) against every tagged report on the site.
     fetch(`./index.php/api/reports/${reportId}/led_suggest`, auth)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (!dead && j && j.suggestion) setSug(j.suggestion); })
+      .then((j) => {
+        if (dead || !j) return;
+        // A model-level match if there is one, otherwise just the nominal CCT read from the curve.
+        if (j.suggestion) setSug(j.suggestion);
+        else if (j.cctGuess) setSug({ cctOnly: true, cct: j.cctGuess });
+      })
       .catch(() => {});
     return () => { dead = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,8 +44,10 @@ export default function QuickFieldsModal({ reportId, label, T: t, onClose, onOpe
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ reportId, kind, values: [value] }),
       });
-      await post('led_brand', sug.brand);
-      await post('led_model', sug.model);
+      if (!sug.cctOnly) {
+        await post('led_brand', sug.brand);
+        await post('led_model', sug.model);
+      }
       if (sug.cct) await post('led_cct', sug.cct);
       setSug(null);
       setReport(null);
@@ -61,11 +68,11 @@ export default function QuickFieldsModal({ reportId, label, T: t, onClose, onOpe
         <div style={{ fontSize: 12, color: t.dim, marginBottom: 12, wordBreak: 'break-word' }}>{label || 'Unnamed'}</div>
         {err && <div style={{ color: t.bad, fontSize: 13 }}>{err}</div>}
         {!report && !err && <div style={{ color: t.dim, fontSize: 13 }}>Loading…</div>}
-        {sug && (
+        {sug && !(sug.cctOnly && report && report.categories && report.categories.led_cct && report.categories.led_cct.length) && (
           <div style={{ border: `1px solid ${t.accent}60`, background: `${t.accent}12`, borderRadius: 8, padding: '8px 10px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 140, fontSize: 13 }}>
-              <span style={{ color: t.dim, fontSize: 11 }}>{sug.source === 'title' ? 'Title and curve suggest' : 'Looks like'}</span><br />
-              <b>{[sug.brand, sug.model].filter(Boolean).join(' ')}{sug.cct ? ` · ${String(sug.cct).replace(/\s*k$/i, '')} K` : ''}</b>
+              <span style={{ color: t.dim, fontSize: 11 }}>{sug.cctOnly ? 'No LED match yet; the curve reads as' : sug.source === 'title' ? 'Title and curve suggest' : 'Looks like'}</span><br />
+              <b>{[sug.brand, sug.model].filter(Boolean).join(' ')}{sug.cct ? `${sug.cctOnly ? '' : ' · '}${String(sug.cct).replace(/\s*k$/i, '')} K` : ''}</b>
             </div>
             <button disabled={applying} onClick={applySuggestion} style={{ background: t.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontWeight: 700, cursor: 'pointer', opacity: applying ? 0.6 : 1 }}>
               Apply

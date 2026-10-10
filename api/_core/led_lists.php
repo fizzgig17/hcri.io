@@ -99,6 +99,39 @@ function led_overlap(array $a, array $b): float {
 }
 
 /**
+ * Nominal CCT for a measured spectrum: the nearest value in the site's LED CCT list (within 7%). Checked on the
+ * CC-BY "Real Light Source SPDs" data (Esposito & Houser): the measured CCT rounds to the part's nominal bin
+ * for 92% of Cree/Seoul emitters, better than matching curves (64%), so this needs no reference spectra.
+ */
+function led_cct_guess(PDO $db, array $wls, array $vals): ?string {
+    try {
+        require_once __DIR__ . '/spd.php';
+        $n = min(count($wls), count($vals));
+        if ($n < 10) return null;
+        $w = []; $v = [];
+        for ($i = 0; $i < $n; $i++) if (is_numeric($wls[$i]) && is_numeric($vals[$i])) { $w[] = (float)$wls[$i]; $v[] = max(0.0, (float)$vals[$i]); }
+        if (count($w) < 10 || array_sum($v) <= 0) return null;
+        $cct = calc_cct_duv_hires($w, $v)['cct'];
+        $best = null; $bestD = INF;
+        foreach (led_lists_payload($db)['lists']['led_cct'] as $val) {
+            $num = (float)preg_replace('/[^0-9.]/', '', (string)$val);
+            if ($num < 1000) continue;
+            $d = abs($num - $cct);
+            if ($d < $bestD) { $bestD = $d; $best = ['val' => (string)$val, 'num' => $num]; }
+        }
+        return ($best && $bestD / $best['num'] <= 0.07) ? $best['val'] : null;
+    } catch (\Throwable $e) { return null; }
+}
+
+/** led_match() plus `cctGuess` (always available from the spectrum alone), also used to fill a missing CCT. */
+function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0, string $title = ''): array {
+    $out = led_match($db, $wls, $vals, $requesterId, $title);
+    $out['cctGuess'] = led_cct_guess($db, $wls, $vals);
+    if (!empty($out['suggestion']) && empty($out['suggestion']['cct']) && $out['cctGuess']) $out['suggestion']['cct'] = $out['cctGuess'];
+    return $out;
+}
+
+/**
  * Best LED match for a spectrum from every report that already has an LED brand AND model, public or private.
  * Returns ['suggestion' => {...}|null, 'alternatives' => [...]]. A suggestion is only returned when
  * it is clearly ahead of the other candidates; a wrong confident guess is worse than none.
@@ -115,7 +148,7 @@ function led_title_has(string $title, string $value): bool {
     return (bool)preg_match($re, $title);
 }
 
-function led_suggest(PDO $db, array $wls, array $vals, int $requesterId = 0, string $title = ''): array {
+function led_match(PDO $db, array $wls, array $vals, int $requesterId = 0, string $title = ''): array {
     $none = ['suggestion' => null, 'alternatives' => []];
     $fp = led_fingerprint($wls, $vals);
     if (!$fp) return $none;
