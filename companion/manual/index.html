@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.24 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.25 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -222,6 +222,11 @@
           need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in 1.25</h3>
+      <ul>
+        <li><strong>Generate API Token</strong> now works on the first tap with the keyboard open (it used to take a second tap, the first only closed the keyboard), and the password box has an <strong>eye button</strong> to show or hide what you type. The password is always hidden when the window opens; hold the eye to see its label. The same first-tap fix applies to <code>Save</code> and <code>Forget Credentials</code> in Settings.</li>
+        <li><strong>Main follows LED changes made in History:</strong> if you edit the current reading's LEDs from History, the LED button, the Data tab and the TM-30 report on Main show the new LEDs when you come back.</li>
+      </ul>
       <h3>What's new in 1.24</h3>
       <ul>
         <li><strong>More than one LED per light.</strong> Many lights have two or more different LEDs (for example a 1800K Nichia plus a red Luminus). The LED window now holds a list: each LED has its own brand, model and CCT, kept together, with <code>+ Add another LED</code>. Finished LEDs collapse into a Brand / LED / CCT list with an <code>Edit</code> button, and the new LED opens and scrolls into view. You can remove any LED, or all of them, and Save. All LEDs go up to the hCRI.io report and appear on the TM-30 report. See <a href="#led-details">LED details</a>.</li>
@@ -321,7 +326,8 @@
       <ol class="steps">
         <li><strong>Tap the 🔑 button next to Save</strong><span>Opens the Generate API Token dialog.</span></li>
         <li><strong>Enter your hCRI.io username or email, and your password</strong><span>Used once to
-          sign in — your password is never stored on the device and never sent anywhere else.</span></li>
+          sign in — your password is never stored on the device and never sent anywhere else. The password
+          is hidden as you type; tap the eye at the right of the box to check it, and tap again to hide it.</span></li>
         <li><strong>Review the token name</strong><span>Defaults to "hCRI Companion Data Upload Token" —
           this is the name you'll see later if you list or revoke tokens from Profile → API on the
           website. Change it if you'd like something more specific.</span></li>
