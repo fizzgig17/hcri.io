@@ -40,4 +40,10 @@ $map = ['brand' => 'led_brand', 'model' => 'led_model', 'cct' => 'led_cct',
 $details = [];
 foreach ($map as $field => $kind) if (isset($b[$field])) $details[$kind] = (string)$b[$field];
 $result = led_save_report_details($db, $reportId, $user, $details);
+if (array_key_exists('notes', $b)) {
+    $notes = trim((string)$b['notes']);
+    if (mb_strlen($notes) > 10000) json_error('Notes too long (max 10000 characters)', 400);
+    $db->prepare('UPDATE reports SET notes = ? WHERE id = ?')->execute([$notes === '' ? null : $notes, $reportId]);
+    $result['notes'] = $notes === '' ? null : $notes;
+}
 json_out($result);
