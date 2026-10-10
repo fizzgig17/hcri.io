@@ -14,7 +14,12 @@ require_once __DIR__ . '/pdf_extract.php';
 // it powers the "uploaded via API" count on the admin user list. Only
 // v1_upload.php should pass true; the inbound-email callers explicitly pass
 // false so a mail-in report is never miscounted as an API upload.
-function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origName, string $label = '', bool $viaApi = false): array {
+//
+// $replaceId (optional): id of one of this user's own existing reports to overwrite instead of inserting a new one
+// (the Companion app re-uploading a reading it already uploaded). The row keeps its id, link, visibility, created_at,
+// categories/LED groups and notes; label, spectrum, metrics and file are replaced. If that id isn't found or isn't
+// the user's, a new report is inserted as usual. The response carries 'replaced' => true/false.
+function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origName, string $label = '', bool $viaApi = false, int $replaceId = 0): array {
     $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
     if (!in_array($ext, ['csv', 'tsv', 'txt', 'json', 'sp', 'pdf'], true)) {
         throw new RuntimeException('Unsupported format ".' . $ext . '". Allowed: csv, tsv, txt, json, sp, pdf');
@@ -79,6 +84,40 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
         catch (\Throwable $e) {}
         $pub = $defPriv ? 0 : 1;
 
+        $existing = null;
+        if ($replaceId > 0) {
+            $q = $db->prepare('SELECT id, file_name, is_public, created_at FROM reports WHERE id=? AND user_id=?');
+            $q->execute([$replaceId, $userId]);
+            $existing = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        if ($existing) {
+            $u = $db->prepare('UPDATE reports SET label=?, source_type=?, file_name=?, cct=?, duv=?, cie_x=?, cie_y=?, rf=?, rg=?, spd_data=?, meta=? WHERE id=? AND user_id=?');
+            $u->execute([
+                $label, $sourceType, $filename,
+                $result['cct'], $result['duv'], $result['x'] ?? null, $result['y'] ?? null,
+                $result['Rf'], $result['Rg'], $spdData, $meta, (int)$existing['id'], $userId,
+            ]);
+            $oldFile = (string)($existing['file_name'] ?? '');
+            if ($oldFile !== '' && $oldFile !== $filename && basename($oldFile) === $oldFile) @unlink($uploadDir . '/' . $oldFile);
+            return [
+                'id'         => (int)$existing['id'],
+                'label'      => $label,
+                'sourceType' => $sourceType,
+                'cct'        => $result['cct'] !== null ? (int)$result['cct']   : null,
+                'duv'        => $result['duv'] !== null ? (float)$result['duv'] : null,
+                'x'          => $result['x']   !== null ? (float)$result['x']   : null,
+                'y'          => $result['y']   !== null ? (float)$result['y']   : null,
+                'Rf'         => $result['Rf']  !== null ? (int)$result['Rf']    : null,
+                'Rg'         => $result['Rg']  !== null ? (int)$result['Rg']    : null,
+                'ra'         => $result['ra']  !== null ? (float)$result['ra']  : null,
+                'r9'         => $result['r9']  !== null ? (float)$result['r9']  : null,
+                'isPublic'   => (int)$existing['is_public'] === 1,
+                'createdAt'  => (string)$existing['created_at'],
+                'viaApi'     => $viaApi,
+                'replaced'   => true,
+            ];
+        }
+
         $params = [
             $userId, $label, $sourceType, $filename,
             $result['cct'], $result['duv'], $result['x'] ?? null, $result['y'] ?? null,
@@ -123,6 +162,7 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
             'isPublic'   => $pub ? true : false,
             'createdAt'  => $now,
             'viaApi'     => $viaApi,
+            'replaced'   => false,
         ];
     } catch (\Throwable $e) {
         @unlink($dest);

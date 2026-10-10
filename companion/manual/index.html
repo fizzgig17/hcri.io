@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.23 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.24 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -222,6 +222,17 @@
           need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in 1.24</h3>
+      <ul>
+        <li><strong>More than one LED per light.</strong> Many lights have two or more different LEDs (for example a 1800K Nichia plus a red Luminus). The LED window now holds a list: each LED has its own brand, model and CCT, kept together, with <code>+ Add another LED</code>. Finished LEDs collapse into a Brand / LED / CCT list with an <code>Edit</code> button, and the new LED opens and scrolls into view. You can remove any LED, or all of them, and Save. All LEDs go up to the hCRI.io report and appear on the TM-30 report. See <a href="#led-details">LED details</a>.</li>
+        <li><strong>Uploading a reading again updates its report</strong> instead of creating a duplicate: the report keeps its link, visibility, notes and LEDs, and gets the new title and spectrum.</li>
+        <li><strong>Long-press labels:</strong> hold any icon-only button (History row icons, the battery, flicker chart controls, the <code>?</code> and <code>×</code> buttons, page dots) to see what it is.</li>
+        <li><strong>Connecting no longer blocks the app.</strong> The main button reads <code>Tap to cancel</code> while connecting, the status shows the current step (scanning, connecting, setting up), and History, Settings and Logs stay usable.</li>
+        <li><strong>Password managers and passkey autofill</strong> now work on the username, password and token fields in Settings (iCloud Keychain / Passwords, Google Password Manager, 1Password, Bitwarden and others).</li>
+        <li><strong>iPhone haptics:</strong> button taps are now a light tap and a finished reading or upload uses the system success / error feedback (iOS can't shorten the old vibration, which felt like a long buzz).</li>
+        <li><strong>Test readings include flicker</strong> when the public report has a flicker reading: the Flicker page and button appear (view only) and show the report's first flicker capture.</li>
+        <li>History now shows <code>✎ Edit</code> beside a reading's LED line so it's clear you can tap it to change the LEDs.</li>
+      </ul>
       <h3>What's new in 1.23</h3>
       <ul>
         <li>Layout fixes: the <code>💡 Add LED</code> button no longer overlaps the reading title on Main, History rows have more room between the CCT/Ra values and the icons, and the Generate API Token window stays above the keyboard on iPhone and Android.</li>
@@ -323,9 +334,12 @@
         <li><strong>Enter your hCRI.io username</strong><span>The same username you sign in with at hcri.io.</span></li>
         <li><strong>Enter your hCRI.io API token</strong><span>Find or generate this from Profile → API on
           hcri.io. The field is masked while typing.</span></li>
-        <li><strong>Tap Save</strong><span>The token is stored in your device's secure keychain (Android Keystore) — not in plain text, and not readable by any other app.</span></li>
+        <li><strong>Tap Save</strong><span>The token is stored in your device's secure keychain (Android Keystore or the iOS Keychain) — not in plain text, and not readable by any other app.</span></li>
       </ol>
 
+      <p>The username, password and token fields work with your phone's password manager and passkeys — iCloud Keychain /
+        Passwords on iPhone, Google Password Manager on Android, or an app such as 1Password or Bitwarden — so you can
+        fill them in with one tap instead of typing or pasting.</p>
       <p>Either way, once saved, the fields switch to a locked, read-only view with a
         <code>Forget Credentials</code> button — a deliberate extra step before replacing a saved key, so
         a stray keystroke can't silently overwrite a working token.</p>
@@ -351,6 +365,10 @@
         row lets you reopen that same list later without a fresh scan. Device switching has been refined a lot
         in 1.15: the list stays current while you look at it, a meter that is momentarily busy is retried
         automatically, and switching to another meter no longer needs a reset.</p>
+      <p>Connecting happens in the background, so the rest of the app stays usable while it works. The status line
+        shows the current step (<em>Scanning for meter…</em>, <em>Connecting to meter…</em>, <em>Setting up
+        meter…</em>), and the main button changes to <code>Tap to cancel</code> if you want to stop. History, Settings
+        and Logs can be used the whole time.</p>
       <p>No meter handy? See <a href="#test-reading">Try it without a meter</a>.</p>
       <div class="card warn">
         <h4>Meter won't connect?</h4>
@@ -460,6 +478,11 @@
         Main, even from Data or Logs. The phone's bottom navigation bar is hidden to give the app more
         room; swipe up from the bottom edge to bring it back for a moment. While the keyboard is open the
         bar stays visible, so Back and Home remain reachable.</p>
+      <h3>Icon labels</h3>
+      <p>Buttons that show only an icon have a label: touch and hold one for about half a second and a small
+        tooltip names it (a normal tap still does what it always did). This works on the History row icons, the battery
+        indicator, the flicker chart controls (help, settings, pan and zoom), the <code>?</code> help buttons, the close
+        <code>×</code> buttons and the page dots.</p>
       <h3 id="test-reading">Try it without a meter</h3>
       <p>While no meter is connected, a <code>Show a test reading</code> button appears under
         <code>Connect to Meter</code>. It loads the spectrum from a random public report on hCRI.io, so you
@@ -469,6 +492,9 @@
         Data) is disabled while one is showing. Its title is read-only, and a note under the buttons names
         the report it came from. Connect a meter and take a real reading to replace it. The button
         disappears as soon as a meter is connected.</p>
+      <p>If that public report has a flicker reading on hCRI.io, the test reading also gets the Flicker page and a
+        <code>Flicker</code> button, showing the first (oldest) flicker capture. It is view-only: sampling, sharing and
+        uploading flicker need a meter and a reading of your own.</p>
       <h3>Measurement grid</h3>
       <p>Shows CCT, Ra (CRI), Duv, Lux, Rf, R9, and Rg by default. Which measurements appear here, and in
         what order, is fully customizable from <a href="#settings">Settings</a> — including any individual
@@ -497,6 +523,29 @@
         next to the button once it succeeds — there's no popup to dismiss on a routine upload. If an
         upload fails, an alert explains what happened; check the <a href="#logs-tab">Logs tab</a> for the
         server's own response if you need more detail.</p>
+      <p>Uploading a reading that was already uploaded <strong>updates that report</strong> rather than creating a
+        second copy. The report keeps its ID and link, who can see it, its notes and its LEDs, and takes the new
+        title and spectrum. If you deleted the report on hCRI.io, the next upload creates a new one. (A flicker
+        reading attached on the first upload is left as it was.)</p>
+      <h3 id="led-details">LED details</h3>
+      <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. Tap the
+        <code>💡 Add LED</code> button beside the reading's title on Main (it reads <code>💡 LED ✓</code> or
+        <code>💡 2 LEDs ✓</code> once set), <code>Edit</code> on the Data tab, or the 💡 line on a History row (it shows
+        <code>✎ Edit</code> once LEDs are set). The app may also suggest an LED from the shape of the spectrum; tap
+        <code>Yes</code> to accept it or <code>Other</code> to choose yourself.</p>
+      <ul>
+        <li>Each LED has a <strong>brand</strong>, a <strong>model</strong> and a <strong>CCT</strong>. Start typing or tap a match from the
+          hCRI.io lists; models seen with the brand you chose are listed first. Leave CCT blank for a deep-red LED.</li>
+        <li>For a light with more than one LED, tap <code>+ Add another LED</code>. The new LED opens at the bottom and the
+          window scrolls to it. LEDs you've finished collapse into a Brand / LED / CCT list at the top; tap <code>Edit</code> on a row
+          to reopen it, <code>Done</code> to collapse it again, and <code>Remove</code> to delete it. Keeping each LED's brand, model
+          and CCT together means two different LEDs are never mixed up.</li>
+        <li>To remove the LED details completely, press <code>Remove</code> on each LED and tap <code>Save</code>. The LEDs are cleared on
+          the reading and on its hCRI.io report, and the app won't suggest one again for that reading.</li>
+        <li>Values that aren't in the lists yet are sent to hCRI.io for review rather than added straight away.</li>
+        <li>LED details are saved with the reading and sent to its hCRI.io report as soon as it has been uploaded. They also
+          appear on the TM-30 report, one line per LED.</li>
+      </ul>
     </section>
 
     <section id="data-tab">
@@ -505,8 +554,8 @@
       <ul>
         <li><strong>Upload Title</strong> — type a custom title, or leave it blank to use the
           auto-generated username + timestamp + device label.</li>
-        <li><strong>LED</strong> — the LED brand, model and CCT for this reading, with <code>Edit</code>
-          (or <code>💡 Add LED details</code>) to set them. Available once the reading is saved to History.</li>
+        <li><strong>LED</strong> — the brand, model and CCT of each LED in this reading's light (one block per LED), with <code>Edit</code>
+          (or <code>💡 Add LED details</code>) to set them. Available once the reading is saved to History. See <a href="#led-details">LED details</a>.</li>
         <li><strong>Upload Preview</strong> — the exact wavelength/value payload about to be sent, so you
           can eyeball the range and point count before it goes anywhere.</li>
         <li><strong>R1–R15</strong>, <strong>Chromaticity</strong>, and <strong>Device Info</strong> —
@@ -525,7 +574,7 @@
           R-values exactly as they looked when it was taken.</li>
         <li><strong>Rename</strong> a reading — renaming before upload sends it to hCRI.io under that new
           title.</li>
-        <li><strong>Re-upload</strong> a reading at any time, including ones already sent. Row actions are icons: cloud (upload to hCRI.io), tray (share CSV), eye (view) and trash (delete). A small waveform icon next to the CCT/Ra marks a reading that includes a flicker sample, which goes up with it.</li>
+        <li><strong>Re-upload</strong> a reading at any time, including ones already sent — an already-uploaded reading updates its existing hCRI.io report instead of creating a duplicate (a confirmation says <em>Updated</em>). Tap a reading's 💡 LED line (marked <code>✎ Edit</code>) to change its LEDs. Row actions are icons: cloud (upload to hCRI.io), tray (share CSV), eye (view) and trash (delete). A small waveform icon next to the CCT/Ra marks a reading that includes a flicker sample, which goes up with it.</li>
         <li><strong>TM-30, Copy, Report</strong> — every reading has a <code>◐ TM-30</code> button that opens
           its TM-30 report in the app (see <a href="#tm30">The TM-30 report</a>), whether or not it was ever
           uploaded. For a reading that has been uploaded, <code>Copy</code> puts its hCRI.io link on the
@@ -560,6 +609,13 @@
       <h3>Appearance</h3>
       <p>Light, Dark, or System (the default) — follows your phone's own light/dark setting unless
         overridden here.</p>
+      <h3>Feedback (haptics)</h3>
+      <p>Two switches, both on by default: <code>Button taps</code> (a short tick when you press a button in the bottom bar and long-press
+        labels) and <code>Reading and upload results</code> (a distinct vibration when a reading or upload finishes, and a different one when
+        it fails). On iPhone these use the Taptic Engine.</p>
+      <h3>Capture flicker with each reading</h3>
+      <p>Off by default. Takes one flicker sample with every reading on meters that support it — see
+        <a href="#livemodes">Live readings &amp; Flicker</a>.</p>
       <h3>Stay connected in background</h3>
       <p><strong>On by default.</strong> Keeps the meter connected when you switch away from the app or
         lock the screen, so coming back doesn't need a fresh reconnect. Turn this off to disconnect the

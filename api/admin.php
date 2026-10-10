@@ -5,6 +5,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/report_leds.php';
 require_once __DIR__ . '/_core/categories_csv.php';
 require_once __DIR__ . '/_core/settings.php';
 require_once __DIR__ . '/_core/spd.php';
@@ -66,6 +67,9 @@ if ($m === 'POST' && $path === '/categories/delete') {
                              ) x)')->execute([$id, $to]);
         $db->prepare('UPDATE report_categories SET category_id = ? WHERE category_id = ?')
            ->execute([$to, $id]);
+        report_leds_repoint($db, $id, $to, (string)$cat['kind']);
+    } else {
+        report_leds_forget($db, $id, (string)$cat['kind']);
     }
     $db->prepare('DELETE FROM categories WHERE id = ?')->execute([$id]);
     json_out(['ok' => true]);
@@ -285,6 +289,7 @@ function admin_report_payload(PDO $db, int $rid): ?array {
         'userName'     => $row['user_name'],
         'userEmail'    => $row['user_email'],
         'categories'   => report_categories_map($db, $rid),
+        'leds'         => report_leds_get($db, $rid),
         'isPublic'     => !empty($row['is_public']),
     ];
     if (!empty($row['spd_data'])) {
@@ -311,13 +316,19 @@ if ($m === 'PATCH' && preg_match('#^/reports/(\d+)$#', $path, $rm)) {
     if (array_key_exists('notes', $b))        { $sets[] = 'notes=?';        $params[] = (string)$b['notes']; }
     if (array_key_exists('isPublic', $b))     { $sets[] = 'is_public=?';   $params[] = $b['isPublic'] ? 1 : 0; }
     if ($sets) { $params[] = $rid; $db->prepare('UPDATE reports SET '.implode(',', $sets).' WHERE id=?')->execute($params); }
+    $hasLeds = isset($b['leds']) && is_array($b['leds']);
     if (isset($b['categories']) && is_array($b['categories'])) {
+        $ledTouched = false;
         foreach ($b['categories'] as $kind => $value) {
             if (!is_category_kind($kind)) continue;
+            if ($hasLeds && in_array($kind, LED_KINDS_FLAT, true)) continue;   // the LED list below wins
             $values = is_array($value) ? $value : (trim((string)$value) === '' ? [] : [$value]);
             set_report_categories($db, $rid, $kind, $values, $admin['id']);
+            if (in_array($kind, LED_KINDS_FLAT, true)) $ledTouched = true;
         }
+        if ($ledTouched) report_leds_resync($db, $rid);
     }
+    if ($hasLeds) report_leds_set($db, $rid, ['id' => $admin['id'], 'is_admin' => 1], array_values($b['leds']));
     json_out(admin_report_payload($db, $rid));
 }
 // ── GET /api/admin — dashboard stats ─────────────────────────────────────────

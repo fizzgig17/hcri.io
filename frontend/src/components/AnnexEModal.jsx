@@ -101,12 +101,14 @@ export default function AnnexEModal({ report, onClose }) {
       c.beginPath(); c.moveTo(0, 86); c.lineTo(825, 86); c.stroke();
 
       // Source / category strip
+      const ledsOf = (x) => (x && Array.isArray(x.leds) ? x.leds.filter((l) => l && (l.brand || l.led || l.model || l.cct)) : []);
       const cat = (k) => ((r.categories && r.categories[k]) || []).map((x) => x && x.value).filter(Boolean).join(', ');
       const cols = [['SOURCE', r.label || '—']];
       [
         ['LIGHT', [cat('light_brand'), cat('light_model')].filter(Boolean).join(' ')],
-        ['LED', [cat('led_brand'), cat('led_model')].filter(Boolean).join(' ')],
-        ['CCT', cat('led_cct')],
+        // With several LEDs, list each one's brand + LED and its CCT separately ("A 519A / B SST-20-DR").
+        ['LED', ledsOf(r).length ? ledsOf(r).map((l) => [l.brand, l.led || l.model].filter(Boolean).join(' ')).filter(Boolean).join(' / ') : [cat('led_brand'), cat('led_model')].filter(Boolean).join(' ')],
+        ['CCT', ledsOf(r).length ? ledsOf(r).map((l) => l.cct).filter(Boolean).join(' / ') : cat('led_cct')],
         ['OPTIC', cat('optic')],
       ].forEach((p) => p[1] && cols.push(p));
       const colW = 825 / cols.length;

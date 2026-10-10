@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getToken } from '../lib/api';
 import CategoryEditor from './CategoryEditor.jsx';
+import { ledsFromReport } from './LedGroupsEditor.jsx';
 
 export default function QuickFieldsModal({ reportId, label, T: t, onClose, onOpenFull }) {
   const [report, setReport] = useState(null);
@@ -40,15 +41,16 @@ export default function QuickFieldsModal({ reportId, label, T: t, onClose, onOpe
     if (!sug) return;
     setApplying(true);
     try {
-      const post = (kind, value) => fetch('./index.php/api/categories/assign', {
+      // Apply to the first LED (brand, LED, CCT together) and leave any other LEDs on the report as they are.
+      const cur = ledsFromReport(report);
+      const first = { ...(cur[0] || { brand: '', led: '', cct: '' }) };
+      if (!sug.cctOnly) { first.brand = sug.brand; first.led = sug.model; }
+      if (sug.cct) first.cct = sug.cct;
+      const leds = [first, ...cur.slice(1)].filter((l) => l.brand || l.led || l.cct);
+      await fetch('./index.php/api/categories/leds', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ reportId, kind, values: [value] }),
+        body: JSON.stringify({ reportId, leds }),
       });
-      if (!sug.cctOnly) {
-        await post('led_brand', sug.brand);
-        await post('led_model', sug.model);
-      }
-      if (sug.cct) await post('led_cct', sug.cct);
       setSug(null);
       setReport(null);
       setRev((x) => x + 1);   // reload the report so the editor shows the new values
