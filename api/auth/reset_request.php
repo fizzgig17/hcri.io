@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../_core/response.php';
 require_once __DIR__ . '/../_core/db.php';
 require_once __DIR__ . '/../_core/mailer.php';
+require_once __DIR__ . '/../_core/ratelimit.php';
 
 cors_headers();
 method('POST');
@@ -10,6 +11,12 @@ method('POST');
 $b     = body();
 $email = strtolower(trim($b['email'] ?? ''));
 if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('Valid email required', 400);
+
+// Mail-flood guard: 5 requests per hour per address, 3 per mailbox. Over the limit it still answers ok
+// (like the unknown-email case) so the response never reveals anything.
+if (rl_count('reset_ip', rl_client_ip(), 3600) >= 5 || rl_count('reset_mail', $email, 3600) >= 3) { json_out(['ok' => true]); }
+rl_hit('reset_ip', rl_client_ip(), 3600);
+rl_hit('reset_mail', $email, 3600);
 
 $db = get_db();
 

@@ -1,10 +1,16 @@
 # .htaccess
-# Disable caching for JS, CSS and API responses
+# JS/CSS: always revalidate (the bundle filenames are not hashed), but allow a cheap 304 via ETag
+# instead of re-downloading the whole file on every visit.
 <FilesMatch "\.(js|css)$">
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
-    Header set Pragma "no-cache"
-    Header set Expires 0
+    Header set Cache-Control "no-cache, must-revalidate"
 </FilesMatch>
+
+# Images, icons, fonts and PDFs change rarely: let browsers keep them for a day.
+<FilesMatch "\.(png|jpe?g|gif|svg|ico|webp|woff2?|pdf|webmanifest)$">
+    Header set Cache-Control "public, max-age=86400"
+</FilesMatch>
+
+AddType application/manifest+json .webmanifest
 
 # No cache for PHP/API
 <FilesMatch "\.php$">
@@ -12,6 +18,15 @@
     Header set Pragma "no-cache"
     Header set Expires 0
 </FilesMatch>
+
+# Security headers (sent on every response)
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    Header always set Strict-Transport-Security "max-age=15552000"
+</IfModule>
 
 # Pass Authorization header to PHP
 SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
