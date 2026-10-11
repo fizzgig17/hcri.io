@@ -4,6 +4,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/gdpr.php';
+require_once __DIR__ . '/_core/report_leds.php';
 
 cors_headers();
 
@@ -47,7 +48,22 @@ if ($path === '/export') {
             foreach (['meta', 'spd_data'] as $jf) {
                 if (array_key_exists($jf, $row)) $row[$jf] = maybe_json($row[$jf]);
             }
+            // The LED(s) set on this report (brand, LED, CCT), if any.
+            try { $row['leds'] = report_leds_get($db, (int)$row['id']); } catch (\Throwable $e) {}
             $reports[] = $row;
+        }
+    } catch (\Throwable $e) {}
+
+    // Flicker readings (stand-alone or attached to a report). The table is created lazily.
+    $flicker = [];
+    try {
+        $fs = $db->prepare('SELECT * FROM flicker_readings WHERE user_id=? ORDER BY captured_at');
+        $fs->execute([$uid]);
+        foreach ($fs->fetchAll() as $row) {
+            foreach (['waveform', 'settings'] as $jf) {
+                if (array_key_exists($jf, $row)) $row[$jf] = maybe_json($row[$jf]);
+            }
+            $flicker[] = $row;
         }
     } catch (\Throwable $e) {}
 
@@ -64,6 +80,7 @@ if ($path === '/export') {
         'export_format'       => 'hCRI account data export v1',
         'account'             => $user,
         'reports'             => $reports,
+        'flicker_readings'    => $flicker,
         'api_tokens'          => $tokens,
         'notes'               => 'Anonymous up/down votes are stored against a device key, not your account, so they are not personally identifiable and are not included here.',
     ];
