@@ -589,6 +589,7 @@ function FilterPanel({
   catOpts, catSel, onCatSel,
   rng, cct, onCct, duv, onDuv, ra, onRa,
   tintSel, onToggleTint,
+  flickerOnly, onFlickerOnly,
   minRf, onMinRf, rg, onRg, r9, onR9,
   onReset, resultCount, onShowResults,
 }) {
@@ -682,6 +683,16 @@ function FilterPanel({
           })}
         </div>
       </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: r.text, fontSize: 13, fontFamily: 'monospace' }}>
+        <input
+          type="checkbox"
+          checked={!!flickerOnly}
+          onChange={(ev) => onFlickerOnly(ev.target.checked)}
+          style={{ cursor: 'pointer', accentColor: r.accent, width: 15, height: 15, margin: 0 }}
+        />
+        Has flicker readings
+      </label>
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -874,6 +885,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [tintSel, setTintSel] = useState([]);
+  const [flickerOnly, setFlickerOnly] = useState(false);
   const [filtersTouched, setFiltersTouched] = useState(false);
   const [folderSel, setFolderSel] = useState(() => {
     try {
@@ -1081,6 +1093,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       sort: sortBy,
       order: sortOrder,
       tint: _my ? '' : tintSel.join(','),
+      flicker: !_my && flickerOnly ? '1' : '',
     });
     if (!_my) {
       Object.keys(catSel).forEach((key) => {
@@ -1138,7 +1151,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       console.error(err);
       P(false);
     }
-  }, [c, d, h, v, b, S, raR, catSel, sortBy, sortOrder, tintSel, lumR, curR, userSel, tab, n, vAll, folderSel, filtersTouched]);
+  }, [c, d, h, v, b, S, raR, catSel, sortBy, sortOrder, tintSel, flickerOnly, lumR, curR, userSel, tab, n, vAll, folderSel, filtersTouched]);
 
   useEffect(() => { perPageRef.current = perPage; }, [perPage]);
 
@@ -1576,6 +1589,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     setRaR(rng && rng.ra ? [rng.ra[0], rng.ra[1]] : [0, 100]);
     setCatSel({});
     setTintSel([]);
+    setFlickerOnly(false);
     setSortBy('date');
     setSortOrder('desc');
     setUserSel('');
@@ -1828,6 +1842,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     duv: h, onDuv: (e) => { activateFilters(); setDuv(e); A(1); },
     ra: raR, onRa: (e) => { activateFilters(); setRaR(e); A(1); },
     tintSel, onToggleTint: (k2) => { activateFilters(); setTintSel((p) => (p.includes(k2) ? p.filter((z) => z !== k2) : [...p, k2])); A(1); },
+    flickerOnly, onFlickerOnly: (on) => { activateFilters(); setFlickerOnly(on); A(1); },
     minRf: v, onMinRf: (val) => { activateFilters(); y(val); A(1); },
     rg: b, onRg: (e) => { activateFilters(); x(e); A(1); },
     r9: S, onR9: (e) => { activateFilters(); C(e); A(1); },

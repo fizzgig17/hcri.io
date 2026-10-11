@@ -23,7 +23,8 @@ require_once __DIR__ . '/_core/auth.php';
 
 
 require_once __DIR__ . '/_core/categories.php';
-require_once __DIR__ . '/_core/completeness.php';
+require_once __DIR__ . '/_core/completeness.php';
+require_once __DIR__ . '/_core/flicker.php';
 
 
 
@@ -1035,6 +1036,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
+    }
+
+    // Only reports that have at least one flicker reading attached (flicker=1). The table is created lazily, so make
+    // sure it exists before the query references it.
+    if (($_GET['flicker'] ?? '') === '1') {
+        try { ensure_flicker_schema($db); } catch (\Throwable $e) {}
+        $where[] = 'EXISTS (SELECT 1 FROM flicker_readings fl WHERE fl.report_id = r.id)';
     }
 
 
