@@ -90,7 +90,7 @@
       d.style.cssText = 'position:absolute;top:6px;' + side + ':6px;font-size:10.5px;font-weight:600;color:#fff;background:rgba(0,0,0,.5);padding:2px 7px;border-radius:6px;pointer-events:none'; d.textContent = txt; return d; }
     pwrap.appendChild(cRef); pwrap.appendChild(cRend); pwrap.appendChild(divider);
     pwrap.appendChild(lab('left', 'Reference')); pwrap.appendChild(lab('right', 'Under this light'));
-    var tools = document.createElement('div'); tools.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px';
+    var tools = document.createElement('div'); tools.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:8px';
     function mkBtn(t) { var b = document.createElement('button'); b.type = 'button'; b.textContent = t;
       b.style.cssText = 'font:inherit;font-size:12px;color:' + text + ';background:none;border:1px solid ' + border + ';border-radius:8px;padding:6px 11px;cursor:pointer'; return b; }
     var bUpload = mkBtn('Use your own photo');
@@ -113,7 +113,7 @@
     el.appendChild(wrap);
 
     // photo engine
-    var PMAX = 520, divPos = 50, origData = null;
+    var PMAX = 760, divPos = 50, origData = null;
     var origCv = document.createElement('canvas'), octx = origCv.getContext('2d', { willReadFrequently: true });
     var rctx = cRef.getContext('2d'), dctx = cRend.getContext('2d');
     var shiftFor = shiftFromBins(o.rcsBins, o.rhsBins, o.rlsBins);
@@ -122,9 +122,9 @@
     function fit() {
       if (!origData) return;
       var avail = pcol.clientWidth || pwrap.clientWidth || 480;
-      var aspect = origData.width / origData.height, maxH = 440;
+      var aspect = origData.width / origData.height, maxH = Math.max(480, Math.min(640, window.innerHeight - 220));
       var wpx = Math.min(avail, maxH * aspect);
-      if (wpx > 10) pwrap.style.width = Math.round(wpx) + 'px';
+      if (wpx > 10) { pwrap.style.width = Math.round(wpx) + 'px'; pwrap.style.margin = '0 auto'; }
       layout();
     }
     function render() {

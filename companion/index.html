@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>hCRI Companion</title>
-<meta name="description" content="The Android and iPhone app that pairs with your Hopoocolor HPCS or Torch Bearer spectrometer and uploads readings straight to hCRI.io.">
+<meta name="description" content="The Android, iPhone and iPad app that pairs with your Hopoocolor HPCS or Torch Bearer spectrometer and uploads readings straight to hCRI.io.">
 
 <!-- Social share preview (link unfurls in iMessage, Slack, Discord, X,
      Facebook, etc.). og-image.png is a static 1200x630 render matching this
@@ -21,13 +21,13 @@
 <meta property="og:image" content="https://www.hcri.io/companion/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="hCRI Companion for Android &amp; iPhone — connects to your Hopoocolor or Torch Bearer meter over Bluetooth and uploads readings to hCRI.io">
+<meta property="og:image:alt" content="hCRI Companion for Android, iPhone &amp; iPad — connects to your Hopoocolor or Torch Bearer meter over Bluetooth and uploads readings to hCRI.io">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="hCRI Companion — Bluetooth spectrometer client for hCRI.io">
 <meta name="twitter:description" content="Connects to your Hopoocolor HPCS or Torch Bearer spectrometer over Bluetooth, reads the full spectrum, and uploads it to hCRI.io in one tap — no cable, no CSV export.">
 <meta name="twitter:image" content="https://www.hcri.io/companion/og-image.png">
-<meta name="twitter:image:alt" content="hCRI Companion for Android &amp; iPhone — connects to your Hopoocolor meter over Bluetooth and uploads readings to hCRI.io">
+<meta name="twitter:image:alt" content="hCRI Companion for Android, iPhone &amp; iPad — connects to your Hopoocolor meter over Bluetooth and uploads readings to hCRI.io">
 
 <script>
   // Match whatever theme the person has set on the main app (same
@@ -235,13 +235,13 @@
 
   <header class="top">
     <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
-      <span class="tag">for Android &amp; iPhone</span>
+      <span class="tag">for Android, iPhone &amp; iPad</span>
     </div>
     <nav class="links">
       <a href="#features">Features</a>
       <a href="#privacy">Privacy</a>
       <a href="#how-it-works">How it works</a>
-      <a href="#download">Get Access</a>
+      <a href="#download">Get the app</a>
       <a href="manual/">Manual</a>
       <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a>
       <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme" style="background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text);padding:0">🌙</button>
@@ -256,16 +256,17 @@
       <p class="lede">
         hCRI Companion connects to your Hopoocolor HPCS or Torch Bearer spectrometer over Bluetooth, reads the full spectrum
         off the sensor, and uploads it to your hCRI.io account in one tap — no cable, no CSV
-        export, no re-typing numbers off a tiny screen.
+        export, no re-typing numbers off a tiny screen. It runs on Android phones and tablets, iPhone and iPad,
+        and it's open for testing on all of them.
       </p>
       <div class="cta-row">
-        <a class="btn solid" href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20closed%20testing">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
-          Email to join closed testing
+        <a class="btn solid" href="#download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+          Get the app for testing
         </a>
         <a class="btn ghost" href="#how-it-works">See how it works</a>
       </div>
-      <div class="meta-note">Android 7.0+ and iPhone (iOS 15.1+) · Bluetooth LE required · Currently in closed testing</div>
+      <div class="meta-note">Now on Android, iPhone and iPad · Android 7.0+ · iOS / iPadOS 15.1+ · Bluetooth LE required · Open for testers</div>
     </div>
 
     <div class="device" aria-hidden="true">
@@ -326,7 +327,7 @@
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18"/></svg></div>
         <h3>CIE 1931 chromaticity plot</h3>
-        <p>x, y, CCT and Duv plotted against the real spectral locus — derived from the reading's
+        <p>x, y, CCT and Duv plotted against the real spectral locus, drawn at the true CIE aspect ratio everywhere — derived from the reading's
           spectrum, not the meter's own onboard registers, which can drift between firmware states.</p>
       </div>
       <div class="card">
@@ -387,7 +388,7 @@
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h7v7M21 3l-9 9"/><path d="M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg></div>
         <h3>A TM-30 report, right in the app</h3>
-        <p>Any reading — uploaded or not — opens a full IES TM-30-18 report on your phone, ready to scroll or
+        <p>Any reading — uploaded or not — opens a full IES TM-30-18 report on your phone or tablet (in its own window with an X on a tablet), ready to scroll or
           share as a PDF. Uploaded readings also get Copy and Report buttons for their hCRI.io page.</p>
       </div>
       <div class="card">
@@ -422,6 +423,36 @@
         <p>Reads the Torch Bearer spectrometer through a small open-source ESP32 bridge, with a built-in
           spectral correction (on by default, switchable in Settings) that lines CCT, Duv and CRI up
           with the HPCS. Needs the bridge — see Compatibility below.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+        <h3>Made for iPad and tablets</h3>
+        <p>On an iPad or Android tablet the app opens up: every chart at once (spectrum, CIE, R1–R15 and, when
+          a reading has one, flicker), your History alongside, and the Data tab in its own space. Landscape puts
+          the big chart on the left with the others stacked beside it; portrait swaps to a roomy chart with
+          History and Data underneath. Settings, the TM-30 report and any past reading open as windows you
+          close with an X.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg></div>
+        <h3>Drag a chart to make it big</h3>
+        <p>On a tablet in landscape, grab the handle on any chart and drop it on the large one (or just tap the
+          handle) to swap it in. The app remembers your choice for the main page; past readings you open from
+          History always start in the standard order.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/></svg></div>
+        <h3>Compare readings side by side</h3>
+        <p>Select two to six readings in History and tap Compare. Each gets its own card with its stats and a
+          chart you can switch between SPD and Flicker, followed by an overlay of all of them — spectra scaled to
+          their own peak, or flicker waves with Wave / Risk views and zoom — and a metrics table showing the
+          difference from the first reading.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+        <h3>See it on a photo (iPad)</h3>
+        <p>The same “See it on a photo” tool as hCRI.io, built into the iPad app: use a photo to see how the
+          light you measured renders colour, in a large centred window with an X to close.</p>
       </div>
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg></div>
@@ -569,30 +600,59 @@
   <section id="download">
     <div class="section-head">
       <div class="eyebrow">Get the app</div>
-      <h2>Join closed testing</h2>
+      <h2>Now available for testing on Android, iPhone and iPad</h2>
+      <p>hCRI Companion is in open testing. Pick your platform below — it takes a couple of minutes to get in.</p>
     </div>
-    <div class="download-card">
+    <div class="grid3" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+      <div class="card" style="padding:26px">
+        <h3 style="font-size:17px">Android</h3>
+        <div class="steps" style="margin-top:0">
+          <div class="step" style="padding-block:12px"><div class="num"></div><div>
+            <h4>Join the testers group</h4>
+            <p>Go to <a href="https://groups.google.com/g/hcri-companion-testers" target="_blank" rel="noopener">the hcri-companion-testers Google Group</a> and join it, using the Google account you use on Google Play.</p>
+          </div></div>
+          <div class="step" style="padding-block:12px"><div class="num"></div><div>
+            <h4>Confirm you're a tester</h4>
+            <p>Open <a href="https://play.google.com/apps/testing/com.hcricompanion" target="_blank" rel="noopener">the testing page on Google Play</a> and confirm you're now a tester.</p>
+          </div></div>
+          <div class="step" style="padding-block:12px"><div class="num"></div><div>
+            <h4>Download it on Google Play</h4>
+            <p>Tap the “Download it on Google Play” link on that page. It can take up to 24 hours after you join before the app shows up, so if it isn't there yet, check back later.</p>
+          </div></div>
+        </div>
+        <a class="btn solid" href="https://groups.google.com/g/hcri-companion-testers" target="_blank" rel="noopener" style="margin-top:6px">Join the Android testers group</a>
+      </div>
+      <div class="card" style="padding:26px">
+        <h3 style="font-size:17px">iPhone and iPad</h3>
+        <div class="steps" style="margin-top:0">
+          <div class="step" style="padding-block:12px"><div class="num"></div><div>
+            <h4>Email your details</h4>
+            <p>Email <a href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20iOS%20testing&amp;body=First%20name%3A%0ALast%20name%3A%0AApp%20Store%20email%3A%0A">fizzgig@hcri.io</a> with your <strong>first name</strong>, <strong>last name</strong> and the <strong>email address of your App Store (Apple) account</strong>.</p>
+          </div></div>
+          <div class="step" style="padding-block:12px"><div class="num"></div><div>
+            <h4>Get access</h4>
+            <p>You'll be given access and receive an invitation to test the app through Apple's TestFlight.</p>
+          </div></div>
+          <div class="step" style="padding-block:12px"><div class="num"></div><div>
+            <h4>Install from TestFlight</h4>
+            <p>Accept the invitation and install hCRI Companion on your iPhone or iPad.</p>
+          </div></div>
+        </div>
+        <a class="btn solid" href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20iOS%20testing&amp;body=First%20name%3A%0ALast%20name%3A%0AApp%20Store%20email%3A%0A" style="margin-top:6px">Email for iOS access</a>
+      </div>
+    </div>
+    <div class="download-card" style="margin-top:22px">
       <div class="left">
-        <h3 style="margin:0 0 8px;font-size:17px">hCRI Companion is in closed testing</h3>
-        <p style="margin:0;color:var(--dim);font-size:13.5px">
-          The app isn't publicly downloadable right now. Email us and we'll add you as a tester —
-          you'll get instructions for installing a build on your device.
-        </p>
+        <h3 style="margin:0 0 8px;font-size:15px">What you'll need</h3>
         <ul class="req-list">
-          <li>Android 7.0 or newer, or iPhone with iOS 15.1 or newer</li>
+          <li>Android 7.0 or newer, or iPhone / iPad with iOS / iPadOS 15.1 or newer</li>
           <li>Bluetooth Low Energy support</li>
           <li>A Hopoocolor HPCS-series meter, or a Torch Bearer with the <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hCRI ESP32 bridge</a></li>
         </ul>
       </div>
-      <div>
-        <a class="btn solid" href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20closed%20testing" style="height:50px;padding-inline:26px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
-          Email fizzgig@hcri.io
-        </a>
-        <div class="meta-note" style="text-align:center;margin-top:10px">
-          Need help? Read the <a href="manual/">full manual</a> or grab the
-          <a href="manual/hCRI-Companion-Manual.pdf" download>PDF</a>.
-        </div>
+      <div class="meta-note" style="max-width:34ch;margin:0">
+        Need help? Read the <a href="manual/">full manual</a> or grab the
+        <a href="manual/hCRI-Companion-Manual.pdf" download>PDF</a>. Questions or bugs: <a href="mailto:fizzgig@hcri.io">fizzgig@hcri.io</a>.
       </div>
     </div>
   </section>
