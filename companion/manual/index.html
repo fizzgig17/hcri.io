@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.26 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.27 · Last updated October 11, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -222,6 +222,13 @@
           need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in 1.27</h3>
+      <ul>
+        <li><strong>Auto-connect to meter can be turned off.</strong> Settings → <code>Auto-connect to meter</code> (on by default). When it is off the app only connects when you tap <code>Connect to Meter</code>, not when it opens or when you switch back to it.</li>
+        <li><strong>No connection attempts while Bluetooth is off.</strong> The app now checks Bluetooth first. If it is off, or (iPhone) the app has not been allowed to use it, nothing is attempted when you open or return to the app and the Main status line says <em>Bluetooth is off</em> or <em>Bluetooth access is off</em>. Tapping <code>Connect to Meter</code> explains the problem, with an <code>Open Settings</code> button.</li>
+        <li><strong>Friendlier network messages.</strong> Uploads and other hCRI.io requests give up after a short time with a clear "can't reach hCRI.io" or "took too long" message. When History is full, readings you have not uploaded are kept and the oldest uploaded ones are dropped first; the app tells you if a reading or its LED details could not be saved.</li>
+        <li><strong>Accessibility and small fixes.</strong> Screen reader labels on switches and tabs, the update notice fades out cleanly and names the right store, the keyboard no longer covers fields on scrolling screens, and incomplete Settings fields now say "Missing information".</li>
+      </ul>
       <h3>What's new in 1.26</h3>
       <ul>
         <li><strong>LED suggestions can be turned off.</strong> Settings → <code>LED suggestions</code> (on by default). When it is off the app stops asking hCRI.io to suggest an LED and hides the suggestion cards on Main and in History; you can still add LED details yourself with the 💡 button. Switching it back on brings the suggestions back.</li>
@@ -371,7 +378,11 @@
       <p>If Bluetooth is turned off on your phone, a message tells you that Bluetooth is required to take
         readings, with an <code>Open Settings</code> button that jumps to your phone's Bluetooth settings
         and an <code>OK</code> button that simply closes it. This message appears when the app opens and
-        when you tap <code>Connect to Meter</code> — not every time you switch back to the app.</p>
+        when you tap <code>Connect to Meter</code> — not every time you switch back to the app. On iPhone, if you
+        have not allowed hCRI Companion to use Bluetooth, a similar message (<em>Bluetooth access is off</em>)
+        sends you to the app's settings. While Bluetooth is off or blocked the app does not try to connect on its
+        own, and the Main status line says why.</p>
+      <p>Prefer to connect only when you choose to? Turn off <code>Auto-connect to meter</code> in Settings.</p>
       <p>If more than one matching meter is found, a picker appears so you choose which one — look for its
         advertised name and signal strength. A small <code>⇄ Switch meter</code> icon next to the status
         row lets you reopen that same list later without a fresh scan. Device switching has been refined a lot
@@ -450,6 +461,10 @@
         <li>Flicker that came with a reading never shows Share or Upload flicker, and the readings you open from History show their flicker without any controls.</li>
         <li>A note under the buttons reminds you that New sample clears the current reading, and whether it is saved to History.</li>
       </ul>
+      <h3>Auto-connect to meter</h3>
+      <p>On by default. The app looks for your meter when it opens and when you switch back to it (and skips the
+        attempt while Bluetooth is off or blocked). Turn it off to connect only when you tap <code>Connect to Meter</code>.
+        See <a href="#pairing">Pairing with your meter</a>.</p>
       <h3>Capture flicker with each reading</h3>
       <p>Settings → <em>Capture flicker with each reading</em> (off by default) takes a one-shot flicker snapshot
         automatically after every reading. It adds a few seconds per reading. Even when it is off you can add a
@@ -674,7 +689,8 @@
         reconnect delay for a little extra meter battery life), turn that setting off. Either way, coming
         back to the foreground with nothing connected always tries to reconnect automatically — you
         shouldn't need to tap Connect yourself just because the meter dropped on its own while you were
-        away.</p>
+        away. (Not when <code>Auto-connect to meter</code> is turned off in Settings, and not while Bluetooth is off
+        or blocked — the Main status line says so.)</p>
       <p class="dim">Sharing a CSV or the debug log briefly hands control to your phone's own share sheet,
         which looks like backgrounding the app — this is recognized and never triggers a disconnect either
         way, since you're still right there using the app.</p>
@@ -686,6 +702,12 @@
       <p>Tap <code>Meter won't connect? Reset connection</code> on the Main tab (shown while
         disconnected). This clears a leftover Bluetooth connection from a previous session — by far the
         most common cause, and something that used to require power-cycling the meter.</p>
+      <h3>Main says "Bluetooth is off" or "Bluetooth access is off"</h3>
+      <p>The app does not try to connect until Bluetooth is usable. Turn Bluetooth on in your phone's settings; on iPhone, if
+        it says <em>access</em> is off, open Settings → hCRI Companion and allow Bluetooth. Then tap <code>Connect to Meter</code>
+        (or switch away and back to the app).</p>
+      <h3>The app doesn't connect by itself any more</h3>
+      <p>Check Settings → <code>Auto-connect to meter</code>; when it is off, connect with the button on Main.</p>
       <h3>App crashed, or won't open</h3>
       <p>A crash lands on a "Try Again" screen rather than kicking you back to your home screen. If the app
         won't stay open at all, force-close it from your phone's app switcher and reopen it — this app
