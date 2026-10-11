@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../_core/response.php';
 require_once __DIR__ . '/../_core/db.php';
 require_once __DIR__ . '/../_core/auth.php';
+require_once __DIR__ . '/../_core/ratelimit.php';
 require_once __DIR__ . '/../_core/gdpr.php';
 
 cors_headers();
@@ -31,6 +32,10 @@ if ($action === 'register') {
     if (!$email || !$name || !$password)  json_error('email, name and password required');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('Invalid email');
     if (strlen($password) < 8)            json_error('Password must be ≥8 characters');
+
+    // At most 10 sign-ups per hour from one address.
+    rl_block_if_over('register', rl_client_ip(), 10, 3600);
+    rl_hit('register', rl_client_ip(), 3600);
     $consent = !empty($b['consent']);
     if (!$consent) json_error('You must accept the Privacy Policy and Terms to create an account', 400);
     consent_ensure($db);
@@ -60,10 +65,20 @@ if ($action === 'login') {
     $password =      $b['password'] ?? '';
     if (!$email || !$password) json_error('email and password required');
 
+    // Password-guessing guard: 10 failures per 15 minutes per address, 8 per account.
+    $rlAcct = strtolower($email);
+    rl_block_if_over('login_ip', rl_client_ip(), 10, 900);
+    rl_block_if_over('login_acct', $rlAcct, 8, 900);
+
     $s = $db->prepare('SELECT * FROM users WHERE email=?');
     $s->execute([strtolower($email)]);
     $u = $s->fetch();
-    if (!$u || !password_verify($password, $u['password'])) json_error('Invalid email or password', 401);
+    if (!$u || !password_verify($password, $u['password'])) {
+        rl_hit('login_ip', rl_client_ip(), 900);
+        rl_hit('login_acct', $rlAcct, 900);
+        json_error('Invalid email or password', 401);
+    }
+    rl_clear('login_acct', $rlAcct);
 
     $token = jwt_sign(['id' => $u['id'], 'email' => $u['email'], 'name' => $u['name']]);
     json_out(['token' => $token, 'user' => ['id' => $u['id'], 'email' => $u['email'], 'name' => $u['name']]]);

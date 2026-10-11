@@ -190,11 +190,11 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.26 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.27 · Last updated October 11, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
-      <p class="lede">hCRI Companion is an independent Android app that connects to a Hopoocolor HPCS-series
+      <p class="lede">hCRI Companion is an independent app for Android and iPhone that connects to a Hopoocolor HPCS-series
         spectrometer (or a Torch Bearer, via the ESP32 bridge) over Bluetooth Low Energy, reads the full spectrum off the sensor, computes the same
         colorimetric values hCRI.io itself computes, and uploads a reading to your hCRI.io account in one
         tap — no cable, no CSV export, no re-typing numbers off the meter's own tiny screen.</p>
@@ -222,6 +222,13 @@
           need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in 1.27</h3>
+      <ul>
+        <li><strong>Auto-connect to meter can be turned off.</strong> Settings → <code>Auto-connect to meter</code> (on by default). When it is off the app only connects when you tap <code>Connect to Meter</code>, not when it opens or when you switch back to it.</li>
+        <li><strong>No connection attempts while Bluetooth is off.</strong> The app now checks Bluetooth first. If it is off, or (iPhone) the app has not been allowed to use it, nothing is attempted when you open or return to the app and the Main status line says <em>Bluetooth is off</em> or <em>Bluetooth access is off</em>. Tapping <code>Connect to Meter</code> explains the problem, with an <code>Open Settings</code> button.</li>
+        <li><strong>Friendlier network messages.</strong> Uploads and other hCRI.io requests give up after a short time with a clear "can't reach hCRI.io" or "took too long" message. When History is full, readings you have not uploaded are kept and the oldest uploaded ones are dropped first; the app tells you if a reading or its LED details could not be saved.</li>
+        <li><strong>Accessibility and small fixes.</strong> Screen reader labels on switches and tabs, the update notice fades out cleanly and names the right store, the keyboard no longer covers fields on scrolling screens, and incomplete Settings fields now say "Missing information".</li>
+      </ul>
       <h3>What's new in 1.26</h3>
       <ul>
         <li><strong>LED suggestions can be turned off.</strong> Settings → <code>LED suggestions</code> (on by default). When it is off the app stops asking hCRI.io to suggest an LED and hides the suggestion cards on Main and in History; you can still add LED details yourself with the 💡 button. Switching it back on brings the suggestions back.</li>
@@ -296,7 +303,7 @@
     <section id="requirements">
       <h2><span class="num">02</span> Requirements</h2>
       <ul>
-        <li>Android 8.0 (Oreo) or newer</li>
+        <li>Android 7.0 (Nougat) or newer, or iOS 15.1 or newer on iPhone</li>
         <li>Bluetooth Low Energy (BLE) support</li>
         <li>A Hopoocolor HPCS-series meter, powered on and in range — or a Torch Bearer connected to the <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hCRI ESP32 bridge</a> (see <a href="#torchbearer">Using a Torch Bearer</a>)</li>
         <li>An hCRI.io account, if you want to upload readings (not required just to take and view them)</li>
@@ -305,12 +312,12 @@
 
     <section id="installing">
       <h2><span class="num">03</span> Installing the app</h2>
-      <p>hCRI Companion isn't on the Play Store — it's a direct install, the same way most spectrometer
-        and BLE utilities in this space are distributed.</p>
+      <p>hCRI Companion is in closed testing. Email <a href="mailto:fizzgig@hcri.io?subject=hCRI%20Companion%20closed%20testing">fizzgig@hcri.io</a>
+        from the <a href="../#download">Companion page</a> and you'll be added as a tester with instructions for your phone.</p>
       <ol class="steps">
-        <li><strong>Download the APK</strong><span>From the <a href="../#download">Companion download page</a>, tap Download APK. Android downloads the file like any other.</span></li>
-        <li><strong>Allow installs from this source</strong><span>Opening the downloaded file for the first time, Android will ask to confirm installing from an unknown source — this is expected for any app distributed outside the Play Store. Allow it for your browser or Files app.</span></li>
-        <li><strong>Install and open</strong><span>Finish the install prompt, then open hCRI Companion from your app drawer.</span></li>
+        <li><strong>Android</strong><span>You're added to the closed test on Google Play. Open the Play Store link you're sent, join the test and install the app like any other. If you were sent an APK instead, open the downloaded file and allow installs from your browser or Files app when Android asks.</span></li>
+        <li><strong>iPhone</strong><span>iPhone builds are being prepared for TestFlight. Once you're added as a tester, install Apple's free TestFlight app, accept the invitation and install hCRI Companion from there.</span></li>
+        <li><strong>Open the app</strong><span>Open hCRI Companion and allow Bluetooth when asked. It needs Bluetooth to find your meter.</span></li>
       </ol>
       <div class="card tip">
         <h4>Updating later</h4>
@@ -318,7 +325,8 @@
           version each time it opens. When one is available, a small grey <em>Update available</em> capsule slides down from the top of the screen and hovers there with an <code>Update</code> button (opens the Play Store page) and a × to hide it until the next launch; Settings → Update shows
           <code>Open in Play Store</code>; the update itself is installed from the Play Store page. If you
           installed the APK directly, there's no automatic check: re-download and install the APK the same way to
-          get a newer build — it installs over the existing app and keeps your saved readings, account, and settings.</p>
+          get a newer build — it installs over the existing app and keeps your saved readings, account, and settings.
+          On iPhone the app has no update check of its own: TestFlight (or the App Store, once the app is listed) tells you when a new build is ready.</p>
       </div>
     </section>
 
@@ -370,7 +378,11 @@
       <p>If Bluetooth is turned off on your phone, a message tells you that Bluetooth is required to take
         readings, with an <code>Open Settings</code> button that jumps to your phone's Bluetooth settings
         and an <code>OK</code> button that simply closes it. This message appears when the app opens and
-        when you tap <code>Connect to Meter</code> — not every time you switch back to the app.</p>
+        when you tap <code>Connect to Meter</code> — not every time you switch back to the app. On iPhone, if you
+        have not allowed hCRI Companion to use Bluetooth, a similar message (<em>Bluetooth access is off</em>)
+        sends you to the app's settings. While Bluetooth is off or blocked the app does not try to connect on its
+        own, and the Main status line says why.</p>
+      <p>Prefer to connect only when you choose to? Turn off <code>Auto-connect to meter</code> in Settings.</p>
       <p>If more than one matching meter is found, a picker appears so you choose which one — look for its
         advertised name and signal strength. A small <code>⇄ Switch meter</code> icon next to the status
         row lets you reopen that same list later without a fresh scan. Device switching has been refined a lot
@@ -449,6 +461,10 @@
         <li>Flicker that came with a reading never shows Share or Upload flicker, and the readings you open from History show their flicker without any controls.</li>
         <li>A note under the buttons reminds you that New sample clears the current reading, and whether it is saved to History.</li>
       </ul>
+      <h3>Auto-connect to meter</h3>
+      <p>On by default. The app looks for your meter when it opens and when you switch back to it (and skips the
+        attempt while Bluetooth is off or blocked). Turn it off to connect only when you tap <code>Connect to Meter</code>.
+        See <a href="#pairing">Pairing with your meter</a>.</p>
       <h3>Capture flicker with each reading</h3>
       <p>Settings → <em>Capture flicker with each reading</em> (off by default) takes a one-shot flicker snapshot
         automatically after every reading. It adds a few seconds per reading. Even when it is off you can add a
@@ -471,7 +487,7 @@
     <section id="reading">
       <h2><span class="num">08</span> Taking a reading</h2>
       <p>Once connected, tap <code>Take Reading</code>. The meter takes its exposure, and a short haptic
-        buzz confirms the moment it lands (a different pattern if it fails) — handy when you're not looking
+        tick confirms the moment it lands (a different pattern if it fails; see Feedback (haptics) in Settings) — handy when you're not looking
         directly at the screen. The spectrum, CCT, Duv, Ra, and the rest of your chosen measurements appear
         immediately after.</p>
       <p>Every completed reading is saved automatically to <a href="#history-tab">History</a> — there's
@@ -486,7 +502,7 @@
         everything just reads zero/blank, so nothing jumps around once real numbers appear).</p>
       <p>A small <code>?</code> button beside the Main / Data / Logs tabs opens a short overview of what the
         app does. Tapping the <code>Home</code> tab at the bottom of the screen always brings you back to
-        Main, even from Data or Logs. The phone's bottom navigation bar is hidden to give the app more
+        Main, even from Data or Logs. On Android, the phone's bottom navigation bar is hidden to give the app more
         room; swipe up from the bottom edge to bring it back for a moment. While the keyboard is open the
         bar stays visible, so Back and Home remain reachable.</p>
       <h3>Icon labels</h3>
@@ -573,13 +589,13 @@
           full numeric detail, including the meter's own firmware version and integration time.</li>
         <li><strong>Upload to hCRI.io</strong> and <strong>Share CSV</strong> — the same upload button as
           Main (with the same inline checkmark), plus exporting this one reading as a CSV file through
-          Android's share sheet.</li>
+          your phone's share sheet.</li>
       </ul>
     </section>
 
     <section id="history-tab">
       <h2><span class="num">11</span> The History tab</h2>
-      <p>Every reading you've ever taken, grouped by day, newest first. From here you can:</p>
+      <p>Your most recent readings (up to 100), grouped by day, newest first. From here you can:</p>
       <ul>
         <li><strong>View</strong> a past reading's full measurement grid, spectrum, chromaticity, and
           R-values exactly as they looked when it was taken.</li>
@@ -597,6 +613,12 @@
         <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone; a
           copy already uploaded to hCRI.io stays there until you delete it from your account separately.</li>
       </ul>
+      <div class="card tip">
+        <h4>How many readings are kept</h4>
+        <p>History holds your most recent 100 readings. When it is full, the oldest <em>uploaded</em> readings are removed
+          first, so a reading you haven't uploaded yet is kept (up to 200 in total). From 90 readings on, a note at the top of
+          History reminds you. Readings you've uploaded stay safe on hCRI.io after they leave History.</p>
+      </div>
     </section>
 
     <section id="logs-tab">
@@ -604,7 +626,7 @@
       <p>A running debug log of connect/disconnect/measure/upload activity, each line timestamped in your
         phone's own local time. Useful for troubleshooting, or to attach to a bug report.</p>
       <ul>
-        <li><strong>Share Debug Log</strong> — sends the current log through Android's share sheet (email,
+        <li><strong>Share Debug Log</strong> — sends the current log through your phone's share sheet (email,
           messaging, wherever you'd like to send it).</li>
         <li><strong>Clear</strong> — empties the log.</li>
       </ul>
@@ -650,8 +672,8 @@
       <p>Check which measurements show on the Main tab's result card, and hold the <code>⠿</code> handle to
         drag a row and reorder it. <code>Reset to Default</code> restores CCT, Ra, Duv, Lux, Rf, R9, Rg in
         that order.</p>
-      <p>Settings has two tabs at the top: <code>Settings</code> and <code>About</code>, so About is one
-        tap away instead of at the bottom of a long scroll.</p>
+      <p>Settings has three tabs at the top: <code>Settings</code>, <code>Update</code> and <code>About</code>, so About is one
+        tap away instead of at the bottom of a long scroll. <code>Update</code> shows what Google Play reports about newer versions and, on Android, has the button that opens the app's Play Store page; it carries a dot when an update is waiting. iPhone has no in-app update check.</p>
       <h3>About</h3>
       <p>The current list of supported meter models (and which are independently verified), a
         <code>Send Feedback</code> button that opens a pre-addressed email, and a link back to this
@@ -667,8 +689,9 @@
         reconnect delay for a little extra meter battery life), turn that setting off. Either way, coming
         back to the foreground with nothing connected always tries to reconnect automatically — you
         shouldn't need to tap Connect yourself just because the meter dropped on its own while you were
-        away.</p>
-      <p class="dim">Sharing a CSV or the debug log briefly hands control to Android's own share sheet,
+        away. (Not when <code>Auto-connect to meter</code> is turned off in Settings, and not while Bluetooth is off
+        or blocked — the Main status line says so.)</p>
+      <p class="dim">Sharing a CSV or the debug log briefly hands control to your phone's own share sheet,
         which looks like backgrounding the app — this is recognized and never triggers a disconnect either
         way, since you're still right there using the app.</p>
     </section>
@@ -679,10 +702,24 @@
       <p>Tap <code>Meter won't connect? Reset connection</code> on the Main tab (shown while
         disconnected). This clears a leftover Bluetooth connection from a previous session — by far the
         most common cause, and something that used to require power-cycling the meter.</p>
+      <h3>Main says "Bluetooth is off" or "Bluetooth access is off"</h3>
+      <p>The app does not try to connect until Bluetooth is usable. Turn Bluetooth on in your phone's settings; on iPhone, if
+        it says <em>access</em> is off, open Settings → hCRI Companion and allow Bluetooth. Then tap <code>Connect to Meter</code>
+        (or switch away and back to the app).</p>
+      <h3>The app doesn't connect by itself any more</h3>
+      <p>Check Settings → <code>Auto-connect to meter</code>; when it is off, connect with the button on Main.</p>
       <h3>App crashed, or won't open</h3>
       <p>A crash lands on a "Try Again" screen rather than kicking you back to your home screen. If the app
-        won't stay open at all, force-close it from Android's recent-apps view and reopen it — this app
+        won't stay open at all, force-close it from your phone's app switcher and reopen it — this app
         recovers from a mid-session crash cleanly.</p>
+      <h3>Upload says it can't reach hCRI.io, or took too long</h3>
+      <p>Uploads, token creation and link requests give up after about 25 seconds (a minute for uploads) instead of
+        waiting forever. "Can't reach hCRI.io" means the phone has no working internet connection; "took too long" means
+        the connection is there but slow or the site didn't answer. Check your signal or Wi-Fi and tap Upload again — the reading is
+        still on your phone. If a reading could not be added to History, or LED details could not be saved, the app tells you.</p>
+      <h3>Too many sign-in attempts</h3>
+      <p>For security, hCRI.io limits repeated failed sign-ins and password-reset requests. If you see
+        "Too many attempts", wait about 15 minutes and try again; if you use a saved token, signing in is not needed.</p>
       <h3>A reading looks wrong</h3>
       <p>Double-check the correct meter model connected (shown next to the status dot on Main) — each
         model has its own field layout, and the wrong one can occasionally still connect if its advertised

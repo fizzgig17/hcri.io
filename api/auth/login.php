@@ -7,6 +7,7 @@ require_once __DIR__ . '/../_core/response.php';
 require_once __DIR__ . '/../_core/db.php';
 
 require_once __DIR__ . '/../_core/auth.php';
+require_once __DIR__ . '/../_core/ratelimit.php';
 
 
 
@@ -62,6 +63,10 @@ if ($action === 'register') {
 
     if (strlen($password) < 8)            json_error('Password must be ≥8 characters');
 
+    // At most 10 sign-ups per hour from one address.
+    rl_block_if_over('register', rl_client_ip(), 10, 3600);
+    rl_hit('register', rl_client_ip(), 3600);
+
 
 
     $s = $db->prepare('SELECT id FROM users WHERE email=?');
@@ -102,6 +107,11 @@ if ($action === 'login') {
 
     if (!$email || !$password) json_error('email and password required');
 
+    // Password-guessing guard: 10 failures per 15 minutes per address, 8 per account.
+    $rlAcct = strtolower($email);
+    rl_block_if_over('login_ip', rl_client_ip(), 10, 900);
+    rl_block_if_over('login_acct', $rlAcct, 8, 900);
+
 
 
     // Accept email OR name (case-insensitive)
@@ -112,7 +122,12 @@ if ($action === 'login') {
 
     $u = $s->fetch();
 
-    if (!$u || !password_verify($password, $u['password'])) json_error('Invalid email or password', 401);
+    if (!$u || !password_verify($password, $u['password'])) {
+        rl_hit('login_ip', rl_client_ip(), 900);
+        rl_hit('login_acct', $rlAcct, 900);
+        json_error('Invalid email or password', 401);
+    }
+    rl_clear('login_acct', $rlAcct);
 
     if (!empty($u['disabled'])) json_error('This account has been disabled.', 403);
 

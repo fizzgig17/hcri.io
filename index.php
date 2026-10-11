@@ -150,6 +150,27 @@ if ($uri !== '/' && is_file($staticFile)) {
 
 }
 
+// ── sitemap.xml: home, explore and every public report ───────────────────────
+if ($uri === '/sitemap.xml') {
+    $smScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $smBase   = $smScheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'www.hcri.io') . '/';
+    header('Content-Type: application/xml; charset=utf-8');
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+    foreach ([$smBase, $smBase . '?explore'] as $u) {
+        echo '  <url><loc>' . htmlspecialchars($u, ENT_XML1) . '</loc></url>' . "\n";
+    }
+    try {
+        require_once __DIR__ . '/api/_core/db.php';
+        $rows = get_db()->query('SELECT id, created_at FROM reports WHERE is_public = 1 ORDER BY id DESC LIMIT 45000')->fetchAll();
+        foreach ($rows as $r) {
+            echo '  <url><loc>' . htmlspecialchars($smBase . '?report=' . (int)$r['id'], ENT_XML1) . '</loc><lastmod>' . date('Y-m-d', strtotime((string)$r['created_at'])) . '</lastmod></url>' . "\n";
+        }
+    } catch (\Throwable $e) {
+        // Database unavailable: still serve the static entries above.
+    }
+    echo '</urlset>' . "\n";
+    exit;
+}
 // ── Legal pages (clean URLs) ──────────────────────────────────────────────────
 
 if ($uri === '/privacy' || $uri === '/privacy.html' || $uri === '/terms' || $uri === '/terms.html' || $uri === '/licenses' || $uri === '/licenses.html') {
@@ -396,7 +417,7 @@ if (str_starts_with($uri, '/api/')) {
 
     header('Content-Type: application/json');
 
-    echo json_encode(['error' => 'Not found: ' . $uri]);
+    echo json_encode(['error' => 'Not found']);
 
     exit;
 
@@ -1077,6 +1098,10 @@ header('Content-Type: text/html; charset=utf-8');
 <title><?= $ogH($ogTitle) ?></title>
 
 <meta name="description" content="<?= $ogH($ogDesc) ?>">
+
+<link rel="canonical" href="<?= $ogH($ogUrl) ?>">
+
+<link rel="manifest" href="<?= htmlspecialchars($base) ?>assets/manifest.webmanifest">
 
 <meta property="og:type" content="<?= $ogH($ogType) ?>">
 

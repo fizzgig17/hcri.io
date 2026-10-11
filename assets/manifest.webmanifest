@@ -1,0 +1,12 @@
+{
+  "name": "hCRI.io",
+  "short_name": "hCRI.io",
+  "description": "Upload, analyze and share LED spectral power distributions with CRI, TM-30, CCT and Duv.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060a0f",
+  "theme_color": "#060a0f",
+  "icons": [
+    { "src": "favicon-192.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}

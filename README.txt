@@ -1,87 +1,47 @@
-hCRI.io — TM-30 report fixes (August 2026)
-==========================================
+hCRI.io -- website and API
+==========================
 
-The 9 files in this archive are already in their correct folders.
-Extract this zip INTO your site root — the folder that contains
-index.php, .htaccess, api/, assets/ and frontend/ — and choose
-"overwrite / replace" when prompted.
+PHP + MySQL backend (no framework), a React/Vite frontend, and static pages. The built frontend bundle
+(assets/app.js) is committed, so the site runs without a build step on the server.
 
-Nothing needs to be moved or renamed afterwards.
+LAYOUT
+------
+index.php          Router for pages, share/report previews (Open Graph), sitemap.xml and /api/*
+api/               JSON endpoints; api/_core/ holds shared code (db, auth, SPD maths, PDF builders, rate limiter)
+api/v1_*.php       Personal-token API used by scripts and the hCRI Companion app (see assets/hcri-api-spec.pdf)
+frontend/          React source (Vite). `npm run build` regenerates assets/app.js
+assets/            Built bundle, icons, manifest, API reference PDF
+companion/         hCRI Companion landing page and user manual (HTML + PDF)
+sql/               One-off migrations (run once, in the database, when a release says so)
+database.sql       Full schema for a fresh install
+help_content.json  Text of the in-site Help window
+privacy.html, terms.html, licenses.html, about/   Static pages
 
+CONFIGURATION
+-------------
+Secrets are never committed. Copy api/_core/secrets.local.php.example to api/_core/secrets.local.php on the
+server (or set the same names as environment variables) and fill in the database and mail credentials.
 
-CONTENTS
---------
-api/_core/spd.php
-api/_core/tm30_pdf_builder.php
-api/_core/share_lookup.php
-api/guest_pdf.php
-api/reports_item.php
-assets/app.js
-assets/hcri-photo.js
-frontend/src/components/CVGWheel.jsx
-frontend/src/components/ReportView.jsx
+BRANCHES AND DEPLOY
+-------------------
+develop  -> dev.hcri.io  (deployed automatically by .github/workflows/deploy-dev.yml)
+master   -> www.hcri.io  (production)
+Merge develop into master only for a release.
 
+RELEASE CHECKLIST
+-----------------
+1. Run any new file in sql/ on the production database (see the release notes / commit message).
+2. If the frontend changed: `cd frontend && npm run build`, and commit the regenerated assets/app.js.
+3. Regenerate assets/hcri-api-spec.pdf if the API changed, and the Companion manual PDF if the manual changed.
+4. Update companion/manual/index.html ("Covers app version", What's new) when the app version changes.
 
-BEFORE YOU EXTRACT
-------------------
-Back up those same 9 files from the live site. That is your rollback
-if anything goes wrong.
-
-
-AFTER YOU EXTRACT — ONE REQUIRED STEP
--------------------------------------
-Open the admin panel and click  "⟳ Recalc All"  once.
-
-This computes the new colour-vector-graphic coordinates for every
-existing report and stores them. Until it runs, older reports fall
-back to rebuilding the shape from data already in the database:
-accurate to about 0.1 on Rg, but the arrow bases sit up to ~6 degrees
-off around the circle.
-
-There is no SQL to run, no configuration to change, and no database
-migration.
-
-
-OPTIONAL CHECK
+SECURITY NOTES
 --------------
-1. Open any report. The red outline in the colour vector graphic should
-   now cross the black reference circle instead of sitting entirely
-   inside it.
-2. Download that report's TM-30 PDF. Same shape, plus a revision note
-   in the footer.
+* Login, sign-up and password reset are rate-limited per IP (and per account/mailbox) by api/_core/ratelimit.php,
+  which keeps small counter files in the system temp directory.
+* .htaccess sets the security headers and cache rules. JS/CSS are revalidated on every load (ETag), PHP is never cached.
+* The API uses bearer tokens (not cookies), so Access-Control-Allow-Origin: * is intentional.
 
-
-NOTE ON assets/app.js
----------------------
-That file is the built frontend bundle. If you ever run "npm run build"
-inside frontend/, it will be regenerated and this change lost. The two
-.jsx source files are included so the source matches the bundle. If you
-do not run a build step, the bundle alone is sufficient.
-
-
-WHAT CHANGED
-------------
-* Colour vector graphic now plots chroma and hue shift per TM-30-18,
-  not per-hue fidelity. Over-saturation is representable for the first
-  time; polygon area now corresponds to Rg. Reference-to-test arrows
-  added. Applies to the on-screen wheel, the TM-30 PDF, the Annex E
-  PNG/PDF export, the share card and the photo-preview inset.
-* PDF chroma-shift and hue-shift charts now use the stored per-bin
-  data instead of deriving it from fidelity. (The hue chart previously
-  read 0.00 on all 16 bins for every report.)
-* PDF 99-sample Rf,CES chart now uses the real per-sample values
-  instead of interpolating the 16 hue bins.
-* PDF spectral chart now draws the actual reference illuminant,
-  flux-matched to the test source, instead of a flat line.
-* CVG polygon now appears in generated PDFs at all — a malformed PDF
-  path operator meant viewers discarded it silently.
-* Per-bin lightness shift, bin colours and per-sample fidelity are no
-  longer discarded by analyze_spd(), which also removes a duplicate
-  full recomputation on every single-report page view.
-* Report PDFs no longer divide by zero on an all-zero spectrum, and
-  wavelength-wrapped multi-scan exports no longer draw a zigzag.
-* Reports with no spectral data print "No spectral data" instead of
-  drawing a perfect circle.
-* Footer separators and chart axis labels no longer render as mojibake.
-
-Metric values (Rf, Rg, CCT, Duv, Ra, R9, R1-R15) are unchanged.
+LICENSE
+-------
+GNU Affero General Public License v3 or later; see LICENSE and THIRD-PARTY-NOTICES.md.

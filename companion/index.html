@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>hCRI Companion</title>
-<meta name="description" content="The Android app that pairs with your Hopoocolor HPCS or Torch Bearer spectrometer and uploads readings straight to hCRI.io.">
+<meta name="description" content="The Android and iPhone app that pairs with your Hopoocolor HPCS or Torch Bearer spectrometer and uploads readings straight to hCRI.io.">
 
 <!-- Social share preview (link unfurls in iMessage, Slack, Discord, X,
      Facebook, etc.). og-image.png is a static 1200x630 render matching this
@@ -21,13 +21,13 @@
 <meta property="og:image" content="https://www.hcri.io/companion/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="hCRI Companion for Android — connects to your Hopoocolor or Torch Bearer meter over Bluetooth and uploads readings to hCRI.io">
+<meta property="og:image:alt" content="hCRI Companion for Android &amp; iPhone — connects to your Hopoocolor or Torch Bearer meter over Bluetooth and uploads readings to hCRI.io">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="hCRI Companion — Bluetooth spectrometer client for hCRI.io">
 <meta name="twitter:description" content="Connects to your Hopoocolor HPCS or Torch Bearer spectrometer over Bluetooth, reads the full spectrum, and uploads it to hCRI.io in one tap — no cable, no CSV export.">
 <meta name="twitter:image" content="https://www.hcri.io/companion/og-image.png">
-<meta name="twitter:image:alt" content="hCRI Companion for Android — connects to your Hopoocolor meter over Bluetooth and uploads readings to hCRI.io">
+<meta name="twitter:image:alt" content="hCRI Companion for Android &amp; iPhone — connects to your Hopoocolor meter over Bluetooth and uploads readings to hCRI.io">
 
 <script>
   // Match whatever theme the person has set on the main app (same
@@ -235,7 +235,7 @@
 
   <header class="top">
     <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
-      <span class="tag">for Android</span>
+      <span class="tag">for Android &amp; iPhone</span>
     </div>
     <nav class="links">
       <a href="#features">Features</a>
@@ -265,7 +265,7 @@
         </a>
         <a class="btn ghost" href="#how-it-works">See how it works</a>
       </div>
-      <div class="meta-note">Android 8.0+ · Bluetooth LE required · Currently in closed testing</div>
+      <div class="meta-note">Android 7.0+ and iPhone (iOS 15.1+) · Bluetooth LE required · Currently in closed testing</div>
     </div>
 
     <div class="device" aria-hidden="true">
@@ -360,7 +360,7 @@
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l4 2"/></svg></div>
         <h3>Every reading, saved automatically</h3>
-        <p>The History tab keeps a running log of everything you've scanned. Rename a reading,
+        <p>The History tab keeps your most recent readings (up to 100; unuploaded ones are protected). Rename a reading,
           re-upload it later, or delete it — renaming before upload sends it to hCRI.io under that
           same title. Tap View on any past reading to reopen its full measurement grid, spectrum,
           CIE plot, and R-values, exactly as they looked the moment it was taken.</p>
@@ -405,7 +405,7 @@
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></div>
         <h3>Built for a session at the light bench</h3>
-        <p>A short haptic buzz confirms a reading finished (a different pattern if it failed) without
+        <p>A short haptic tick confirms a reading finished (a different pattern if it failed) without
           needing to look at the screen, and an optional setting keeps the screen awake for as long
           as the meter stays connected.</p>
       </div>
@@ -579,7 +579,7 @@
           you'll get instructions for installing a build on your device.
         </p>
         <ul class="req-list">
-          <li>Android 8.0 or newer</li>
+          <li>Android 7.0 or newer, or iPhone with iOS 15.1 or newer</li>
           <li>Bluetooth Low Energy support</li>
           <li>A Hopoocolor HPCS-series meter, or a Torch Bearer with the <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hCRI ESP32 bridge</a></li>
         </ul>
@@ -619,7 +619,7 @@
           a reading) are stored locally in the app's private storage until you delete them or
           uninstall the app.<br>
           — Your hCRI.io username and API token, if you sign in, are stored in your device's secure
-          keychain (Android Keystore) — not in plain text, and not readable by other apps.<br>
+          keychain (Android Keystore / iOS Keychain) — not in plain text, and not readable by other apps.<br>
           — The Bluetooth ID of the most recently connected meter is stored locally so the app can
           reconnect to it faster next time.
         </p>
@@ -633,7 +633,7 @@
           existing API token, your hCRI.io username/email and password are sent once, over the same
           encrypted connection, to sign in and create a new token. Your password is never stored by
           the app and never leaves that one request.<br>
-          — "Share CSV" and "Share Debug Log" hand data to Android's own share sheet so you can send
+          — "Share CSV" and "Share Debug Log" hand data to your phone's own share sheet so you can send
           it wherever you choose (email, messaging, etc.) — the app itself does not see or record
           where that goes.<br>
           — These, plus pairing with your meter over Bluetooth, are the only network/radio activity
