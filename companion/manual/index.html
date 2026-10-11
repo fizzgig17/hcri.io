@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.25 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.26 · Last updated October 10, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -222,6 +222,11 @@
           need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in 1.26</h3>
+      <ul>
+        <li><strong>LED suggestions can be turned off.</strong> Settings → <code>LED suggestions</code> (on by default). When it is off the app stops asking hCRI.io to suggest an LED and hides the suggestion cards on Main and in History; you can still add LED details yourself with the 💡 button. Switching it back on brings the suggestions back.</li>
+        <li><strong>A new update notice.</strong> When a newer version is available, a small grey <em>Update available</em> capsule slides down from the top of the screen and hovers there with a blue <code>Update</code> button and a × to hide it until the next launch. It replaces the full-width blue bar.</li>
+      </ul>
       <h3>What's new in 1.25</h3>
       <ul>
         <li><strong>Generate API Token</strong> now works on the first tap with the keyboard open (it used to take a second tap, the first only closed the keyboard), and the password box has an <strong>eye button</strong> to show or hide what you type. The password is always hidden when the window opens; hold the eye to see its label. The same first-tap fix applies to <code>Save</code> and <code>Forget Credentials</code> in Settings.</li>
@@ -310,7 +315,7 @@
       <div class="card tip">
         <h4>Updating later</h4>
         <p>If you installed from Google Play (including the closed test), the app checks Play for a newer
-          version each time it opens. When one is available, a banner appears and Settings → Update shows
+          version each time it opens. When one is available, a small grey <em>Update available</em> capsule slides down from the top of the screen and hovers there with an <code>Update</code> button (opens the Play Store page) and a × to hide it until the next launch; Settings → Update shows
           <code>Open in Play Store</code>; the update itself is installed from the Play Store page. If you
           installed the APK directly, there's no automatic check: re-download and install the APK the same way to
           get a newer build — it installs over the existing app and keeps your saved readings, account, and settings.</p>
@@ -537,7 +542,7 @@
       <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. Tap the
         <code>💡 Add LED</code> button beside the reading's title on Main (it reads <code>💡 LED ✓</code> or
         <code>💡 2 LEDs ✓</code> once set), <code>Edit</code> on the Data tab, or the 💡 line on a History row (it shows
-        <code>✎ Edit</code> once LEDs are set). The app may also suggest an LED from the shape of the spectrum; tap
+        <code>✎ Edit</code> once LEDs are set). The app may also suggest an LED from the shape of the spectrum (you can turn this off in Settings → LED suggestions); tap
         <code>Yes</code> to accept it or <code>Other</code> to choose yourself.</p>
       <ul>
         <li>Each LED has a <strong>brand</strong>, a <strong>model</strong> and a <strong>CCT</strong>. Start typing or tap a match from the
@@ -619,6 +624,10 @@
       <p>Two switches, both on by default: <code>Button taps</code> (a short tick when you press a button in the bottom bar and long-press
         labels) and <code>Reading and upload results</code> (a distinct vibration when a reading or upload finishes, and a different one when
         it fails). On iPhone these use the Taptic Engine.</p>
+      <h3>LED suggestions</h3>
+      <p>On by default. After a reading, hCRI.io suggests the LED (brand, model and CCT) from the shape of the spectrum and the reading's
+        title, and you confirm it with one tap. Turn it off to stop those requests and hide the suggestion cards; adding LED details yourself
+        still works. See <a href="#led-details">LED details</a>.</p>
       <h3>Capture flicker with each reading</h3>
       <p>Off by default. Takes one flicker sample with every reading on meters that support it — see
         <a href="#livemodes">Live readings &amp; Flicker</a>.</p>
