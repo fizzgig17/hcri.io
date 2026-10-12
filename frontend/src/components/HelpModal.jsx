@@ -100,12 +100,19 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
   const [listOpen, setListOpen] = useState(false);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const isMobile = useIsMobile(768);
 
   useEffect(() => {
-    fetch('./help_content.json')
-      .then(r => r.json())
+    // Try the page-relative path first, then the site root; only accept a real JSON list (a host that answers with an
+    // HTML page or an error must not leave the "Loading..." screen up).
+    const load = (url) => fetch(url, { cache: 'no-cache' }).then((r) => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then((d) => { if (!Array.isArray(d) || !d.length) throw new Error('empty'); return d; });
+    load('./help_content.json')
+      .catch(() => load('/help_content.json'))
       .then(data => {
         setTopics(data);
         setLoading(false);
@@ -117,7 +124,7 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
           if (ix >= 0) setIndex(ix);
         }
       })
-      .catch(() => setLoading(false));
+      .catch(() => { setLoading(false); setFailed(true); });
   }, []);
 
   useEffect(() => {
@@ -141,9 +148,16 @@ export default function HelpModal({ onClose, initialTitle, initialSlug }) {
   }
 
   if (loading || topics.length === 0) {
+    // Never a dead end: tap anywhere or press Close to leave, even if the topics can't be loaded.
     return (
-      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ color:T.dim, fontFamily:'monospace', fontSize:14 }}>Loading…</div>
+      <div onClick={closeAndClearUrl} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.85)', zIndex:2000, display:'flex', flexDirection:'column', gap:16, alignItems:'center', justifyContent:'center', padding:24, textAlign:'center' }}>
+        <div style={{ color:T.dim, fontFamily:'monospace', fontSize:14 }}>
+          {failed ? 'Help couldn\u2019t be loaded right now. Check your connection and try again.' : 'Loading\u2026'}
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); closeAndClearUrl(); }}
+          style={{ background:T.surface, border:`1px solid ${T.border}`, color:T.text, borderRadius:8, padding:'10px 22px', fontFamily:'monospace', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+          Close
+        </button>
       </div>
     );
   }

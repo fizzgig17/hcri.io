@@ -256,14 +256,13 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
                 style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, width:38, height:34, padding:0, display:'inline-flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box', fontSize:16, cursor:'pointer', color:T.text }}>
                 {themeName==='dark' ? '☀' : '🌙'}
               </button>
-              <button
-                onClick={() => {
-                  try { window.dispatchEvent(new CustomEvent('hcri:openHelp', { detail: { title: null } })); } catch {}
-                }}
+              {/* A plain link to the standalone Help page: it can't hang the app the way the pop-up did for signed-out visitors. */}
+              <a href="/help/" target="_blank" rel="opener"
                 title="New here? Learn more about hCRI.io"
-                style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, width:38, height:34, padding:0, display:'inline-flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box', fontSize:14, fontWeight:700, cursor:'pointer', color:T.text, fontFamily:'monospace' }}>
+                aria-label="Help"
+                style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:8, width:38, height:34, padding:0, display:'inline-flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box', fontSize:14, fontWeight:700, cursor:'pointer', color:T.text, fontFamily:'monospace', textDecoration:'none' }}>
                 ?
-              </button>
+              </a>
             </div>
           </div>
 
