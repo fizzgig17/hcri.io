@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>hCRI Companion</title>
-<meta name="description" content="The Android, iPhone and iPad app that pairs with your Hopoocolor HPCS or Torch Bearer spectrometer and uploads readings straight to hCRI.io.">
+<meta name="description" content="The Android, iPhone and iPad app that pairs with your Hopoocolor HPCS, Torch Bearer or ColorMunki spectrometer and uploads readings straight to hCRI.io.">
 
 <!-- Social share preview (link unfurls in iMessage, Slack, Discord, X,
      Facebook, etc.). og-image.png is a static 1200x630 render matching this
@@ -17,15 +17,15 @@
 <meta property="og:site_name" content="hCRI.io">
 <meta property="og:url" content="https://www.hcri.io/companion/">
 <meta property="og:title" content="hCRI Companion — Bluetooth spectrometer client for hCRI.io">
-<meta property="og:description" content="Connects to your Hopoocolor HPCS or Torch Bearer spectrometer over Bluetooth, reads the full spectrum, and uploads it to hCRI.io in one tap — no cable, no CSV export.">
+<meta property="og:description" content="Connects to your Hopoocolor HPCS, Torch Bearer or ColorMunki spectrometer over Bluetooth, reads the full spectrum, and uploads it to hCRI.io in one tap — no cable, no CSV export.">
 <meta property="og:image" content="https://www.hcri.io/companion/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="hCRI Companion for Android, iPhone &amp; iPad — connects to your Hopoocolor or Torch Bearer meter over Bluetooth and uploads readings to hCRI.io">
+<meta property="og:image:alt" content="hCRI Companion for Android, iPhone &amp; iPad — connects to your Hopoocolor, Torch Bearer or ColorMunki meter over Bluetooth and uploads readings to hCRI.io">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="hCRI Companion — Bluetooth spectrometer client for hCRI.io">
-<meta name="twitter:description" content="Connects to your Hopoocolor HPCS or Torch Bearer spectrometer over Bluetooth, reads the full spectrum, and uploads it to hCRI.io in one tap — no cable, no CSV export.">
+<meta name="twitter:description" content="Connects to your Hopoocolor HPCS, Torch Bearer or ColorMunki spectrometer over Bluetooth, reads the full spectrum, and uploads it to hCRI.io in one tap — no cable, no CSV export.">
 <meta name="twitter:image" content="https://www.hcri.io/companion/og-image.png">
 <meta name="twitter:image:alt" content="hCRI Companion for Android, iPhone &amp; iPad — connects to your Hopoocolor meter over Bluetooth and uploads readings to hCRI.io">
 
@@ -263,7 +263,7 @@
       <div class="eyebrow">Bluetooth spectrometer client</div>
       <h1>Your spectrometer, <span class="accent">wired straight into hCRI.io</span>.</h1>
       <p class="lede">
-        hCRI Companion connects to your Hopoocolor HPCS or Torch Bearer spectrometer over Bluetooth, reads the full spectrum
+        hCRI Companion connects to your Hopoocolor HPCS, Torch Bearer or X-Rite ColorMunki spectrometer over Bluetooth, reads the full spectrum
         off the sensor, and uploads it to your hCRI.io account in one tap — no cable, no CSV
         export, no re-typing numbers off a tiny screen. It runs on Android phones and tablets, iPhone and iPad,
         and it's open for testing on all of them.
@@ -428,7 +428,7 @@
       </div>
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h10v10H7z"/><path d="M4 9h3M4 15h3M17 9h3M17 15h3M9 4v3M15 4v3M9 17v3M15 17v3"/></svg></div>
-        <h3>Torch Bearer support</h3>
+        <h3>Torch Bearer and ColorMunki support</h3>
         <p>Reads the Torch Bearer spectrometer through a small open-source ESP32 bridge, with a built-in
           spectral correction (on by default, switchable in Settings) that lines CCT, Duv and CRI up
           with the HPCS. Also reads the ColorMunki Photo/Design. Needs the bridge — see the <a href="bridge/">bridge setup guide</a>.</p>
@@ -476,7 +476,7 @@
   <section>
     <div class="section-head">
       <div class="eyebrow">Compatibility</div>
-      <h2>Hopoocolor HPCS and Torch Bearer</h2>
+      <h2>Hopoocolor HPCS, Torch Bearer and ColorMunki</h2>
       <p>Each model's own BLE layout is handled on its own terms — the app reads the advertised
         device name and picks the right field map automatically.</p>
     </div>
@@ -487,10 +487,11 @@
       <span class="chip"><span class="k">Model</span> HPCS-330P</span>
       <span class="chip"><span class="k">Model</span> HPCS330Pro</span>
       <span class="chip"><span class="k">Model</span> Torch Bearer (via ESP32 bridge)</span>
+      <span class="chip"><span class="k">Model</span> ColorMunki Photo / Design (via ESP32 bridge)</span>
     </div>
     <div class="card" style="margin-top:22px">
-      <h3>The Torch Bearer needs the hCRI ESP32 bridge</h3>
-      <p>The Torch Bearer has no Bluetooth of its own, so a small LilyGO T-Display S3 board running our
+      <h3>The Torch Bearer and ColorMunki need the hCRI ESP32 bridge</h3>
+      <p>These instruments have no Bluetooth of their own, so a small LilyGO T-Display S3 board running our
         open-source bridge firmware sits between the spectrometer and your phone. The
         <a href="bridge/">ESP32 bridge setup guide</a> lists the exact
         board to buy, how to connect it and how to install the firmware, step by step. It also works with the X-Rite ColorMunki Photo and Design. The Hopoocolor HPCS
@@ -656,7 +657,7 @@
         <ul class="req-list">
           <li>Android 7.0 or newer, or iPhone / iPad with iOS / iPadOS 15.1 or newer</li>
           <li>Bluetooth Low Energy support</li>
-          <li>A Hopoocolor HPCS-series meter, or a Torch Bearer with the <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hCRI ESP32 bridge</a></li>
+          <li>A Hopoocolor HPCS-series meter, or a Torch Bearer or ColorMunki Photo / Design with the <a href="bridge/">hCRI ESP32 bridge</a></li>
         </ul>
       </div>
       <div class="meta-note" style="max-width:34ch;margin:0">
@@ -676,7 +677,7 @@
       <div>
         <h3>Overview</h3>
         <p>hCRI Companion ("the app") is an independent Bluetooth client for Hopoocolor HPCS-series
-          spectrometers and the Torch Bearer (via the open-source ESP32 bridge), built to read spectral data and upload it to your own hCRI.io account. The
+          spectrometers, the Torch Bearer and the ColorMunki (via the open-source ESP32 bridge), built to read spectral data and upload it to your own hCRI.io account. The
           app has no backend server of its own, and does not collect, sell, or share your data with
           any third party. There is no analytics SDK, no advertising SDK, and no crash-reporting
           service built into the app.</p>

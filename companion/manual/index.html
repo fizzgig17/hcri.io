@@ -215,13 +215,19 @@
         up-to-date list (including which models are independently verified against a real captured
         reading) is always on the app's own Settings → About tab.</p>
       <div class="card warn">
-        <h4>The Torch Bearer needs the ESP32 bridge</h4>
-        <p>The Torch Bearer has no Bluetooth of its own. A LilyGO T-Display S3 board running the
-          open-source hCRI bridge firmware connects to it by USB and talks to the app over Bluetooth. The
-          <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hcri-esp32-bridge repository</a> lists the hardware you
-          need and explains how to install the firmware. Hopoocolor HPCS meters connect directly and need
+        <h4>The Torch Bearer and ColorMunki need the ESP32 bridge</h4>
+        <p>The Torch Bearer and the X-Rite ColorMunki Photo / Design have no Bluetooth of their own. A LilyGO T-Display S3 (or S3 Pro) board running the
+          open-source hCRI bridge firmware connects to them by USB and talks to the app over Bluetooth. The
+          <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
+      <h3>What's new in the latest update (Android 2026.10.13.4)</h3>
+      <ul>
+        <li><strong>ColorMunki Photo / Design support</strong> through the ESP32 bridge: ambient readings of the full spectrum, with CCT, Duv, CRI and lux. Calibrate with the dial in the calibration position, then measure in ambient. See <a href="#torchbearer">Using a Torch Bearer</a>.</li>
+        <li><strong>Calibration limit</strong> (Settings → ColorMunki): the app asks for a fresh calibration after a set number of hours (default 1, 0 turns it off), because the sensor's dark reference drifts.</li>
+        <li><strong>Settings reorganised</strong> into sections, with each explanation behind a <code>?</code> button next to the setting.</li>
+        <li>The meter list and header show <code>ColorMunki</code> or <code>Torch Bearer</code> to match the instrument on the bridge, and calibration problems now say "Calibration failed".</li>
+      </ul>
       <h3>What's new in 1.28</h3>
       <ul>
         <li><strong>iPad and tablet layouts.</strong> On a tablet every chart is shown at once: the spectrum, CIE, R1&ndash;R15 and (when the reading has one) flicker. In landscape the big chart sits on the left with the others beside it and History, Data and Settings are a tap away; in portrait the charts sit on top (swipe between them) with History bottom-left and Data bottom-right. There is no tab bar on a tablet: Settings is the cog next to the <code>?</code>.</li>
@@ -650,37 +656,26 @@
 
     <section id="settings">
       <h2><span class="num">13</span> Settings</h2>
+      <p>Settings are grouped into sections. Tap the <code>?</code> in a circle beside any setting for a short explanation of it.</p>
       <h3>hCRI.io account</h3>
       <p>Your username and API token — see <a href="#account">Connecting your hCRI.io account</a> above.</p>
-      <h3>Appearance</h3>
-      <p>Light, Dark, or System (the default) — follows your phone's own light/dark setting unless
-        overridden here.</p>
-      <h3>Feedback (haptics)</h3>
-      <p>Two switches, both on by default: <code>Button taps</code> (a short tick when you press a button in the bottom bar and long-press
-        labels) and <code>Reading and upload results</code> (a distinct vibration when a reading or upload finishes, and a different one when
-        it fails). On iPhone these use the Taptic Engine.</p>
-      <h3>LED suggestions</h3>
-      <p>On by default. After a reading, hCRI.io suggests the LED (brand, model and CCT) from the shape of the spectrum and the reading's
-        title, and you confirm it with one tap. Turn it off to stop those requests and hide the suggestion cards; adding LED details yourself
-        still works. See <a href="#led-details">LED details</a>.</p>
-      <h3>Capture flicker with each reading</h3>
-      <p>Off by default. Takes one flicker sample with every reading on meters that support it — see
-        <a href="#livemodes">Live readings &amp; Flicker</a>.</p>
-      <h3>Stay connected in background</h3>
-      <p><strong>On by default.</strong> Keeps the meter connected when you switch away from the app or
-        lock the screen, so coming back doesn't need a fresh reconnect. Turn this off to disconnect the
-        meter whenever the app isn't in the foreground instead — saves the meter's own battery, at the cost
-        of reconnecting (a few seconds) every time you come back. See
-        <a href="#background">Background &amp; reconnect behavior</a> for the full picture.</p>
-      <h3>Keep screen awake while connected</h3>
-      <p>Prevents the screen from locking during a session with the meter connected. Uses more battery —
-        off by default.</p>
-      <h3>Verbose logging</h3>
-      <p>Adds the full wavelength-by-wavelength and Bluetooth hex detail to the debug log — see
-        <a href="#logs-tab">The Logs tab</a>.</p>
-      <h3>Torch Bearer correction</h3>
-      <p><strong>On by default.</strong> Applies the spectral correction to Torch Bearer readings so CCT, Duv,
-        Ra and R9 agree with the HPCS. Turn it off to see the raw spectrum. Does not affect HPCS meters.</p>
+      <h3>Display</h3>
+      <p>Light, Dark, or System (the default), which follows your phone's own light/dark setting. Also holds the Main Screen Measurements picker (below) and, on Android, LED suggestions and flicker options.</p>
+      <h3>Connection</h3>
+      <p><code>Auto-connect to meter</code> and <code>Stay connected in background</code> are on by default; <code>Keep screen awake</code> is off by default and uses more battery. See
+        <a href="#background">Background &amp; reconnect behavior</a>.</p>
+      <h3>Torch Bearer</h3>
+      <p><code>Spectrum correction</code> is <strong>on by default</strong>. It applies the spectral correction to Torch Bearer readings so CCT, Duv,
+        Ra and R9 agree with the HPCS; turn it off to see the raw spectrum. <code>Flip screen</code> turns the bridge's screen 180°. Neither affects HPCS meters.</p>
+      <h3>ColorMunki</h3>
+      <p><code>Calibration limit (hours)</code>: how old the ColorMunki's calibration may be before the app asks you to calibrate again. The default is 1 hour; 0 turns the check off. The bridge itself still needs one calibration after it powers up.</p>
+      <h3>Readings</h3>
+      <p><code>LED suggestions</code> (on by default): after a reading, hCRI.io suggests the LED from the shape of the spectrum and the reading's title, and you confirm it with one tap. See <a href="#led-details">LED details</a>.
+        <code>Capture flicker with each reading</code> (off by default) takes one flicker sample with every reading on meters that support it; see <a href="#livemodes">Live readings &amp; Flicker</a>.</p>
+      <h3>Feedback</h3>
+      <p>Two switches, both on by default: <code>Button taps</code> (a short tick when you press a button in the bottom bar) and <code>Reading and upload results</code> (a distinct vibration when a reading or upload finishes, and a different one when it fails). On iPhone these use the Taptic Engine.</p>
+      <h3>Troubleshooting</h3>
+      <p><code>Verbose logging</code> adds the full wavelength-by-wavelength and Bluetooth hex detail to the debug log; see <a href="#logs-tab">The Logs tab</a>.</p>
       <h3>Main Screen Measurements</h3>
       <p>Check which measurements show on the Main tab's result card, and hold the <code>⠿</code> handle to
         drag a row and reorder it. <code>Reset to Default</code> restores CCT, Ra, Duv, Lux, Rf, R9, Rg in
@@ -733,6 +728,8 @@
       <h3>Too many sign-in attempts</h3>
       <p>For security, hCRI.io limits repeated failed sign-ins and password-reset requests. If you see
         "Too many attempts", wait about 15 minutes and try again; if you use a saved token, signing in is not needed.</p>
+      <h3>ColorMunki: "Calibrate first", "Calibration failed" or wrong dial</h3>
+      <p>Turn the ColorMunki's dial to the calibration position, keep it still and tap Calibrate. After calibrating, turn the dial to ambient. The app asks again once the time in Settings → ColorMunki has passed. Repeated communication errors usually mean weak USB power: use a power bank on the standard T-Display S3. More in the <a href="../bridge/#troubleshooting">bridge setup guide</a>.</p>
       <h3>A reading looks wrong</h3>
       <p>Double-check the correct meter model connected (shown next to the status dot on Main) — each
         model has its own field layout, and the wrong one can occasionally still connect if its advertised
