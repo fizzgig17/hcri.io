@@ -6,49 +6,102 @@ $appName = 'hCRI.io';
 $contactEmail = 'fizzgig@hcri.io'; // ← change this
 $lastUpdated  = 'June 14, 2026';
 
-// ── Handle deletion form submission ──────────────────────────────────────────
-$message = '';
-$error   = '';
+// ── Account deletion, confirmed by email ─────────────────────────────────────
+// Step 1 (POST email): if the address belongs to an account, mail it a signed one-hour link. The page always answers
+//   the same, so it never reveals whether an address is registered, and nothing is deleted yet.
+// Step 2 (GET ?confirm=...): the link opens a page with a button. (A button, not an automatic delete, so mail scanners
+//   that pre-fetch links cannot trigger it.)
+// Step 3 (POST token): verifies the signature and expiry, then deletes the account and everything it owns.
+require_once __DIR__ . '/api/_core/ratelimit.php';
+require_once __DIR__ . '/api/_core/mailer.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-
-    if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Please enter a valid email address.';
-    } else {
-        // Try to delete from database directly
-        try {
-            require_once __DIR__ . '/api/_core/db.php';
-            $db = get_db();
-
-            $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
-            $stmt->execute([strtolower($email)]);
-            $user = $stmt->fetch();
-
-            if ($user) {
-                // Delete all uploads for this user
-                $rStmt = $db->prepare('SELECT file_name FROM reports WHERE user_id = ?');
-                $rStmt->execute([$user['id']]);
-                $files = $rStmt->fetchAll();
-                foreach ($files as $f) {
-                    if (!empty($f['file_name'])) {
-                        $path = __DIR__ . '/uploads/' . $f['file_name'];
-                        if (file_exists($path)) @unlink($path);
-                    }
-                }
-
-                // Delete user (cascades to reports)
-                $db->prepare('DELETE FROM users WHERE id = ?')->execute([$user['id']]);
-
-                $message = 'success';
-            } else {
-                // Don't reveal whether email exists — same message either way
-                $message = 'success';
-            }
-        } catch (\Throwable $e) {
-            $error = 'An error occurred. Please contact us directly at ' . $contactEmail;
+function del_secret(): string {
+    $s = (string)(getenv('JWT_SECRET') ?: '');
+    return ($s === '' || $s === 'REPLACE_ME') ? '' : 'account-delete|' . $s;
+}
+function del_token(int $uid, string $pwHash, int $exp): string {
+    $sig = hash_hmac('sha256', $uid . '|' . $exp . '|' . substr(hash('sha256', $pwHash), 0, 16), del_secret());
+    return $uid . '.' . $exp . '.' . $sig;
+}
+/** Returns the user id when the token is genuine and unexpired, otherwise null. */
+function del_verify(PDO $db, string $token): ?int {
+    if (del_secret() === '' || !preg_match('/^(\d+)\.(\d+)\.([a-f0-9]{64})$/', $token, $m)) return null;
+    $uid = (int)$m[1]; $exp = (int)$m[2];
+    if ($exp < time()) return null;
+    $s = $db->prepare('SELECT password FROM users WHERE id = ?');
+    $s->execute([$uid]);
+    $pw = $s->fetchColumn();
+    if ($pw === false) return null;
+    return hash_equals(del_token($uid, (string)$pw, $exp), $token) ? $uid : null;
+}
+function del_account(PDO $db, int $uid): void {
+    $rStmt = $db->prepare('SELECT file_name FROM reports WHERE user_id = ?');
+    $rStmt->execute([$uid]);
+    foreach ($rStmt->fetchAll() as $f) {
+        if (!empty($f['file_name'])) {
+            $path = __DIR__ . '/uploads/' . basename($f['file_name']);
+            if (file_exists($path)) @unlink($path);
         }
     }
+    $db->beginTransaction();
+    try {
+        $db->prepare('DELETE FROM report_votes WHERE report_id IN (SELECT id FROM reports WHERE user_id=?)')->execute([$uid]);
+        $db->prepare('DELETE FROM reports WHERE user_id=?')->execute([$uid]);
+        foreach (['flicker_readings', 'api_tokens', 'password_resets'] as $t) {
+            try { $db->prepare("DELETE FROM $t WHERE user_id=?")->execute([$uid]); } catch (\Throwable $e) {}
+        }
+        $db->prepare('DELETE FROM users WHERE id=?')->execute([$uid]);
+        $db->commit();
+    } catch (\Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        throw $e;
+    }
+}
+
+$message = '';   // 'sent' | 'confirm' | 'success'
+$error   = '';
+$token   = '';
+
+try {
+    require_once __DIR__ . '/api/_core/db.php';
+    $db = get_db();
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['token'])) {
+        $uid = del_verify($db, (string)$_POST['token']);
+        if ($uid === null) {
+            $error = 'This deletion link is invalid or has expired. Please request a new one.';
+        } else {
+            del_account($db, $uid);
+            $message = 'success';
+        }
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $email = strtolower(trim($_POST['email'] ?? ''));
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Please enter a valid email address.';
+        } else {
+            $message = 'sent';   // same answer whether or not the address is registered
+            if (rl_count('del_ip', rl_client_ip(), 3600) < 5 && rl_count('del_mail', $email, 3600) < 3 && del_secret() !== '') {
+                rl_hit('del_ip', rl_client_ip(), 3600);
+                rl_hit('del_mail', $email, 3600);
+                $s = $db->prepare('SELECT id, name, password FROM users WHERE email = ?');
+                $s->execute([$email]);
+                if ($u = $s->fetch()) {
+                    $host = preg_match('/^([a-z0-9-]+\.)*hcri\.io$/i', (string)($_SERVER['HTTP_HOST'] ?? '')) ? $_SERVER['HTTP_HOST'] : 'www.hcri.io'; // never trust an arbitrary Host header in an emailed link
+                    $url  = 'https://' . $host . $_SERVER['SCRIPT_NAME'] . '?confirm=' . del_token((int)$u['id'], (string)$u['password'], time() + 3600);
+                    $name = $u['name'] ?: 'there';
+                    try {
+                        send_email($email, $name, 'Confirm deleting your hCRI.io account',
+                            "Hi $name,\n\nSomeone asked to permanently delete your hCRI.io account and all its reports. To confirm, open this link (valid for 1 hour):\n\n$url\n\nIf this wasn't you, ignore this email and nothing will be deleted.\n\nhCRI.io");
+                    } catch (\Throwable $e) { error_log('Account deletion email failed: ' . $e->getMessage()); }
+                }
+            }
+        }
+    } elseif (isset($_GET['confirm'])) {
+        if (del_verify($db, (string)$_GET['confirm']) !== null) { $message = 'confirm'; $token = (string)$_GET['confirm']; }
+        else $error = 'This deletion link is invalid or has expired. Please request a new one.';
+    }
+} catch (\Throwable $e) {
+    $error = 'An error occurred. Please contact us directly at ' . $contactEmail;
 }
 ?><!DOCTYPE html>
 <html lang="en">
@@ -109,14 +162,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <div class="success">
     <div class="icon">✓</div>
-    <h2>Request processed</h2>
-    <p>If an account with that email address existed, it has been permanently deleted along with all associated reports and uploaded files.</p>
+    <h2>Account deleted</h2>
+    <p>Your account, reports and uploaded files have been permanently deleted.</p>
     <p style="margin-top:12px;font-size:13px;color:#6a9ab8">This action cannot be undone. You may register a new account at any time.</p>
+  </div>
+
+  <?php elseif ($message === 'sent'): ?>
+
+  <div class="success">
+    <div class="icon">✉</div>
+    <h2>Check your email</h2>
+    <p>If an account exists for that address, we have sent a confirmation link. It is valid for one hour. Nothing is deleted until you open the link and confirm.</p>
+  </div>
+
+  <?php elseif ($message === 'confirm'): ?>
+
+  <div class="card">
+    <h2>Confirm account deletion</h2>
+    <div class="warning"><p>⚠ This permanently deletes your account, all your reports and uploaded files. It cannot be undone.</p></div>
+    <form method="POST" action="">
+      <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
+      <button type="submit" class="btn">Yes, permanently delete my account</button>
+    </form>
   </div>
 
   <?php else: ?>
 
-  <p>Submitting this form will <strong style="color:#fff">permanently delete</strong> your account and all data associated with it.</p>
+  <p>Confirming deletion will <strong style="color:#fff">permanently delete</strong> your account and all data associated with it.</p>
 
   <p>The following will be removed:</p>
   <ul>
@@ -128,6 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <div class="card">
     <h2>Request account deletion</h2>
+    <p style="font-size:14px">We will email a confirmation link to your account address. Nothing is deleted until you open it.</p>
 
     <div class="warning">
       <p>⚠ This is permanent and cannot be undone. Your data cannot be recovered after deletion.</p>
@@ -145,10 +218,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <div class="confirm-row">
         <input type="checkbox" id="confirm" name="confirm" required>
-        <label for="confirm">I understand this will permanently delete my account and all my data. This cannot be undone.</label>
+        <label for="confirm">I understand deleting my account is permanent and cannot be undone.</label>
       </div>
 
-      <button type="submit" class="btn" id="submit-btn">Delete my account and all data</button>
+      <button type="submit" class="btn" id="submit-btn">Email me a confirmation link</button>
     </form>
 
     <div class="alt">
