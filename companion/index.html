@@ -431,7 +431,7 @@
         <h3>Torch Bearer support</h3>
         <p>Reads the Torch Bearer spectrometer through a small open-source ESP32 bridge, with a built-in
           spectral correction (on by default, switchable in Settings) that lines CCT, Duv and CRI up
-          with the HPCS. Needs the bridge — see Compatibility below.</p>
+          with the HPCS. Also reads the ColorMunki Photo/Design. Needs the bridge — see the <a href="bridge/">bridge setup guide</a>.</p>
       </div>
       <div class="card">
         <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
@@ -492,8 +492,8 @@
       <h3>The Torch Bearer needs the hCRI ESP32 bridge</h3>
       <p>The Torch Bearer has no Bluetooth of its own, so a small LilyGO T-Display S3 board running our
         open-source bridge firmware sits between the spectrometer and your phone. The
-        <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hcri-esp32-bridge repository</a> lists the exact
-        hardware you need and walks through installing the firmware, step by step. The Hopoocolor HPCS
+        <a href="bridge/">ESP32 bridge setup guide</a> lists the exact
+        board to buy, how to connect it and how to install the firmware, step by step. It also works with the X-Rite ColorMunki Photo and Design. The Hopoocolor HPCS
         meters connect directly and need nothing extra.</p>
     </div>
     <div class="card" style="margin-top:14px">

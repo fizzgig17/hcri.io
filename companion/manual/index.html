@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.28 · Last updated October 11, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.28 · Last updated October 13, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -314,7 +314,7 @@
       <ul>
         <li>Android 7.0 (Nougat) or newer, or iOS 15.1 or newer on iPhone</li>
         <li>Bluetooth Low Energy (BLE) support</li>
-        <li>A Hopoocolor HPCS-series meter, powered on and in range — or a Torch Bearer connected to the <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hCRI ESP32 bridge</a> (see <a href="#torchbearer">Using a Torch Bearer</a>)</li>
+        <li>A Hopoocolor HPCS-series meter, powered on and in range — or a Torch Bearer connected to the <a href="../bridge/">hCRI ESP32 bridge</a> (see <a href="#torchbearer">Using a Torch Bearer</a>)</li>
         <li>An hCRI.io account, if you want to upload readings (not required just to take and view them)</li>
       </ul>
     </section>
@@ -412,16 +412,20 @@
 
     <section id="torchbearer">
       <h2><span class="num">06</span> Using a Torch Bearer</h2>
-      <p>The Torch Bearer spectrometer reaches the app through the hCRI ESP32 bridge. You need:</p>
+      <p>The Torch Bearer (and the X-Rite ColorMunki Photo / Design) reaches the app through the hCRI ESP32 bridge,
+        a small LilyGO ESP32-S3 board. You need:</p>
       <ul>
-        <li>a LilyGO T-Display S3 board (the standard version, not the Pro, with 16&nbsp;MB flash)</li>
-        <li>a USB-C OTG cable or adapter with a USB-A socket for the Torch Bearer plus a USB-C socket for power</li>
-        <li>a power bank to run the bridge in the field</li>
-        <li>the Torch Bearer spectrometer, and this app on your phone</li>
+        <li>a LilyGO T-Display-S3 (16&nbsp;MB flash) or T-Display-S3 Pro ("Without Camera")</li>
+        <li>a USB-C OTG adapter with a USB-A socket for the instrument plus a USB-C socket for power</li>
+        <li>a power bank (optional on the Pro, which has its own battery)</li>
+        <li>the instrument, and this app on your phone</li>
       </ul>
-      <p>Full hardware notes, ready-built firmware downloads and the flashing steps are in the
-        <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">hcri-esp32-bridge repository</a>. Once the bridge is flashed
-        and powered, it shows up in the app as <code>Torch Bearer</code> and connects like any other meter.</p>
+      <p>Where to buy the board, how to connect it and how to install the firmware are covered step by step in the
+        <a href="../bridge/">ESP32 bridge setup guide</a>. Once the bridge is flashed and powered, it shows up in the app and connects like any other meter;
+        the header shows <code>Torch Bearer</code> or <code>ColorMunki</code> depending on what is plugged in.</p>
+      <h3>ColorMunki</h3>
+      <p>Turn the dial to calibration and tap Calibrate, then turn to ambient and measure. The app asks for a fresh
+        calibration after the time set in Settings (default 1 hour), because the dark reference drifts. Lux is approximate.</p>
       <h3>Good to know</h3>
       <ul>
         <li>The bridge allows one Bluetooth connection at a time and stops advertising while connected — close
