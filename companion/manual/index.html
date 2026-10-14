@@ -310,7 +310,7 @@
       </ul>
       <h3>What's new in 1.15</h3>
       <ul>
-        <li>Torch Bearer support, with an optional spectral correction (Settings → Torch Bearer correction).</li>
+        <li>Torch Bearer support, with a built-in spectral correction.</li>
         <li>Continuous (Live) readings and Flicker on meters that support them.</li>
         <li>Device scanning, connecting and switching between meters refined a lot.</li>
         <li>History: Share selected readings, a restyled top bar, and a title editor whose Save works on the first tap.</li>
@@ -442,9 +442,9 @@
           other Bluetooth tools (such as nRF Connect) if the app can't see it.</li>
         <li>Its exposure adapts automatically. Hold the sensor about 25&nbsp;cm from the lamp, ideally behind a
           diffuser; very close to a bright source it can saturate.</li>
-        <li><strong>Torch Bearer correction</strong> (Settings, on by default) adjusts the spectrum so CCT,
+        <li><strong>Spectral correction</strong> is built in (the bridge firmware applies it; older firmware relies on the app) and adjusts the spectrum so CCT,
           Duv, Ra and R9 line up with the HPCS. In our checks on five lamps it cut the CCT error from about
-          208&nbsp;K to 36&nbsp;K. Turn it off for the raw spectrum; every shared CSV records whether it was applied.</li>
+          208&nbsp;K to 36&nbsp;K. Every shared CSV records whether it was applied.</li>
         <li>Lux and PAR are not calibrated yet — treat them as approximate (within about 15 percent of an HPCS).</li>
         <li>The Torch Bearer takes single readings; Live and Flicker are not available on it.</li>
       </ul>
@@ -670,9 +670,8 @@
       <h3>Connection</h3>
       <p><code>Auto-connect to meter</code> and <code>Stay connected in background</code> are on by default; <code>Keep screen awake</code> is off by default and uses more battery. See
         <a href="#background">Background &amp; reconnect behavior</a>.</p>
-      <h3>Torch Bearer</h3>
-      <p><code>Spectrum correction</code> is <strong>on by default</strong>. It applies the spectral correction to Torch Bearer readings so CCT, Duv,
-        Ra and R9 agree with the HPCS; turn it off to see the raw spectrum. <code>Flip screen</code> turns the bridge's screen 180°. Neither affects HPCS meters.</p>
+      <h3>Bridge</h3>
+      <p><code>Flip screen</code> turns the hCRI Bridge's screen 180° (for a Torch Bearer or a ColorMunki), so it reads upright the other way round. It takes effect right away while the bridge is connected and needs the latest bridge firmware. It does not affect HPCS meters. The Torch Bearer's spectral correction is applied by the bridge firmware itself, so there is no setting for it.</p>
       <h3>ColorMunki</h3>
       <p><code>Calibration limit (hours)</code>: how old the ColorMunki's calibration may be before the app asks you to calibrate again. The default is 1 hour; 0 turns the check off. The bridge itself still needs one calibration after it powers up.</p>
       <h3>Readings</h3>
