@@ -221,11 +221,13 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.13.6)</h3>
+      <h3>What's new in the latest update (Android 2026.10.14.2)</h3>
       <ul>
         <li><strong>ColorMunki Photo / Design support</strong> through the ESP32 bridge: ambient readings of the full spectrum, with CCT, Duv, CRI and lux. Calibrate with the dial in the calibration position, then measure in ambient. See <a href="#torchbearer">Using a Torch Bearer</a>.</li>
         <li><strong>Calibration limit</strong> (Settings → ColorMunki): the app asks for a fresh calibration after a set number of hours (default 1, 0 turns it off), because the sensor's dark reference drifts.</li>
         <li><strong>Settings reorganised</strong> into sections, with each explanation behind a <code>?</code> button next to the setting.</li>
+        <li><strong>The bridge is now called hCRI Bridge.</strong> Newer bridge firmware advertises as <code>hCRI Bridge</code> instead of Torch Bearer, and its screen says HCRI BRIDGE until an instrument is plugged in. Once connected, the app shows the instrument, Torch Bearer or ColorMunki. Older firmware still works. The no-instrument message is now generic.</li>
+        <li><strong>Galaxy Z Fold8 and other 4:3 unfolded foldables</strong> get the same charts-left, History-and-Data-right layout as the nearly square Fold Ultra, in both orientations.</li>
         <li><strong>TM-30 report: Save image</strong> makes a PNG of the whole report page, and the three action buttons (On a photo, Save image, Share PDF) are now icons with captions. On iPhone the PDF now fills the whole page instead of leaving blank margins.</li>
         <li><strong>Reading names stay in sync:</strong> renaming a reading on Main updates it in History straight away, and renaming it in History updates Main.</li>
         <li>The meter list and header show <code>ColorMunki</code> or <code>Torch Bearer</code> to match the instrument on the bridge, and calibration problems now say "Calibration failed".</li>
@@ -429,8 +431,8 @@
         <li>the instrument, and this app on your phone</li>
       </ul>
       <p>Where to buy the board, how to connect it and how to install the firmware are covered step by step in the
-        <a href="../bridge/">ESP32 bridge setup guide</a>. Once the bridge is flashed and powered, it shows up in the app and connects like any other meter;
-        the header shows <code>Torch Bearer</code> or <code>ColorMunki</code> depending on what is plugged in.</p>
+        <a href="../bridge/">ESP32 bridge setup guide</a>. Once the bridge is flashed and powered, it is listed in the meter picker as <code>hCRI Bridge</code> (older firmware: <code>Torch Bearer</code>) and connects like any other meter;
+        once connected, the header shows <code>Torch Bearer</code> or <code>ColorMunki</code> depending on what is plugged in.</p>
       <h3>ColorMunki</h3>
       <p>Turn the dial to calibration and tap Calibrate, then turn to ambient and measure. The app asks for a fresh
         calibration after the time set in Settings (default 1 hour), because the dark reference drifts. Lux is approximate.</p>
