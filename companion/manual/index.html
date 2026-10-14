@@ -221,8 +221,9 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.14.3)</h3>
+      <h3>What's new in the latest update (Android 2026.10.14.4)</h3>
       <ul>
+        <li><strong>Fix: uploading a second reading no longer overwrites the first.</strong> Taking a new reading and uploading it right after uploading the previous one replaced the earlier report on hCRI.io. Each new reading now gets its own report; uploading the same reading again still updates its report.</li>
         <li><strong>Settings → Bridge.</strong> The Torch Bearer section is now called Bridge and holds <code>Flip screen</code>, which works for both a Torch Bearer and a ColorMunki. The spectrum-correction switch is gone: newer bridge firmware applies the correction itself (older firmware still gets it from the app), so readings always match the HPCS.</li>
         <li><strong>Colour spectrum on the bridge's own screen.</strong> The T-Display S3 draws the spectrum in wavelength colours, and with the correction built in it shows corrected CCT, Duv, Ra and R9 without the app. Needs the latest bridge firmware.</li>
         <li><strong>ColorMunki Photo / Design support</strong> through the ESP32 bridge: ambient readings of the full spectrum, with CCT, Duv, CRI and lux. Calibrate with the dial in the calibration position, then measure in ambient. See <a href="#torchbearer">Using a Torch Bearer</a>.</li>
@@ -580,7 +581,8 @@
       <p>Uploading a reading that was already uploaded <strong>updates that report</strong> rather than creating a
         second copy. The report keeps its ID and link, who can see it, its notes and its LEDs, and takes the new
         title and spectrum. If you deleted the report on hCRI.io, the next upload creates a new one. (A flicker
-        reading attached on the first upload is left as it was.)</p>
+        reading attached on the first upload is left as it was.) A new reading always uploads as a new report of
+        its own; it never replaces the one before it.</p>
       <h3 id="led-details">LED details</h3>
       <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. Tap the
         <code>💡 Add LED</code> button beside the reading's title on Main (it reads <code>💡 LED ✓</code> or
