@@ -221,8 +221,10 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.14.2)</h3>
+      <h3>What's new in the latest update (Android 2026.10.14.3)</h3>
       <ul>
+        <li><strong>Settings → Bridge.</strong> The Torch Bearer section is now called Bridge and holds <code>Flip screen</code>, which works for both a Torch Bearer and a ColorMunki. The spectrum-correction switch is gone: newer bridge firmware applies the correction itself (older firmware still gets it from the app), so readings always match the HPCS.</li>
+        <li><strong>Colour spectrum on the bridge's own screen.</strong> The T-Display S3 draws the spectrum in wavelength colours, and with the correction built in it shows corrected CCT, Duv, Ra and R9 without the app. Needs the latest bridge firmware.</li>
         <li><strong>ColorMunki Photo / Design support</strong> through the ESP32 bridge: ambient readings of the full spectrum, with CCT, Duv, CRI and lux. Calibrate with the dial in the calibration position, then measure in ambient. See <a href="#torchbearer">Using a Torch Bearer</a>.</li>
         <li><strong>Calibration limit</strong> (Settings → ColorMunki): the app asks for a fresh calibration after a set number of hours (default 1, 0 turns it off), because the sensor's dark reference drifts.</li>
         <li><strong>Settings reorganised</strong> into sections, with each explanation behind a <code>?</code> button next to the setting.</li>
