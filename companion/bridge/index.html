@@ -258,15 +258,15 @@
         <li><strong>Attach the adapter</strong><span>Plug the OTG adapter into the board's USB-C port.</span></li>
         <li><strong>Plug in the instrument</strong><span>Put the instrument's USB-A plug into the adapter's female USB-A.</span></li>
         <li><strong>Add power</strong><span>Standard S3: plug the power bank into the adapter's female USB-C. Pro: optional.</span></li>
-        <li><strong>Wait for the screen</strong><span>The board shows which instrument it found ("Torch Bearer" or "ColorMunki") and goes to its ready screen.</span></li>
+        <li><strong>Wait for the screen</strong><span>Until an instrument is plugged in the screen says HCRI BRIDGE with a red NO USB. Once it finds the instrument the header changes to TORCH BEARER or COLORMUNKI and it goes to its ready screen.</span></li>
       </ol>
     </section>
 
     <section id="first">
       <h2><span class="num">06</span> First connection</h2>
       <p>Open hCRI Companion and use the meter picker (the connect button on the Main tab). The bridge appears in the list.
-        Tap it to connect; once connected, the app shows the instrument's name (Torch Bearer or ColorMunki) in the header.</p>
-      <p>The bridge accepts one Bluetooth connection at a time and stops advertising while connected. If the app cannot see it, close other Bluetooth tools (nRF Connect, a second phone) and try again. The bridge's Bluetooth name is always "Torch Bearer", whichever instrument is attached.</p>
+        The bridge is listed as <strong>hCRI Bridge</strong>, because it can't say what is plugged in until you connect (a bridge the app has already seen with a ColorMunki is listed as ColorMunki). Tap it to connect; once connected, the app reads which instrument is attached and shows its name, Torch Bearer or ColorMunki, in the header.</p>
+      <p>The bridge accepts one Bluetooth connection at a time and stops advertising while connected. If the app cannot see it, close other Bluetooth tools (nRF Connect, a second phone) and try again. Firmware from before October 14, 2026 advertises as "Torch Bearer" instead of "hCRI Bridge"; the app accepts both. Reflash to get the new name (see <a href="#updating">Updating the firmware</a>), and update the app first.</p>
     </section>
 
     <section id="colormunki">
