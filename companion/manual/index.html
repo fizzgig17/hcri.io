@@ -221,11 +221,12 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.13.5)</h3>
+      <h3>What's new in the latest update (Android 2026.10.13.6)</h3>
       <ul>
         <li><strong>ColorMunki Photo / Design support</strong> through the ESP32 bridge: ambient readings of the full spectrum, with CCT, Duv, CRI and lux. Calibrate with the dial in the calibration position, then measure in ambient. See <a href="#torchbearer">Using a Torch Bearer</a>.</li>
         <li><strong>Calibration limit</strong> (Settings → ColorMunki): the app asks for a fresh calibration after a set number of hours (default 1, 0 turns it off), because the sensor's dark reference drifts.</li>
         <li><strong>Settings reorganised</strong> into sections, with each explanation behind a <code>?</code> button next to the setting.</li>
+        <li><strong>TM-30 report: Save image</strong> makes a PNG of the whole report page, and the three action buttons (On a photo, Save image, Share PDF) are now icons with captions. On iPhone the PDF now fills the whole page instead of leaving blank margins.</li>
         <li><strong>Reading names stay in sync:</strong> renaming a reading on Main updates it in History straight away, and renaming it in History updates Main.</li>
         <li>The meter list and header show <code>ColorMunki</code> or <code>Torch Bearer</code> to match the instrument on the bridge, and calibration problems now say "Calibration failed".</li>
       </ul>
@@ -562,8 +563,10 @@
         opens the full IES TM-30-18 Color Rendition Report: Rf and Rg, CCT, Duv, Ra, R9 and chromaticity,
         the color vector graphic, the spectrum against its reference illuminant, local chroma shift, hue
         shift and fidelity for the 16 hue bins, and the fidelity of all 99 color samples. Scroll the page
-        (pinch to zoom). The <code>Share PDF</code> button docked at the bottom creates a PDF of the same
-        report and opens your share sheet. The report is calculated on your phone with the same math hCRI.io
+        (pinch to zoom). Three buttons are docked at the bottom, each an icon with a caption:
+        <code>On a photo</code> opens the photo tool, <code>Save image</code> makes a PNG of the full report page
+        (on iPhone choose Save Image in the share sheet to put it in Photos; on Android choose Photos or Files), and
+        <code>Share PDF</code> creates a PDF of the same report and opens your share sheet. The report is calculated on your phone with the same math hCRI.io
         uses, so it needs no upload and no connection.</p>
       <h3>Uploading</h3>
       <p>Tap <code>Upload to hCRI.io</code> to send the current reading. A small green checkmark appears
