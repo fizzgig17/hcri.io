@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.28 · Last updated October 13, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.28 · Last updated October 14, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -221,8 +221,12 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.14.4)</h3>
+      <h3>What's new in the latest update (Android 2026.10.14.5)</h3>
       <ul>
+        <li><strong>Selecting in History works like other apps.</strong> Hold a reading's title (or any part of the row that isn't a button) to start selecting, with that reading already checked and a firm haptic. A <code>Select all</code> checkbox appears at the top, and the X cancels. Unchecking the last reading ends selecting. The old Select button is gone.</li>
+        <li><strong>TM-30 and the photo tool are one screen.</strong> Swipe left on the TM-30 report, or tap <code>Photo</code> at the top right, to see the light on a photo; swipe right below the photo, or tap <code>TM-30</code> at the top left, to go back. The X closes it and returns you to Home or History. The bottom bar holds <code>Save image</code> and <code>Share PDF</code>.</li>
+        <li><strong>A cleaner look.</strong> History has round selection marks, plain titles and soft Copy / Report / TM-30 buttons. Icons across the app are one consistent line style (no more emoji), and every X to close looks the same.</li>
+        <li><strong>Android, light mode:</strong> switches that are off are now clearly visible in Settings.</li>
         <li><strong>Fix: uploading a second reading no longer overwrites the first.</strong> Taking a new reading and uploading it right after uploading the previous one replaced the earlier report on hCRI.io. Each new reading now gets its own report; uploading the same reading again still updates its report.</li>
         <li><strong>Settings → Bridge.</strong> The Torch Bearer section is now called Bridge and holds <code>Flip screen</code>, which works for both a Torch Bearer and a ColorMunki. The spectrum-correction switch is gone: newer bridge firmware applies the correction itself (older firmware still gets it from the app), so readings always match the HPCS.</li>
         <li><strong>Colour spectrum on the bridge's own screen.</strong> The T-Display S3 draws the spectrum in wavelength colours, and with the correction built in it shows corrected CCT, Duv, Ra and R9 without the app. Needs the latest bridge firmware.</li>
@@ -359,7 +363,7 @@
 
       <h3>Option A: Generate a token in the app</h3>
       <ol class="steps">
-        <li><strong>Tap the 🔑 button next to Save</strong><span>Opens the Generate API Token dialog.</span></li>
+        <li><strong>Tap the key button next to Save</strong><span>Opens the Generate API Token dialog.</span></li>
         <li><strong>Enter your hCRI.io username or email, and your password</strong><span>Used once to
           sign in — your password is never stored on the device and never sent anywhere else. The password
           is hidden as you type; tap the eye at the right of the box to check it, and tap again to hide it.</span></li>
@@ -406,7 +410,7 @@
         own, and the Main status line says why.</p>
       <p>Prefer to connect only when you choose to? Turn off <code>Auto-connect to meter</code> in Settings.</p>
       <p>If more than one matching meter is found, a picker appears so you choose which one — look for its
-        advertised name and signal strength. A small <code>⇄ Switch meter</code> icon next to the status
+        advertised name and signal strength. A small <code>Switch meter</code> button (two arrows) next to the status
         row lets you reopen that same list later without a fresh scan. Device switching has been refined a lot
         in 1.15: the list stays current while you look at it, a meter that is momentarily busy is retried
         automatically, and switching to another meter no longer needs a reset.</p>
@@ -568,8 +572,9 @@
         opens the full IES TM-30-18 Color Rendition Report: Rf and Rg, CCT, Duv, Ra, R9 and chromaticity,
         the color vector graphic, the spectrum against its reference illuminant, local chroma shift, hue
         shift and fidelity for the 16 hue bins, and the fidelity of all 99 color samples. Scroll the page
-        (pinch to zoom). Three buttons are docked at the bottom, each an icon with a caption:
-        <code>On a photo</code> opens the photo tool, <code>Save image</code> makes a PNG of the full report page
+        (pinch to zoom). Swipe left, or tap <code>Photo</code> at the top right, to see the light on a photo; swipe
+        right below the photo, or tap <code>TM-30</code> at the top left, to come back. The X closes the report and
+        returns you to Home or History. Two buttons are docked at the bottom: <code>Save image</code> makes a PNG of the full report page
         (on iPhone choose Save Image in the share sheet to put it in Photos; on Android choose Photos or Files), and
         <code>Share PDF</code> creates a PDF of the same report and opens your share sheet. The report is calculated on your phone with the same math hCRI.io
         uses, so it needs no upload and no connection.</p>
@@ -585,9 +590,9 @@
         its own; it never replaces the one before it.</p>
       <h3 id="led-details">LED details</h3>
       <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. Tap the
-        <code>💡 Add LED</code> button beside the reading's title on Main (it reads <code>💡 LED ✓</code> or
-        <code>💡 2 LEDs ✓</code> once set), <code>Edit</code> on the Data tab, or the 💡 line on a History row (it shows
-        <code>✎ Edit</code> once LEDs are set). The app may also suggest an LED from the shape of the spectrum (you can turn this off in Settings → LED suggestions); tap
+        <code>Add LED</code> button (a light bulb) beside the reading's title on Main (it reads <code>LED</code> or
+        <code>2 LEDs</code> with a tick once set), <code>Edit</code> on the Data tab, or the light-bulb line on a History row (it shows
+        <code>Edit</code> once LEDs are set). The app may also suggest an LED from the shape of the spectrum (you can turn this off in Settings → LED suggestions); tap
         <code>Yes</code> to accept it or <code>Other</code> to choose yourself.</p>
       <ul>
         <li>Each LED has a <strong>brand</strong>, a <strong>model</strong> and a <strong>CCT</strong>. Start typing or tap a match from the
@@ -611,7 +616,7 @@
         <li><strong>Upload Title</strong> — type a custom title, or leave it blank to use the
           auto-generated username + timestamp + device label.</li>
         <li><strong>LED</strong> — the brand, model and CCT of each LED in this reading's light (one block per LED), with <code>Edit</code>
-          (or <code>💡 Add LED details</code>) to set them. Available once the reading is saved to History. See <a href="#led-details">LED details</a>.</li>
+          (or <code>Add LED details</code>) to set them. Available once the reading is saved to History. See <a href="#led-details">LED details</a>.</li>
         <li><strong>Upload Preview</strong> — the exact wavelength/value payload about to be sent, so you
           can eyeball the range and point count before it goes anywhere.</li>
         <li><strong>R1–R15</strong>, <strong>Chromaticity</strong>, and <strong>Device Info</strong> —
@@ -630,14 +635,15 @@
           R-values exactly as they looked when it was taken.</li>
         <li><strong>Rename</strong> a reading — renaming before upload sends it to hCRI.io under that new
           title.</li>
-        <li><strong>Re-upload</strong> a reading at any time, including ones already sent — an already-uploaded reading updates its existing hCRI.io report instead of creating a duplicate (a confirmation says <em>Updated</em>). Tap a reading's 💡 LED line (marked <code>✎ Edit</code>) to change its LEDs. Row actions are icons: cloud (upload to hCRI.io), tray (share CSV), eye (view) and trash (delete). A small waveform icon next to the CCT/Ra marks a reading that includes a flicker sample, which goes up with it.</li>
-        <li><strong>TM-30, Copy, Report</strong> — every reading has a <code>◐ TM-30</code> button that opens
+        <li><strong>Re-upload</strong> a reading at any time, including ones already sent — an already-uploaded reading updates its existing hCRI.io report instead of creating a duplicate (a confirmation says <em>Updated</em>). Tap a reading's LED line (marked <code>Edit</code>) to change its LEDs. Row actions are icons: cloud (upload to hCRI.io), tray (share CSV), eye (view) and trash (delete). A small waveform icon next to the CCT/Ra marks a reading that includes a flicker sample, which goes up with it.</li>
+        <li><strong>TM-30, Copy, Report</strong> — every reading has a <code>TM-30</code> button that opens
           its TM-30 report in the app (see <a href="#tm30">The TM-30 report</a>), whether or not it was ever
           uploaded. For a reading that has been uploaded, <code>Copy</code> puts its hCRI.io link on the
-          clipboard and <code>↗ Report</code> opens the report in your browser. For a private report, the
+          clipboard and <code>Report</code> opens the report in your browser. For a private report, the
           first tap creates its share link, which anyone holding the link can open.</li>
-        <li><strong>Select</strong> multiple readings and upload them to hCRI.io in one batch, instead of
-          opening and sending each individually.</li>
+        <li><strong>Select</strong> multiple readings: hold a reading's title to start, with that reading checked. Tap
+          more rows to add them, use <code>Select all</code> at the top, and tap the X to stop. Then upload them to
+          hCRI.io in one batch, share, compare or delete them.</li>
         <li><strong>Share</strong> a single reading, the readings you have selected, or your entire history, as CSV. Shared files end with a short summary of the computed values.</li>
         <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone; a
           copy already uploaded to hCRI.io stays there until you delete it from your account separately.</li>
@@ -686,7 +692,7 @@
       <h3>Troubleshooting</h3>
       <p><code>Verbose logging</code> adds the full wavelength-by-wavelength and Bluetooth hex detail to the debug log; see <a href="#logs-tab">The Logs tab</a>.</p>
       <h3>Main Screen Measurements</h3>
-      <p>Check which measurements show on the Main tab's result card, and hold the <code>⠿</code> handle to
+      <p>Check which measurements show on the Main tab's result card, and hold the dotted handle to
         drag a row and reorder it. <code>Reset to Default</code> restores CCT, Ra, Duv, Lux, Rf, R9, Rg in
         that order.</p>
       <p>On Android, Settings has three tabs at the top: <code>Settings</code>, <code>Update</code> and <code>About</code>, so About is one
