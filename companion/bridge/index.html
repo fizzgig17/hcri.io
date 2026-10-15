@@ -180,7 +180,7 @@
 
   <main>
     <h1 class="doc-title">ESP32 Bridge — Setup Guide</h1>
-    <div class="doc-meta">Last updated October 13, 2026 · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Firmware source on GitHub ↗</a></div>
+    <div class="doc-meta">Last updated October 15, 2026 · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Firmware source on GitHub ↗</a></div>
 
     <section id="what">
       <h2><span class="num">01</span> What the bridge does</h2>
@@ -238,7 +238,7 @@
         <li><strong>Install Python</strong><span>Get it from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> if you don't have it.</span></li>
         <li><strong>Download the program</strong><span><code>hcri_companion_esp32_bridge.py</code> from the prod-latest release page.</span></li>
         <li><strong>Plug the board into your computer</strong><span>Use the board's USB-C port. If the screen is blank and nothing has been flashed, it is already in the right mode.</span></li>
-        <li><strong>Run it</strong><span>Windows: <code>py hcri_companion_esp32_bridge.py</code>. Mac/Linux: <code>python3 hcri_companion_esp32_bridge.py</code>. It finds the port, identifies the board (S3 or S3 Pro), downloads the matching firmware, verifies its checksum and flashes it. To skip all questions: <code>py hcri_companion_esp32_bridge.py --s3 --prod --yes</code> (use <code>--s3pro</code> for the Pro).</span></li>
+        <li><strong>Run it</strong><span>Windows: <code>py hcri_companion_esp32_bridge.py</code>. Mac/Linux: <code>python3 hcri_companion_esp32_bridge.py</code>. It finds the port, identifies the board (S3 or S3 Pro), downloads the matching firmware, verifies its checksum and flashes it. If the board already has exactly that build it says so and leaves it alone; add <code>--force</code> to flash it anyway. To skip all questions: <code>py hcri_companion_esp32_bridge.py --s3 --prod --yes</code> (use <code>--s3pro</code> for the Pro).</span></li>
       </ol>
       <h3>Option B: flash the file by hand</h3>
       <ol class="steps">
@@ -272,14 +272,14 @@
     <section id="colormunki">
       <h2><span class="num">07</span> Using a ColorMunki</h2>
       <ol class="steps">
-        <li><strong>Calibrate</strong><span>Turn the instrument's dial to the <strong>calibration</strong> position (the white tile) and tap Calibrate in the app. This measures the sensor's dark reference.</span></li>
+        <li><strong>Calibrate</strong><span>Turn the instrument's dial to the <strong>calibration</strong> position (the white tile) and tap Calibrate in the app, or press the ColorMunki's button. This measures the sensor's dark reference, for normal and high gain (about 6&nbsp;seconds).</span></li>
         <li><strong>Turn to Ambient</strong><span>Turn the dial to <strong>ambient</strong> (the lamp icon) with the diffuser dome in place. Only ambient mode is used.</span></li>
-        <li><strong>Take a reading</strong><span>Point the instrument at the light and tap the measure button.</span></li>
+        <li><strong>Take a reading</strong><span>Point the instrument at the light and tap the measure button. In dim light the bridge integrates longer and averages several integrations (10–15&nbsp;s); tap the button again to cancel.</span></li>
       </ol>
       <div class="card"><h4>How often to recalibrate</h4>
         <p>The dark reference drifts within tens of minutes. The app can require a fresh calibration after a set time: Settings → ColorMunki → Calibration limit (hours). The default is 1 hour, and 0 turns the check off. After that time the button changes to Recalibrate.</p></div>
       <div class="card warn"><h4>Accuracy</h4>
-        <p>With a fresh calibration, CCT typically agrees with a Hopoocolor HPCS within a few percent and lux within roughly 1 to 12 percent. In very dim light the instrument is noisier, and lux is approximate unless you check it against a reference meter.</p></div>
+        <p>The firmware applies a correction fitted against a Hopoocolor HPCS: on six flashlights (2680–6880&nbsp;K) checked one at a time against a curve fitted on the others, the CCT error averaged about 20&nbsp;K and the Duv error about 0.001. The ColorMunki resolves about 10&nbsp;nm, so very peaky, low-CRI LEDs agree less closely. Lux agrees within roughly 1 to 12 percent. In very dim light the instrument is noisier, and lux is approximate unless you check it against a reference meter.</p></div>
     </section>
 
     <section id="torchbearer">

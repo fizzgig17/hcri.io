@@ -190,7 +190,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.28 · Last updated October 14, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.28 · Last updated October 15, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -221,7 +221,14 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.14.5)</h3>
+      <h3>What's new in the latest update (Android 2026.10.15.1)</h3>
+      <ul>
+        <li><strong>Tap again to cancel a reading.</strong> While a reading or a ColorMunki calibration runs, the main button reads <code>Measuring… Tap to cancel</code> (or <code>Calibrating…</code>); tapping it stops it and nothing is saved. With the latest bridge firmware the ColorMunki stops at its next step.</li>
+        <li><strong>ColorMunki: closer to the HPCS.</strong> The latest bridge firmware applies a correction fitted against an HPCS, which halved the CCT error on lamps it was not fitted on (about 40&nbsp;K to 20&nbsp;K), and shared CSVs say <code>SpectralCorrection,applied</code>. Dim light is handled better: up to 4.5&nbsp;s per integration, several integrations averaged, and the sensor's high-gain mode in near darkness, so dim readings take longer (about 10–15&nbsp;s) but are steadier.</li>
+        <li><strong>The ColorMunki dial stays current.</strong> When you come back to the app it reads the dial again, and a calibration started with the ColorMunki's own button shows <code>Calibrating…</code>.</li>
+        <li>The Logs tab says <code>Bridge</code> instead of <code>Torch Bearer</code> for the bridge connection, notes when the ColorMunki calibration set up high gain, and records the ColorMunki's raw sensor data with each reading (for developing its high-resolution mode).</li>
+      </ul>
+      <h3>Android 2026.10.14.5</h3>
       <ul>
         <li><strong>Selecting in History works like other apps.</strong> Hold a reading's title (or any part of the row that isn't a button) to start selecting, with that reading already checked and a firm haptic. A <code>Select all</code> checkbox appears at the top, and the X cancels. Unchecking the last reading ends selecting. The old Select button is gone.</li>
         <li><strong>TM-30 and the photo tool are one screen.</strong> Swipe left on the TM-30 report, or tap <code>Photo</code> at the top right, to see the light on a photo; swipe right below the photo, or tap <code>TM-30</code> at the top left, to go back. The X closes it and returns you to Home or History. The bottom bar holds <code>Save image</code> and <code>Share PDF</code>.</li>
@@ -443,6 +450,11 @@
       <h3>ColorMunki</h3>
       <p>Turn the dial to calibration and tap Calibrate, then turn to ambient and measure. The app asks for a fresh
         calibration after the time set in Settings (default 1 hour), because the dark reference drifts. Lux is approximate.</p>
+      <p>With the latest bridge firmware a calibration takes about 6&nbsp;seconds, because it also prepares the sensor's
+        high-gain mode for near darkness. Normal readings take a second or two; in dim light the bridge integrates for
+        up to 4.5&nbsp;s and averages several integrations, so a reading can take 10–15&nbsp;s. Tap the main button again to
+        cancel. The bridge applies a correction fitted against an HPCS (CCT within about 20&nbsp;K on the lamps we
+        checked); very peaky, low-CRI LEDs agree less well because the ColorMunki resolves about 10&nbsp;nm.</p>
       <h3>Good to know</h3>
       <ul>
         <li>The bridge allows one Bluetooth connection at a time and stops advertising while connected — close
