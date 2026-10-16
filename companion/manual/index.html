@@ -221,7 +221,12 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.15.1)</h3>
+      <h3>What's new in the latest update (Android 2026.10.15.2)</h3>
+      <ul>
+        <li><strong>ColorMunki: high resolution.</strong> With the latest bridge firmware the ColorMunki reports its spectrum in 3.3&nbsp;nm bands instead of 10&nbsp;nm, so narrow peaks (blue LED, phosphor) come out sharper and closer to the HPCS. It is used automatically in normal light; in very dim light the bridge falls back to the steadier 10&nbsp;nm spectrum. The Logs tab notes <code>high resolution</code>, and a shared CSV's Instrument line says <code>3.3 nm high resolution</code> or <code>10 nm</code>.</li>
+        <li><strong>A message instead of a blank chart.</strong> Before the first reading the Main chart tells you what to do next: connect, calibrate, turn the dial, or take a reading, and shows progress while connecting, calibrating or measuring. The measurement tiles show a dash until there is a reading, and a <code>Last reading</code> link opens the most recent one from History.</li>
+      </ul>
+      <h3>Android 2026.10.15.1</h3>
       <ul>
         <li><strong>Tap again to cancel a reading.</strong> While a reading or a ColorMunki calibration runs, the main button reads <code>Measuring… Tap to cancel</code> (or <code>Calibrating…</code>); tapping it stops it and nothing is saved. With the latest bridge firmware the ColorMunki stops at its next step.</li>
         <li><strong>ColorMunki: closer to the HPCS.</strong> The latest bridge firmware applies a correction fitted against an HPCS, which halved the CCT error on lamps it was not fitted on (about 40&nbsp;K to 20&nbsp;K), and shared CSVs say <code>SpectralCorrection,applied</code>. Dim light is handled better: up to 4.5&nbsp;s per integration, several integrations averaged, and the sensor's high-gain mode in near darkness, so dim readings take longer (about 10–15&nbsp;s) but are steadier.</li>
@@ -453,8 +458,9 @@
       <p>With the latest bridge firmware a calibration takes about 6&nbsp;seconds, because it also prepares the sensor's
         high-gain mode for near darkness. Normal readings take a second or two; in dim light the bridge integrates for
         up to 4.5&nbsp;s and averages several integrations, so a reading can take 10–15&nbsp;s. Tap the main button again to
-        cancel. The bridge applies a correction fitted against an HPCS (CCT within about 20&nbsp;K on the lamps we
-        checked); very peaky, low-CRI LEDs agree less well because the ColorMunki resolves about 10&nbsp;nm.</p>
+        cancel. The bridge applies a correction fitted against an HPCS (CCT within about 17&nbsp;K on the lamps we
+        checked). In normal light it uses the ColorMunki's high-resolution mode (3.3&nbsp;nm bands, an effective
+        resolution of about 4&nbsp;nm instead of 11&nbsp;nm); in very dim light it uses the standard 10&nbsp;nm spectrum.</p>
       <h3>Good to know</h3>
       <ul>
         <li>The bridge allows one Bluetooth connection at a time and stops advertising while connected — close
