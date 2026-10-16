@@ -221,7 +221,12 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.15.2)</h3>
+      <h3>What's new in the latest update (Android 2026.10.16.1)</h3>
+      <ul>
+        <li><strong>Meter data as the makers intend.</strong> The Torch Bearer and the ColorMunki now show the spectrum exactly as the meter reports it, with no correction fitted by us. The Torch Bearer spectrum matches what the open-source tobes-ui software shows (we checked an incandescent and an LED side by side: CCT within 1&nbsp;K, same Ra and R9), and the ColorMunki uses the Argyll / X-Rite factory calibration. Expect CCT, Duv and CRI to differ a little from an HPCS, especially on the Torch Bearer at high CCT. Shared CSVs say <code>SpectralCorrection,none (raw)</code>. Needs the latest bridge firmware; older firmware still applies its old correction and says so.</li>
+        <li><strong>Main button caption.</strong> The text under the main button stays one fixed height, so the chart no longer stretches when you take a reading.</li>
+      </ul>
+      <h3>Android 2026.10.15.2</h3>
       <ul>
         <li><strong>ColorMunki: high resolution.</strong> With the latest bridge firmware the ColorMunki reports its spectrum in 3.3&nbsp;nm bands instead of 10&nbsp;nm, so narrow peaks (blue LED, phosphor) come out sharper and closer to the HPCS. It is used automatically in normal light; in very dim light the bridge falls back to the steadier 10&nbsp;nm spectrum. The Logs tab notes <code>high resolution</code>, and a shared CSV's Instrument line says <code>3.3 nm high resolution</code> or <code>10 nm</code>.</li>
         <li><strong>A message instead of a blank chart.</strong> Before the first reading the Main chart tells you what to do next: connect, calibrate, turn the dial, or take a reading, and shows progress while connecting, calibrating or measuring. The measurement tiles show a dash until there is a reading, and a <code>Last reading</code> link opens the most recent one from History.</li>
@@ -458,8 +463,7 @@
       <p>With the latest bridge firmware a calibration takes about 6&nbsp;seconds, because it also prepares the sensor's
         high-gain mode for near darkness. Normal readings take a second or two; in dim light the bridge integrates for
         up to 4.5&nbsp;s and averages several integrations, so a reading can take 10–15&nbsp;s. Tap the main button again to
-        cancel. The bridge applies a correction fitted against an HPCS (CCT within about 17&nbsp;K on the lamps we
-        checked). In normal light it uses the ColorMunki's high-resolution mode (3.3&nbsp;nm bands, an effective
+        cancel. The spectrum is the ColorMunki's own (Argyll / X-Rite factory calibration), with no correction of ours. In normal light it uses the ColorMunki's high-resolution mode (3.3&nbsp;nm bands, an effective
         resolution of about 4&nbsp;nm instead of 11&nbsp;nm); in very dim light it uses the standard 10&nbsp;nm spectrum.</p>
       <h3>Good to know</h3>
       <ul>
@@ -467,9 +471,7 @@
           other Bluetooth tools (such as nRF Connect) if the app can't see it.</li>
         <li>Its exposure adapts automatically. Hold the sensor about 25&nbsp;cm from the lamp, ideally behind a
           diffuser; very close to a bright source it can saturate.</li>
-        <li><strong>Spectral correction</strong> is built in (the bridge firmware applies it; older firmware relies on the app) and adjusts the spectrum so CCT,
-          Duv, Ra and R9 line up with the HPCS. In our checks on five lamps it cut the CCT error from about
-          208&nbsp;K to 36&nbsp;K. Every shared CSV records whether it was applied.</li>
+        <li><strong>No spectral correction.</strong> The spectrum is shown as the Torch Bearer reports it, the same as the open-source tobes-ui software. It reads a few percent high in CCT next to an HPCS, more so at higher CCT (in our checks up to about 550&nbsp;K at 6700&nbsp;K). Older bridge firmware still applies a fitted correction. Every shared CSV records whether one was applied.</li>
         <li>Lux and PAR are not calibrated yet — treat them as approximate (within about 15 percent of an HPCS).</li>
         <li>The Torch Bearer takes single readings; Live and Flicker are not available on it.</li>
       </ul>
@@ -699,7 +701,7 @@
       <p><code>Auto-connect to meter</code> and <code>Stay connected in background</code> are on by default; <code>Keep screen awake</code> is off by default and uses more battery. See
         <a href="#background">Background &amp; reconnect behavior</a>.</p>
       <h3>Bridge</h3>
-      <p><code>Flip screen</code> turns the hCRI Bridge's screen 180° (for a Torch Bearer or a ColorMunki), so it reads upright the other way round. It takes effect right away while the bridge is connected and needs the latest bridge firmware. It does not affect HPCS meters. The Torch Bearer's spectral correction is applied by the bridge firmware itself, so there is no setting for it.</p>
+      <p><code>Flip screen</code> turns the hCRI Bridge's screen 180° (for a Torch Bearer or a ColorMunki), so it reads upright the other way round. It takes effect right away while the bridge is connected and needs the latest bridge firmware. It does not affect HPCS meters. The Torch Bearer spectrum is sent exactly as the meter reports it, so there is no correction setting.</p>
       <h3>ColorMunki</h3>
       <p><code>Calibration limit (hours)</code>: how old the ColorMunki's calibration may be before the app asks you to calibrate again. The default is 1 hour; 0 turns the check off. The bridge itself still needs one calibration after it powers up.</p>
       <h3>Readings</h3>

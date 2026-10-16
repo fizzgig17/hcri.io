@@ -279,12 +279,12 @@
       <div class="card"><h4>How often to recalibrate</h4>
         <p>The dark reference drifts within tens of minutes. The app can require a fresh calibration after a set time: Settings → ColorMunki → Calibration limit (hours). The default is 1 hour, and 0 turns the check off. After that time the button changes to Recalibrate.</p></div>
       <div class="card warn"><h4>Accuracy</h4>
-        <p>The firmware applies a correction fitted against a Hopoocolor HPCS: on six flashlights (2680–6880&nbsp;K) checked one at a time against a curve fitted on the others, the CCT error averaged about 17&nbsp;K and the Duv error about 0.0008. In normal light the ColorMunki is read in its high-resolution mode (3.3&nbsp;nm bands, about 4&nbsp;nm effective resolution, with its own fitted correction), so narrow peaks agree much more closely than before; in very dim light the firmware uses the steadier standard 10&nbsp;nm spectrum, which smooths very peaky, low-CRI LEDs. Lux agrees within roughly 1 to 12 percent. In very dim light the instrument is noisier, and lux is approximate unless you check it against a reference meter.</p></div>
+        <p>The ColorMunki's spectrum is its own (the Argyll / X-Rite factory calibration), with no correction of ours. On six flashlights (2680–6880&nbsp;K) it agreed with a Hopoocolor HPCS to within about 46&nbsp;K in CCT. In normal light the ColorMunki is read in its high-resolution mode (3.3&nbsp;nm bands, about 4&nbsp;nm effective resolution), so narrow peaks agree much more closely than in the standard mode; in very dim light the firmware uses the steadier standard 10&nbsp;nm spectrum, which smooths very peaky, low-CRI LEDs. The Torch Bearer is sent as it reports it (the same as the open-source tobes-ui software) and reads a few percent high in CCT next to an HPCS at higher CCT. Neither is traceable to a standard. In very dim light the ColorMunki is noisier, and lux is approximate unless you check it against a reference meter.</p></div>
     </section>
 
     <section id="torchbearer">
       <h2><span class="num">08</span> Using a Torch Bearer</h2>
-      <p>Plug it in, connect from the app, and tap the measure button. The bridge applies a spectral correction on the board, which lines CCT, Duv and CRI up with the HPCS. See the
+      <p>Plug it in, connect from the app, and tap the measure button. The bridge sends the spectrum exactly as the Torch Bearer reports it (the same as the open-source tobes-ui software), with no correction added. See the
         <a href="../manual/#torchbearer">manual</a> for the full workflow.</p>
     </section>
 
