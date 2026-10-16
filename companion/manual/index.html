@@ -221,7 +221,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.16.3)</h3>
+      <h3>What's new in the latest update (Android 2026.10.16.4, iOS 1.28)</h3>
+      <ul>
+        <li><strong>The Switch meter list shows what is plugged into each bridge.</strong> With the latest bridge firmware, a bridge says whether a Torch Bearer or a ColorMunki is attached, so the list reads <code>hCRI Bridge · Torch Bearer</code> or <code>hCRI Bridge · ColorMunki</code> before you connect. A bridge with nothing plugged in is left out of the list. If the only bridge in range has nothing plugged in, the app says so instead of reporting that no meter was found. Bridges on older firmware are still listed as before.</li>
+      </ul>
+      <h3>Android 2026.10.16.3</h3>
       <ul>
         <li><strong>Two meters, you choose.</strong> When you open the app fresh and two meters are switched on, it now offers the Switch meter list instead of quietly reconnecting to the last one. Coming back to the app after leaving it still reconnects to the meter you were using.</li>
       </ul>
