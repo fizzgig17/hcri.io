@@ -265,7 +265,7 @@
     <section id="first">
       <h2><span class="num">06</span> First connection</h2>
       <p>Open hCRI Companion and use the meter picker (the connect button on the Main tab). The bridge appears in the list.
-        The bridge is listed as <strong>hCRI Bridge</strong>, because it can't say what is plugged in until you connect (a bridge the app has already seen with a ColorMunki is listed as ColorMunki). Tap it to connect; once connected, the app reads which instrument is attached and shows its name, Torch Bearer or ColorMunki, in the header.</p>
+        The bridge is listed as <strong>hCRI Bridge · Torch Bearer</strong> or <strong>hCRI Bridge · ColorMunki</strong>, because the latest firmware tells the app what is plugged in even before you connect. A bridge with nothing plugged in is left out of the list. Older firmware can't say, so it is listed as plain <strong>hCRI Bridge</strong>. Tap it to connect; once connected, the app reads which instrument is attached and shows its name, Torch Bearer or ColorMunki, in the header.</p>
       <p>The bridge accepts one Bluetooth connection at a time and stops advertising while connected. If the app cannot see it, close other Bluetooth tools (nRF Connect, a second phone) and try again. Firmware from before October 14, 2026 advertises as "Torch Bearer" instead of "hCRI Bridge"; the app accepts both. Reflash to get the new name (see <a href="#updating">Updating the firmware</a>), and update the app first.</p>
     </section>
 
