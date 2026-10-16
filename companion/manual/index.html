@@ -221,7 +221,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.16.1)</h3>
+      <h3>What's new in the latest update (Android 2026.10.16.2)</h3>
+      <ul>
+        <li><strong>Clearer meter names.</strong> Hopoocolor meters show just the model (for example <code>HPCS-330P</code>) on Main and in the Switch meter list, without the serial number. A bridge is always listed as <code>hCRI Bridge</code>, followed by what is plugged into it when known (<code>hCRI Bridge · ColorMunki</code>), so it reads the same whether or not it is the connected one.</li>
+      </ul>
+      <h3>Android 2026.10.16.1</h3>
       <ul>
         <li><strong>Meter data as the makers intend.</strong> The Torch Bearer and the ColorMunki now show the spectrum exactly as the meter reports it, with no correction fitted by us. The Torch Bearer spectrum matches what the open-source tobes-ui software shows (we checked an incandescent and an LED side by side: CCT within 1&nbsp;K, same Ra and R9), and the ColorMunki uses the Argyll / X-Rite factory calibration. Expect CCT, Duv and CRI to differ a little from an HPCS, especially on the Torch Bearer at high CCT. Shared CSVs say <code>SpectralCorrection,none (raw)</code>. Needs the latest bridge firmware; older firmware still applies its old correction and says so.</li>
         <li><strong>Main button caption.</strong> The text under the main button stays one fixed height, so the chart no longer stretches when you take a reading.</li>
