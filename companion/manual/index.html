@@ -221,7 +221,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.16.4, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.17.1, iOS 1.28)</h3>
+      <ul>
+        <li><strong>Calmer start screen.</strong> Only one spinner now shows while connecting, in the middle of the empty chart. The status line above it is just text, and the chart no longer shows a spinner while measuring or calibrating. The <code>Last reading</code> link is now <code>View last reading</code> with an eye icon, so the title is never cut off.</li>
+      </ul>
+      <h3>Android 2026.10.16.4</h3>
       <ul>
         <li><strong>The Switch meter list shows what is plugged into each bridge.</strong> With the latest bridge firmware, a bridge says whether a Torch Bearer or a ColorMunki is attached, so the list reads <code>hCRI Bridge · Torch Bearer</code> or <code>hCRI Bridge · ColorMunki</code> before you connect. A bridge with nothing plugged in is left out of the list. If the only bridge in range has nothing plugged in, the app says so instead of reporting that no meter was found. Bridges on older firmware are still listed as before.</li>
       </ul>
@@ -241,7 +245,7 @@
       <h3>Android 2026.10.15.2</h3>
       <ul>
         <li><strong>ColorMunki: high resolution.</strong> With the latest bridge firmware the ColorMunki reports its spectrum in 3.3&nbsp;nm bands instead of 10&nbsp;nm, so narrow peaks (blue LED, phosphor) come out sharper and closer to the HPCS. It is used automatically in normal light; in very dim light the bridge falls back to the steadier 10&nbsp;nm spectrum. The Logs tab notes <code>high resolution</code>, and a shared CSV's Instrument line says <code>3.3 nm high resolution</code> or <code>10 nm</code>.</li>
-        <li><strong>A message instead of a blank chart.</strong> Before the first reading the Main chart tells you what to do next: connect, calibrate, turn the dial, or take a reading, and shows progress while connecting, calibrating or measuring. The measurement tiles show a dash until there is a reading, and a <code>Last reading</code> link opens the most recent one from History.</li>
+        <li><strong>A message instead of a blank chart.</strong> Before the first reading the Main chart tells you what to do next: connect, calibrate, turn the dial, or take a reading, and shows progress while connecting, calibrating or measuring. The measurement tiles show a dash until there is a reading, and a <code>View last reading</code> link opens the most recent one from History.</li>
       </ul>
       <h3>Android 2026.10.15.1</h3>
       <ul>
