@@ -301,6 +301,12 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/v1/backup') {
+
+        require __DIR__ . '/api/v1_backup.php'; exit;
+
+    }
+
     if ($uri === '/api/v1/led_lists') {
 
         require __DIR__ . '/api/v1_led_lists.php'; exit;

@@ -142,6 +142,7 @@ if ($path === '/delete') {
         try { $db->prepare('DELETE FROM flicker_readings WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}
 
         // Tokens & password-reset rows (tables may not exist on older installs).
+        try { $db->prepare('DELETE FROM companion_backups WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}   // private app backups
         try { $db->prepare('DELETE FROM api_tokens WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}
         try { $db->prepare('DELETE FROM password_resets WHERE user_id=?')->execute([$uid]); } catch (\Throwable $e) {}
 
