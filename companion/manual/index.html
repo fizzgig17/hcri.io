@@ -221,7 +221,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.18.1, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.18.2, iOS 1.28)</h3>
+      <ul>
+        <li><strong>History is more reliable.</strong> Readings and saved flickers are now stored one at a time instead of as a single large block, so a long History can no longer become unreadable or stop new readings from saving (the &ldquo;Not saved to History&rdquo; message). Your existing History is moved over automatically the first time you open the app.</li>
+      </ul>
+      <h3>Android 2026.10.18.1</h3>
       <ul>
         <li><strong>Back up your readings to hCRI.io.</strong> With your API token saved, the app now backs up your reading history and saved flickers to your own hCRI.io account after each change, so reinstalling the app or changing phones no longer loses them. Backed-up data is private to you: it is not a report and nobody else can see it. Readings taken before you sign in are sent once you do. Deleting a reading in the app removes it from the backup too. On a fresh install with your token already saved, the app offers to restore, and <code>Settings → Backup</code> has a <code>Restore readings from backup</code> button. There is a switch to turn backup off.</li>
         <li><strong>Flicker samples are kept.</strong> A <code>New sample</code> on the Flicker page is now saved when it ends, so leaving the page no longer loses it. History has a new <code>Flicker</code> list (switch at the top: <code>Readings</code> / <code>Flicker</code>) where you can rename, view, upload or delete saved samples. A badge shows whether a flicker is <em>In report</em>, <em>In reading</em> or <em>Uploaded to hCRI.io</em>.</li>
