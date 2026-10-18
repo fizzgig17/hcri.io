@@ -47,7 +47,7 @@ function del_account(PDO $db, int $uid): void {
     try {
         $db->prepare('DELETE FROM report_votes WHERE report_id IN (SELECT id FROM reports WHERE user_id=?)')->execute([$uid]);
         $db->prepare('DELETE FROM reports WHERE user_id=?')->execute([$uid]);
-        foreach (['flicker_readings', 'api_tokens', 'password_resets'] as $t) {
+        foreach (['flicker_readings', 'companion_backups', 'api_tokens', 'password_resets'] as $t) {
             try { $db->prepare("DELETE FROM $t WHERE user_id=?")->execute([$uid]); } catch (\Throwable $e) {}
         }
         $db->prepare('DELETE FROM users WHERE id=?')->execute([$uid]);

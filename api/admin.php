@@ -440,6 +440,7 @@ if ($m === 'DELETE' && $userId && $subSection === '') {
     // Reports use ON DELETE CASCADE; reassign to the Anonymous account first to preserve them.
     $db->prepare('UPDATE reports SET user_id = ? WHERE user_id = ?')->execute([$anonId, $userId]);
     try { $db->prepare('DELETE FROM flicker_readings WHERE user_id = ?')->execute([$userId]); } catch (\Throwable $e) {}
+    try { $db->prepare('DELETE FROM companion_backups WHERE user_id = ?')->execute([$userId]); } catch (\Throwable $e) {}
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$userId]);
     json_out(['ok' => true, 'reportsReassigned' => true]);
 }
