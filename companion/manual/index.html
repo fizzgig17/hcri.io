@@ -221,7 +221,14 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.17.1, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.18.1, iOS 1.28)</h3>
+      <ul>
+        <li><strong>Back up your readings to hCRI.io.</strong> With your API token saved, the app now backs up your reading history and saved flickers to your own hCRI.io account after each change, so reinstalling the app or changing phones no longer loses them. Backed-up data is private to you: it is not a report and nobody else can see it. Readings taken before you sign in are sent once you do. Deleting a reading in the app removes it from the backup too. On a fresh install with your token already saved, the app offers to restore, and <code>Settings → Backup</code> has a <code>Restore readings from backup</code> button. There is a switch to turn backup off.</li>
+        <li><strong>Flicker samples are kept.</strong> A <code>New sample</code> on the Flicker page is now saved when it ends, so leaving the page no longer loses it. History has a new <code>Flicker</code> list (switch at the top: <code>Readings</code> / <code>Flicker</code>) where you can rename, view, upload or delete saved samples. A badge shows whether a flicker is <em>In report</em>, <em>In reading</em> or <em>Uploaded to hCRI.io</em>.</li>
+        <li><strong>Add a saved flicker to a reading.</strong> A reading in History that has no flicker gets a lightning-bolt button that lists the saved flickers not yet attached to a reading. Pick one and it is copied into the reading (and sent to the report if the reading was already uploaded).</li>
+        <li><strong>Flicker page fix.</strong> The &ldquo;Ready&rdquo; message no longer covers the flicker controls when there is no spectrum reading.</li>
+      </ul>
+      <h3>Android 2026.10.17.1</h3>
       <ul>
         <li><strong>Calmer start screen.</strong> Only one spinner now shows while connecting, in the middle of the empty chart. The status line above it is just text, and the chart no longer shows a spinner while measuring or calibrating. The <code>Last reading</code> link is now <code>View last reading</code> with an eye icon, so the title is never cut off.</li>
       </ul>
@@ -510,7 +517,8 @@
         <li><strong>New sample</strong> measures flicker on its own, continuously. It
           <em>clears the current reading</em> from Main — a reading that was saved stays in History, a live
           reading you had not saved is gone. When you tap <code>Stop</code> you can <code>Share</code> the
-          sample or <code>Upload flicker</code> it to hCRI.io (see below). A New sample is not added to History.</li>
+          sample or <code>Upload flicker</code> it to hCRI.io (see below). When it ends, a New sample is saved to the
+          <code>Flicker</code> list in History (see <a href="#history-tab">The History tab</a>), where you can attach it to a reading later.</li>
         <li><strong>Add to reading</strong> (shown as <strong>Redo for reading</strong> when the reading
           already has a sample) measures flicker for the reading you just took. The last frame when you tap
           <code>Stop</code> becomes that reading's flicker sample: it is saved with the reading, shown in
@@ -665,6 +673,7 @@
 
     <section id="history-tab">
       <h2><span class="num">11</span> The History tab</h2>
+      <p>A switch at the top chooses between two lists: <code>Readings</code> and <code>Flicker</code> (saved flicker samples, described below).</p>
       <p>Your most recent readings (up to 100), grouped by day, newest first. From here you can:</p>
       <ul>
         <li><strong>View</strong> a past reading's full measurement grid, spectrum, chromaticity, and
@@ -681,9 +690,19 @@
           more rows to add them, use <code>Select all</code> at the top, and tap the X to stop. Then upload them to
           hCRI.io in one batch, share, compare or delete them.</li>
         <li><strong>Share</strong> a single reading, the readings you have selected, or your entire history, as CSV. Shared files end with a short summary of the computed values.</li>
-        <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone; a
-          copy already uploaded to hCRI.io stays there until you delete it from your account separately.</li>
+        <li><strong>Add a saved flicker</strong> to a reading that has none: the lightning-bolt button lists your saved flickers that aren't attached to a reading yet. Pick one and it is copied into the reading, so it is saved and uploaded with it. If the reading was already uploaded, the flicker is also added to its report on hCRI.io. The button only appears when the reading has no flicker and a free saved flicker exists. A reading that has a flicker shows a small waveform icon next to its date; its hint says when the flicker went up with the report.</li>
+        <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone (and from your cloud backup, if backup is on); a
+          copy already uploaded to hCRI.io as a report stays there until you delete it from your account separately.</li>
       </ul>
+      <h3>The Flicker list</h3>
+      <p>Each <code>New sample</code> from the Flicker page is saved here automatically when it ends (up to 100, newest first). A row shows the date, the meter model, the frequency, percent flicker and flicker index. Tap the title to rename it, the eye to view the waveform, the cloud to upload it to hCRI.io on its own, or the bin to delete it. A badge says where it belongs:</p>
+      <ul>
+        <li><strong>In report</strong> — it is attached to a reading that has been uploaded as an hCRI.io report.</li>
+        <li><strong>In reading</strong> — it is attached to a reading that hasn't been uploaded yet; it will go up with that reading. If that reading is deleted, the flicker becomes free again.</li>
+        <li><strong>Uploaded to hCRI.io</strong> — it was sent on its own (a standalone flicker reading on hCRI.io).</li>
+        <li>No badge — it is free, and can be attached to a reading with the lightning-bolt button on the Readings list.</li>
+      </ul>
+      <p>Flickers that were taken for a reading (<code>Add to reading</code>, or <code>Capture flicker with each reading</code>) live inside that reading and aren't listed here.</p>
       <div class="card tip">
         <h4>How many readings are kept</h4>
         <p>History holds your most recent 100 readings. When it is full, the oldest <em>uploaded</em> readings are removed
@@ -716,6 +735,9 @@
       <h3>Connection</h3>
       <p><code>Auto-connect to meter</code> and <code>Stay connected in background</code> are on by default; <code>Keep screen awake</code> is off by default and uses more battery. See
         <a href="#background">Background &amp; reconnect behavior</a>.</p>
+      <h3>Backup</h3>
+      <p><code>Back up readings to hCRI.io</code> (on by default) saves your reading history and your saved flickers to your own hCRI.io account a few seconds after each change, and again when you come back to the app. It needs your API token (see <a href="#account">Connecting your hCRI.io account</a>); with no token saved nothing is sent, and everything not yet backed up goes up once you sign in. Backed-up data is private to you: it is stored apart from your reports and is never shown on any public page. Deleting a reading or a saved flicker in the app removes it from the backup, while readings that only drop off the end of History stay in the backup.</p>
+      <p><code>Restore readings from backup</code> (shown once a token is saved) adds back any readings and saved flickers the app doesn't have, newest first, and never removes or changes anything. History still keeps its usual 100 readings (up to 200 if unuploaded), so a very large backup restores only the most recent. On a fresh install with your token already saved, the app also offers to restore once.</p>
       <h3>Bridge</h3>
       <p><code>Flip screen</code> turns the hCRI Bridge's screen 180° (for a Torch Bearer or a ColorMunki), so it reads upright the other way round. It takes effect right away while the bridge is connected and needs the latest bridge firmware. It does not affect HPCS meters. The Torch Bearer spectrum is sent exactly as the meter reports it, so there is no correction setting.</p>
       <h3>ColorMunki</h3>
@@ -795,9 +817,12 @@
     <section id="privacy">
       <h2><span class="num">16</span> Privacy</h2>
       <p>hCRI Companion doesn't collect, store, or transmit anything about you on its own — no analytics,
-        no tracking, no third-party server in the loop. A reading lives only on your device until you tap
+        no tracking, no third-party server in the loop. A reading lives on your device until you tap
         Upload, which sends it straight to your own hCRI.io account over an encrypted connection and
-        nowhere else. If you use <code>Generate Token</code> in Settings, your password is sent once,
+        nowhere else. If you have saved an API token, the optional <code>Back up readings to hCRI.io</code>
+        setting (on by default, see <a href="#settings">Settings</a>) also keeps a private copy of your reading
+        history and saved flickers in your own hCRI.io account; it isn't a report and nobody else can see it.
+        Turn the setting off and nothing is backed up. If you use <code>Generate Token</code> in Settings, your password is sent once,
         over that same encrypted connection, to sign in and create the token — it's never stored on the
         device. Full details are in the
         <a href="../#privacy-policy">Privacy Policy</a> on the Companion page.</p>
