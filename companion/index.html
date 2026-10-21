@@ -112,6 +112,9 @@
   .btn:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
   .btn.solid{background:var(--accent);color:#060a0f;border-color:var(--accent)}
   .btn.solid:hover{background:#5ce6ff}
+  /* Google Play button: black with a white label, like Google's own badge, so the coloured Play icon stays visible in both themes. */
+  .btn.play,:root[data-theme="light"] .btn.play{background:#000;color:#fff;border-color:#a6a6a6}
+  .btn.play:hover,:root[data-theme="light"] .btn.play:hover{background:#1f1f1f;color:#fff}
   /* Light theme's accent (#005baa) is a mid-dark blue -- dark text loses
      contrast there, so switch to a light label instead. */
   :root[data-theme="light"] .btn.solid{color:#fff}
@@ -269,7 +272,7 @@
         and open for testing on iPhone and iPad.
       </p>
       <div class="cta-row">
-        <a class="btn solid" href="https://play.google.com/store/apps/details?id=com.hcricompanion" target="_blank" rel="noopener">
+        <a class="btn play" href="https://play.google.com/store/apps/details?id=com.hcricompanion" target="_blank" rel="noopener">
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#00d2ff" d="M3.6 2.2c-.3.3-.5.8-.5 1.4v16.8c0 .6.2 1.1.5 1.4l9.4-9.8z"/><path fill="#ffce00" d="M16.2 8.8 13 12l3.2 3.2 3.8-2.2c1.1-.6 1.1-1.7 0-2.3z"/><path fill="#f43249" d="m13 12-9.4 9.8c.4.4 1 .4 1.7.1l10.9-6.1z"/><path fill="#00f076" d="M16.2 8.8 5.3 2.1c-.7-.4-1.300-.3-1.700.1L13 12z"/></svg>
           Get it on Google Play
         </a>
@@ -626,7 +629,7 @@
       <div class="card" style="padding:26px">
         <h3 style="font-size:17px">Android</h3>
         <p style="margin:10px 0 16px;color:var(--dim)">hCRI Companion is on Google Play for Android 7.0 and newer. Install it like any other app, allow Bluetooth when asked, and it updates through Google Play.</p>
-        <a class="btn solid" href="https://play.google.com/store/apps/details?id=com.hcricompanion" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#00d2ff" d="M3.6 2.2c-.3.3-.5.8-.5 1.4v16.8c0 .6.2 1.1.5 1.4l9.4-9.8z"/><path fill="#ffce00" d="M16.2 8.8 13 12l3.2 3.2 3.8-2.2c1.1-.6 1.1-1.7 0-2.3z"/><path fill="#f43249" d="m13 12-9.4 9.8c.4.4 1 .4 1.7.1l10.9-6.1z"/><path fill="#00f076" d="M16.2 8.8 5.3 2.1c-.7-.4-1.300-.3-1.700.1L13 12z"/></svg> Get it on Google Play</a>
+        <a class="btn play" href="https://play.google.com/store/apps/details?id=com.hcricompanion" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#00d2ff" d="M3.6 2.2c-.3.3-.5.8-.5 1.4v16.8c0 .6.2 1.1.5 1.4l9.4-9.8z"/><path fill="#ffce00" d="M16.2 8.8 13 12l3.2 3.2 3.8-2.2c1.1-.6 1.1-1.7 0-2.3z"/><path fill="#f43249" d="m13 12-9.4 9.8c.4.4 1 .4 1.7.1l10.9-6.1z"/><path fill="#00f076" d="M16.2 8.8 5.3 2.1c-.7-.4-1.300-.3-1.700.1L13 12z"/></svg> Get it on Google Play</a>
       </div>
       <div class="card" style="padding:26px">
         <h3 style="font-size:17px">iPhone and iPad</h3>
