@@ -221,8 +221,9 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.18.2, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.22.1, iOS 1.28)</h3>
       <ul>
+        <li><strong>Share card.</strong> The TM-30 report has a new <code>Card</code> button that makes the same one-page summary card as hCRI.io (Rf and Rg, CCT, Duv, Ra, R9, the spectrum, the color vector graphic and the local fidelity bars), using the numbers the app shows for the reading. <code>Save image</code> keeps it (Android: Pictures &rsaquo; hCRI; iPhone: choose Save Image in the share sheet) and <code>Copy image</code> puts it on the clipboard so you can paste it into a message.</li>
         <li><strong>iOS: update notice.</strong> The iPhone app now tells you when a newer production version is available in TestFlight. A banner appears at the top, <code>Settings → Update</code> has a <code>Check for updates</code> button, and either one opens TestFlight so you can install it.</li>
         <li><strong>History is more reliable.</strong> Readings and saved flickers are now stored one at a time instead of as a single large block, so a long History can no longer become unreadable or stop new readings from saving (the &ldquo;Not saved to History&rdquo; message). Your existing History is moved over automatically the first time you open the app.</li>
       </ul>
@@ -269,7 +270,7 @@
       <h3>Android 2026.10.14.5</h3>
       <ul>
         <li><strong>Selecting in History works like other apps.</strong> Hold a reading's title (or any part of the row that isn't a button) to start selecting, with that reading already checked and a firm haptic. A <code>Select all</code> checkbox appears at the top, and the X cancels. Unchecking the last reading ends selecting. The old Select button is gone.</li>
-        <li><strong>TM-30 and the photo tool are one screen.</strong> Swipe left on the TM-30 report, or tap <code>Photo</code> at the top right, to see the light on a photo; swipe right below the photo, or tap <code>TM-30</code> at the top left, to go back. The X closes it and returns you to Home or History. The bottom bar holds <code>Save image</code> and <code>Share PDF</code>.</li>
+        <li><strong>TM-30 and the photo tool are one screen.</strong> Swipe left on the TM-30 report, or tap <code>Photo</code> at the top right, to see the light on a photo; swipe right below the photo, or tap <code>TM-30</code> at the top left, to go back. The X closes it and returns you to Home or History. The bottom bar holds <code>Card</code>, <code>Save image</code> and <code>Share PDF</code>.</li>
         <li><strong>A cleaner look.</strong> History has round selection marks, plain titles and soft Copy / Report / TM-30 buttons. Icons across the app are one consistent line style (no more emoji), and every X to close looks the same.</li>
         <li><strong>Android, light mode:</strong> switches that are off are now clearly visible in Settings.</li>
         <li><strong>Fix: uploading a second reading no longer overwrites the first.</strong> Taking a new reading and uploading it right after uploading the previous one replaced the earlier report on hCRI.io. Each new reading now gets its own report; uploading the same reading again still updates its report.</li>
@@ -623,7 +624,7 @@
         shift and fidelity for the 16 hue bins, and the fidelity of all 99 color samples. Scroll the page
         (pinch to zoom). Swipe left, or tap <code>Photo</code> at the top right, to see the light on a photo; swipe
         right below the photo, or tap <code>TM-30</code> at the top left, to come back. The X closes the report and
-        returns you to Home or History. Two buttons are docked at the bottom: <code>Save image</code> makes a PNG of the full report page
+        returns you to Home or History. Three buttons are docked at the bottom: <code>Card</code> makes the share card (a one-page summary image, as on hCRI.io) that you can save or copy to the clipboard, <code>Save image</code> makes a PNG of the full report page
         (on iPhone choose Save Image in the share sheet to put it in Photos; on Android choose Photos or Files), and
         <code>Share PDF</code> creates a PDF of the same report and opens your share sheet. The report is calculated on your phone with the same math hCRI.io
         uses, so it needs no upload and no connection.</p>
