@@ -1,7 +1,4 @@
 <?php
-// TEMPORARY (to be removed): PHP version check, only with a secret query value.
-if (($_GET['phpv'] ?? '') === '74be3a6c96883ebc') { header('Content-Type: text/plain'); echo 'PHP_VERSION=', PHP_VERSION, "\nSAPI=", php_sapi_name(), "\nupload_progress=", ini_get('session.upload_progress.enabled'), "\nmemory_limit=", ini_get('memory_limit'), "\n"; exit; }
-
 
 
 
