@@ -24,8 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: git fetch + fast-forward on dev server
+        id: deploy
         uses: appleboy/ssh-action@v1
         with:
+          capture_stdout: true
           host: ${{ secrets.SPACESHIP_HOST }}
           port: ${{ secrets.SPACESHIP_PORT }}
           username: ${{ secrets.SPACESHIP_USER }}
@@ -37,3 +39,20 @@ jobs:
             git fetch origin develop
             git merge --ff-only origin/develop
             echo "Deployed $(git rev-parse --short HEAD)"
+
+      # The SSH action reports success even when the host refuses the command (e.g. "Shell access is not enabled on your
+      # account!"), which silently stopped deploys from landing. Fail the run in that case, and if the output doesn't
+      # confirm a deploy.
+      - name: Check the server really deployed
+        env:
+          OUT: ${{ steps.deploy.outputs.stdout }}
+        run: |
+          echo "$OUT"
+          if echo "$OUT" | grep -qi "shell access is not enabled"; then
+            echo "::error::The server refused the deploy: shell access is not enabled on the hosting account."
+            exit 1
+          fi
+          if ! echo "$OUT" | grep -q "^Deployed "; then
+            echo "::error::The server did not confirm a deploy (no 'Deployed <commit>' line in its output)."
+            exit 1
+          fi
