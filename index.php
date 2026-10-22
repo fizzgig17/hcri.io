@@ -569,6 +569,7 @@ header('Content-Type: text/html; charset=utf-8');
 </head>
 
 <body>
+<?php if (($_SERVER['HTTP_HOST'] ?? '') === 'dev.hcri.io') echo '<div style="position:fixed;z-index:99999;top:0;left:0;right:0;background:#ffd400;color:#000;font:700 16px monospace;padding:8px;text-align:center">TEMP: PHP ' . PHP_VERSION . ' / ' . php_sapi_name() . ' / upload_progress=' . ini_get('session.upload_progress.enabled') . '</div>'; ?>
 
 <script>if(new URLSearchParams(location.search).has(`embed`))document.body.classList.add(`embed`);</script>
 
@@ -1149,6 +1150,7 @@ header('Content-Type: text/html; charset=utf-8');
 </head>
 
 <body>
+<?php if (($_SERVER['HTTP_HOST'] ?? '') === 'dev.hcri.io') echo '<div style="position:fixed;z-index:99999;top:0;left:0;right:0;background:#ffd400;color:#000;font:700 16px monospace;padding:8px;text-align:center">TEMP: PHP ' . PHP_VERSION . ' / ' . php_sapi_name() . ' / upload_progress=' . ini_get('session.upload_progress.enabled') . '</div>'; ?>
 
 <div id="root"></div>
 
