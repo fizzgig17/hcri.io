@@ -311,7 +311,7 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
           <div style={{ width:'100%', maxWidth:860, display:'grid', gridTemplateColumns:'1fr', gap: isMobile?16:24, alignItems:'start' }}>
             <div style={cardStyle}>
               <div style={{ display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap' }}>
-                <span style={{ fontSize:15, fontWeight:900, color:T.white }}>Try it free</span>
+                <span style={{ fontSize:15, fontWeight:900, color:T.white }}>Try it free (dev test)</span>
                 <span style={{ fontSize:12, color:T.dim }}>Upload a file for an instant TM‑30 report — not saved.</span>
               </div>
               <div
