@@ -24,8 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: git fetch + fast-forward on dev server
+        id: deploy
         uses: appleboy/ssh-action@v1
         with:
+          capture_stdout: true
           host: ${{ secrets.SPACESHIP_HOST }}
           port: ${{ secrets.SPACESHIP_PORT }}
           username: ${{ secrets.SPACESHIP_USER }}
@@ -37,5 +39,16 @@ jobs:
             git fetch origin develop
             git merge --ff-only origin/develop
             echo "Deployed $(git rev-parse --short HEAD)"
-            # TEMPORARY diagnostic: where this deploy really runs and what it holds, written to the account's home folder
-            { echo "pwd: $(pwd)"; echo "whoami: $(whoami)@$(hostname)"; echo "branch: $(git rev-parse --abbrev-ref HEAD)"; echo "head: $(git rev-parse HEAD)"; echo "origin/develop: $(git rev-parse origin/develop)"; echo "remote: $(git remote get-url origin | sed -E 's#//[^@]*@#//***@#')"; echo "app.js md5: $(md5sum assets/app.js)"; echo "dev test count: $(grep -c 'dev test' assets/app.js)"; echo "time: $(date -u +%FT%TZ)"; } > "$HOME/deploy-diagnostic.txt"
+            # TEMPORARY diagnostic (printed back as a GitHub annotation by the step below)
+            echo "pwd: $(pwd)"; echo "whoami: $(whoami)@$(hostname)"; echo "branch: $(git rev-parse --abbrev-ref HEAD)"; echo "head: $(git rev-parse HEAD)"; echo "origin/develop: $(git rev-parse origin/develop)"; echo "app.js md5: $(md5sum assets/app.js)"; echo "dev test count: $(grep -c 'dev test' assets/app.js)"; echo "php cli: $(php -v | head -1)"
+
+      - name: TEMPORARY report what the server did and what the public site serves
+        if: always()
+        env:
+          OUT: ${{ steps.deploy.outputs.stdout }}
+        run: |
+          PUB=$(curl -s -m 20 https://dev.hcri.io/assets/app.js | grep -c 'dev test' || true)
+          HDR=$(curl -sI -m 20 https://dev.hcri.io/ | tr -d '\r' | grep -i -E '^(HTTP|server|x-powered|x-litespeed|cf-|age|cache-control|x-cache|last-modified|etag)' | tr '\n' ';')
+          MSG="server said: $OUT || public app.js has 'dev test' x${PUB} || headers: ${HDR}"
+          MSG="${MSG//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"
+          echo "::notice title=deploy-report::$MSG"
