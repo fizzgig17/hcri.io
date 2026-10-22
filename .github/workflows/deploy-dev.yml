@@ -37,3 +37,5 @@ jobs:
             git fetch origin develop
             git merge --ff-only origin/develop
             echo "Deployed $(git rev-parse --short HEAD)"
+            # TEMPORARY diagnostic: what the server tree actually holds (read at dev.hcri.io/deploy-info.txt)
+            echo "$(git rev-parse --short HEAD) $(date -u +%FT%TZ) $(md5sum assets/app.js) $(grep -c 'dev test' assets/app.js) $(php -v | head -1)" > deploy-info.txt
