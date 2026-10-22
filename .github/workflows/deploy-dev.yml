@@ -39,16 +39,20 @@ jobs:
             git fetch origin develop
             git merge --ff-only origin/develop
             echo "Deployed $(git rev-parse --short HEAD)"
-            # TEMPORARY diagnostic (printed back as a GitHub annotation by the step below)
-            echo "pwd: $(pwd)"; echo "whoami: $(whoami)@$(hostname)"; echo "branch: $(git rev-parse --abbrev-ref HEAD)"; echo "head: $(git rev-parse HEAD)"; echo "origin/develop: $(git rev-parse origin/develop)"; echo "app.js md5: $(md5sum assets/app.js)"; echo "dev test count: $(grep -c 'dev test' assets/app.js)"; echo "php cli: $(php -v | head -1)"
 
-      - name: TEMPORARY report what the server did and what the public site serves
-        if: always()
+      # The SSH action reports success even when the host refuses the command (e.g. "Shell access is not enabled on your
+      # account!"), which silently stopped deploys from landing. Fail the run in that case, and if the output doesn't
+      # confirm a deploy.
+      - name: Check the server really deployed
         env:
           OUT: ${{ steps.deploy.outputs.stdout }}
         run: |
-          PUB=$(curl -s -m 20 https://dev.hcri.io/assets/app.js | grep -c 'dev test' || true)
-          HDR=$(curl -sI -m 20 https://dev.hcri.io/ | tr -d '\r' | grep -i -E '^(HTTP|server|x-powered|x-litespeed|cf-|age|cache-control|x-cache|last-modified|etag)' | tr '\n' ';')
-          MSG="server said: $OUT || public app.js has 'dev test' x${PUB} || headers: ${HDR}"
-          MSG="${MSG//'%'/'%25'}"; MSG="${MSG//$'\n'/'%0A'}"
-          echo "::notice title=deploy-report::$MSG"
+          echo "$OUT"
+          if echo "$OUT" | grep -qi "shell access is not enabled"; then
+            echo "::error::The server refused the deploy: shell access is not enabled on the hosting account."
+            exit 1
+          fi
+          if ! echo "$OUT" | grep -q "^Deployed "; then
+            echo "::error::The server did not confirm a deploy (no 'Deployed <commit>' line in its output)."
+            exit 1
+          fi
