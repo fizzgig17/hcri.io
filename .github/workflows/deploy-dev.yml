@@ -37,5 +37,5 @@ jobs:
             git fetch origin develop
             git merge --ff-only origin/develop
             echo "Deployed $(git rev-parse --short HEAD)"
-            # TEMPORARY diagnostic: what the server tree actually holds (read at dev.hcri.io/deploy-info.txt)
-            echo "$(git rev-parse --short HEAD) $(date -u +%FT%TZ) $(md5sum assets/app.js) $(grep -c 'dev test' assets/app.js) $(php -v | head -1)" > deploy-info.txt
+            # TEMPORARY diagnostic: where this deploy really runs and what it holds, written to the account's home folder
+            { echo "pwd: $(pwd)"; echo "whoami: $(whoami)@$(hostname)"; echo "branch: $(git rev-parse --abbrev-ref HEAD)"; echo "head: $(git rev-parse HEAD)"; echo "origin/develop: $(git rev-parse origin/develop)"; echo "remote: $(git remote get-url origin | sed -E 's#//[^@]*@#//***@#')"; echo "app.js md5: $(md5sum assets/app.js)"; echo "dev test count: $(grep -c 'dev test' assets/app.js)"; echo "time: $(date -u +%FT%TZ)"; } > "$HOME/deploy-diagnostic.txt"
