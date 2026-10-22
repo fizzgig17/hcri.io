@@ -1,1 +1,0 @@
-<?php header('Content-Type: text/plain'); echo 'PHP_VERSION=', PHP_VERSION, "\nSAPI=", php_sapi_name(), "\nupload_progress=", ini_get('session.upload_progress.enabled'), "\nmemory_limit=", ini_get('memory_limit'), "\n";
