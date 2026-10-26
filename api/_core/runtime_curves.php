@@ -96,6 +96,7 @@ function runtime_curve_normalize(mixed $it): array|string {
 
 /**
  * Reads a wide CSV: the first column is time in minutes, every other column is one light (the header is its label).
+ * Optional rows right under the header start with "#" and give per-light info: #group, #unit, #cct, #duv, #cri, #r9, #r12, #rf, #rg, #tempF.
  * Blank cells at the end of a column are ignored. The interval is the median gap between times.
  * @return array{items:array<int,array>,error:?string}
  */
@@ -107,9 +108,16 @@ function runtime_curves_from_csv(string $csv, string $group = '', string $unit =
     if (count($head) < 2) return ['items' => [], 'error' => 'The CSV needs a time column and at least one light column'];
     $times = [];
     $cols = array_fill(1, count($head) - 1, []);
+    $info = []; // per-light info rows: a first cell like "#group", "#unit", "#cct", "#duv", "#cri", "#r9", "#r12", "#rf", "#rg", "#tempF"
     foreach ($lines as $ln) {
         if (trim($ln) === '') continue;
         $row = str_getcsv($ln, ',', '"', '');
+        if (isset($row[0]) && str_starts_with(trim((string)$row[0]), '#')) {
+            $k = strtolower(trim(substr(trim((string)$row[0]), 1)));
+            if ($k === 'tempf' || $k === 'temp_f') $k = 'tempF';
+            for ($c = 1; $c < count($head); $c++) if (isset($row[$c]) && trim((string)$row[$c]) !== '') $info[$c][$k] = trim((string)$row[$c]);
+            continue;
+        }
         if (!isset($row[0]) || !is_numeric($row[0])) return ['items' => [], 'error' => 'The first column must be time in minutes (numbers)'];
         $times[] = (float)$row[0];
         for ($c = 1; $c < count($head); $c++) $cols[$c][] = $row[$c] ?? '';
@@ -125,7 +133,10 @@ function runtime_curves_from_csv(string $csv, string $group = '', string $unit =
         if ($label === '') continue;
         $vals = $cols[$c];
         while ($vals && trim((string)end($vals)) === '') array_pop($vals);
-        $items[] = ['label' => $label, 'group' => $group, 'unit' => $unit, 'intervalSeconds' => round($interval, 3), 'values' => $vals];
+        $i = $info[$c] ?? [];
+        $meta = [];
+        foreach (['cct', 'duv', 'cri', 'r9', 'r12', 'rf', 'rg', 'tempF'] as $mk) if (isset($i[$mk])) $meta[$mk] = $i[$mk];
+        $items[] = ['label' => $label, 'group' => $i['group'] ?? $group, 'unit' => $i['unit'] ?? $unit, 'intervalSeconds' => round($interval, 3), 'values' => $vals, 'meta' => $meta];
     }
     return ['items' => $items, 'error' => null];
 }

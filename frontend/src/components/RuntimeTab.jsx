@@ -285,7 +285,7 @@ export default function RuntimeTab({ T, isAdmin }) {
       )}
       {showUp && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Re-uploading a light replaces its curve. {JSON_HINT}</div>
+          <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Optional rows under the header starting #group, #unit, #cct, #duv, #cri, #r9, #r12, #rf, #rg, #tempF set each light’s info. Re-uploading a light replaces its curve. {JSON_HINT}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <input style={{ ...input, width: 150 }} placeholder="Group (optional)" value={upGroup} onChange={(e) => setUpGroup(e.target.value)} />
             <input style={{ ...input, width: 110 }} placeholder="Unit, e.g. lm" value={upUnit} onChange={(e) => setUpUnit(e.target.value)} />

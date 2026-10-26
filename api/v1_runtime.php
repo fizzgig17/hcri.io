@@ -10,6 +10,7 @@ declare(strict_types=1);
 //   POST   /api/v1/runtime  {"items":[{"label","group","unit","intervalSeconds","values":[...]}]}   -> {"saved":N,"skipped":[...]}
 //   POST   /api/v1/runtime  (Content-Type: text/csv, or multipart field "file")                      -> {"saved":N,"skipped":[...]}
 //          CSV: first column = minutes, every other column = one light (header = its label).
+//          Optional info rows under the header, first cell "#group", "#unit", "#cct", "#duv", "#cri", "#r9", "#r12", "#rf", "#rg", "#tempF".
 //          Optional query: ?group=<name>&unit=<lumens>
 //          Optional per item: "meta":{"cct","duv","cri","r9","r12","rf","rg","tempF"}. An item with only label + meta updates the readings of an existing curve.
 //   DELETE /api/v1/runtime?id=<id>              -> {"deleted":1}
