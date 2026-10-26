@@ -307,7 +307,7 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
-    if ($uri === '/api/v1/runtime') {
+    if (preg_match('#^/api/(v1/)?runtime/?$#', $uri)) {
 
         require __DIR__ . '/api/v1_runtime.php'; exit;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Private runtime (output-over-time) curves, authenticated by the person's API token.
 //
 //   GET    /api/v1/runtime                      -> {"items":[{"id","label","group","unit","intervalSeconds","points","updatedAt"}], "total":N}
+//   GET    /api/v1/runtime?full=1               -> same list, each item also carrying "values"
 //   GET    /api/v1/runtime?id=<id>              -> {"id","label","group","unit","intervalSeconds","points","values":[...]}
 //   POST   /api/v1/runtime  {"items":[{"label","group","unit","intervalSeconds","values":[...]}]}   -> {"saved":N,"skipped":[...]}
 //   POST   /api/v1/runtime  (Content-Type: text/csv, or multipart field "file")                      -> {"saved":N,"skipped":[...]}
@@ -12,6 +13,7 @@ declare(strict_types=1);
 //          Optional query: ?group=<name>&unit=<lumens>
 //   DELETE /api/v1/runtime?id=<id>              -> {"deleted":1}
 //
+// The same endpoint is also served at /api/runtime for the website (session sign-in instead of an API token).
 // Curves are stored per user and are private to the token's owner. Re-sending a label replaces that curve.
 
 require_once __DIR__ . '/_core/response.php';
@@ -19,13 +21,14 @@ require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/api_token.php';
 require_once __DIR__ . '/_core/ratelimit.php';
 require_once __DIR__ . '/_core/runtime_curves.php';
+require_once __DIR__ . '/_core/auth.php';
 
 cors_headers();
 header('Cache-Control: no-store');
 
 $db   = get_db();
 $user = user_from_api_token($db, api_token_from_request());
-if (!$user) json_error('Invalid or missing API token. Send "Authorization: Bearer <token>".', 401);
+if (!$user) $user = require_auth(); // the website sends its session token instead of an API token
 $uid = (int)$user['id'];
 
 runtime_curves_ensure($db);
@@ -42,12 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         json_out(['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
                   'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'values' => is_array($vals) ? $vals : []]);
     }
-    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, updated_at FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
+    $full = !empty($_GET['full']); // ?full=1 also returns every curve's values (the website uses this)
+    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, updated_at' . ($full ? ', payload' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
     $s->execute([$uid]);
     $items = [];
     foreach ($s->fetchAll() as $r) {
-        $items[] = ['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                    'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'updatedAt' => $r['updated_at']];
+        $row = ['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
+                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'updatedAt' => $r['updated_at']];
+        if ($full) { $v = json_decode((string)$r['payload'], true); $row['values'] = is_array($v) ? $v : []; }
+        $items[] = $row;
     }
     json_out(['items' => $items, 'total' => count($items)]);
 }
