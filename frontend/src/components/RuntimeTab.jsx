@@ -264,7 +264,7 @@ export default function RuntimeTab({ T, isAdmin }) {
   const shown = (list || []).filter((c) => !needle || c.label.toLowerCase().includes(needle) || (c.group || '').toLowerCase().includes(needle));
   const groups = {};
   shown.forEach((c) => { (groups[c.group || 'Ungrouped'] = groups[c.group || 'Ungrouped'] || []).push(c); });
-  const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= 12 ? s : [...s, id]));
+  const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const input = { background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, padding: '6px 10px', fontSize: 13, fontFamily: 'monospace' };
 
   return (
@@ -272,6 +272,7 @@ export default function RuntimeTab({ T, isAdmin }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>Runtime <span style={{ color: T.dim, fontWeight: 400, fontSize: 13 }}>output over time · private to you</span></h2>
         <input style={{ ...input, width: 170 }} placeholder="Search lights…" value={q} onChange={(e) => setQ(e.target.value)} />
+        {shown.length > 0 && <button style={btn('dim')} onClick={() => setSel(shown.every((c) => sel.includes(c.id)) ? [] : shown.map((c) => c.id))}>{shown.every((c) => sel.includes(c.id)) ? 'Clear all' : `Select all (${shown.length})`}</button>}
         <button style={btn('accent')} onClick={() => setShowUp((v) => !v)}>Upload CSV</button>
       </div>
       {isAdmin && (
@@ -304,7 +305,9 @@ export default function RuntimeTab({ T, isAdmin }) {
       )}
       {Object.keys(groups).sort().map((g) => (
         <div key={g} style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 6px' }}>{g} <span style={{ fontWeight: 400 }}>({groups[g].length})</span></div>
+          <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 6px' }}>{g} <span style={{ fontWeight: 400 }}>({groups[g].length})</span>
+            <button onClick={() => { const ids = groups[g].map((c) => c.id); setSel((x) => (ids.every((i) => x.includes(i)) ? x.filter((i) => !ids.includes(i)) : [...new Set([...x, ...ids])])); }}
+              style={{ background: 'none', border: 'none', color: T.accent, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11, marginLeft: 8, textTransform: 'none' }}>select group</button></div>
           {groups[g].map((c) => {
             const on = sel.includes(c.id);
             const st = stats(c);
@@ -330,7 +333,7 @@ export default function RuntimeTab({ T, isAdmin }) {
           <span style={{ fontSize: 13, color: T.dim }}>{sel.length} selected</span>
           <button style={btn('dim')} onClick={() => setSel([])}>Clear</button>
           <button style={btn('bad')} onClick={() => remove(sel)}>Delete</button>
-          <button style={btn('accent', sel.length < 2)} disabled={sel.length < 2} onClick={() => setComparing(true)}>Compare →</button>
+          <button style={btn('accent', sel.length < 2 || sel.length > 12)} disabled={sel.length < 2 || sel.length > 12} title={sel.length > 12 ? 'Compare takes up to 12 lights' : ''} onClick={() => setComparing(true)}>{sel.length > 12 ? 'Compare (max 12)' : 'Compare →'}</button>
         </div>
       )}
     </div>
