@@ -2668,7 +2668,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     tab === 'insights' ? <ExploreStats theme={r} />
     : tab === 'finsights' ? <FilteredInsights q={window.__exploreQ || ''} T={r} heading="Filtered Insights" note="Statistics across every report matching your current Explore filters." />
     : tab === 'flicker' ? <FlickerTab T={r} onOpenReport={(rid) => { window.location.href = window.location.pathname + '?explore=mine&rid=' + rid; }} />
-    : tab === 'runtime' ? <RuntimeTab T={r} />
+    : tab === 'runtime' ? <RuntimeTab T={r} isAdmin={!!(n && n.isAdmin)} />
     : tab === 'myinsights' ? <FilteredInsights q={`userId=${(n && n.id) || 0}`} T={r} heading="My Insights" note="Statistics across your own reports, including private ones." />
     : listingBody;
 

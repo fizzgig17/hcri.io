@@ -101,7 +101,10 @@ function Legend({ curves, T }) {
   );
 }
 
-export default function RuntimeTab({ T }) {
+export default function RuntimeTab({ T, isAdmin }) {
+  const [users, setUsers] = useState([]);
+  const [forUser, setForUser] = useState('');
+  const fu = (url) => (forUser ? url + (url.includes('?') ? '&' : '?') + 'for_user=' + forUser : url);
   const [list, setList] = useState(null);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
@@ -116,8 +119,12 @@ export default function RuntimeTab({ T }) {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
 
-  const load = useCallback(() => api.get('/runtime?full=1').then((d) => { setList(d.items || []); setErr(''); }).catch((e) => setErr(e.message)), []);
+  const load = useCallback(() => api.get(fu('/runtime?full=1')).then((d) => { setList(d.items || []); setErr(''); }).catch((e) => setErr(e.message)), [forUser]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get('/admin/users').then((d) => setUsers(Array.isArray(d) ? d : d.users || [])).catch(() => {});
+  }, [isAdmin]);
   useEffect(() => {
     const on = () => { setRt(rtFromUrl()); setComparing(false); };
     window.addEventListener('popstate', on);
@@ -146,7 +153,7 @@ export default function RuntimeTab({ T }) {
       fd.append('file', file);
       if (upGroup.trim()) fd.append('group', upGroup.trim());
       if (upUnit.trim()) fd.append('unit', upUnit.trim());
-      const r = await api.upload('/runtime', fd);
+      const r = await api.upload(fu('/runtime'), fd);
       setMsg(`Saved ${r.saved} light${r.saved === 1 ? '' : 's'}${r.skipped && r.skipped.length ? `, skipped ${r.skipped.length} (${r.skipped.slice(0, 3).map((s) => `${s.label || '?'}: ${s.reason}`).join('; ')}${r.skipped.length > 3 ? '…' : ''})` : ''}.`);
       setShowUp(false);
       await load();
@@ -156,7 +163,7 @@ export default function RuntimeTab({ T }) {
   const remove = async (ids) => {
     if (!window.confirm(ids.length === 1 ? 'Delete this runtime curve?' : `Delete ${ids.length} runtime curves?`)) return;
     try {
-      for (const id of ids) await api.del('/runtime?id=' + encodeURIComponent(id));
+      for (const id of ids) await api.del(fu('/runtime?id=' + encodeURIComponent(id)));
       setSel((s) => s.filter((x) => !ids.includes(x)));
       setMsg(`Deleted ${ids.length}.`);
       await load();
@@ -241,6 +248,15 @@ export default function RuntimeTab({ T }) {
         <input style={{ ...input, width: 170 }} placeholder="Search lights…" value={q} onChange={(e) => setQ(e.target.value)} />
         <button style={btn('accent')} onClick={() => setShowUp((v) => !v)}>Upload CSV</button>
       </div>
+      {isAdmin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13 }}>
+          <span style={{ color: T.dim }}>Admin: working on</span>
+          <select style={{ ...input, maxWidth: 320 }} value={forUser} onChange={(e) => { setForUser(e.target.value); setList(null); setSel([]); setMsg(''); }}>
+            <option value="">My own curves</option>
+            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}
+          </select>
+        </div>
+      )}
       {showUp && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
           <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Re-uploading a light replaces it.</div>
