@@ -10,6 +10,11 @@ import { api } from '../lib/api';
 import { MARKS, stats, valueAt, timeToFraction, fmtVal, fmtPctV, fmtMin } from '../lib/runtime';
 
 const PALETTE = ['#4aa3ff', '#ff8a3d', '#3dd68c', '#e5539b', '#f2c94c', '#9b7bff', '#2fc4c4', '#ff5d5d', '#a3c43a', '#c08a5a', '#7f8fa6', '#d36bff'];
+const META = [['cct', 'CCT', (v) => `${Math.round(v)} K`], ['duv', 'Duv', (v) => (v > 0 ? '+' : '') + v.toFixed(4)], ['cri', 'CRI Ra', (v) => v.toFixed(1)],
+  ['r9', 'R9', (v) => v.toFixed(1)], ['r12', 'R12', (v) => v.toFixed(1)], ['rf', 'Rf', (v) => v.toFixed(1)], ['rg', 'Rg', (v) => v.toFixed(1)],
+  ['tempF', 'Temp', (v) => `${Math.round(v)} °F`]];
+const JSON_HINT = 'A .json file like {"items":[{"label":"My light","meta":{"cct":5000,"duv":0.001,"cri":95,"r9":90,"rf":93,"rg":101}}]} adds meter readings to lights you already have.';
+const hasMeta = (c) => !!(c.meta && Object.keys(c.meta).length);
 const rtFromUrl = () => { try { return new URLSearchParams(window.location.search).get('rt') || null; } catch { return null; } };
 
 function ticks(lo, hi, n = 5) {
@@ -149,11 +154,18 @@ export default function RuntimeTab({ T, isAdmin }) {
     if (!file) return;
     setBusy(true); setErr(''); setMsg('');
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      if (upGroup.trim()) fd.append('group', upGroup.trim());
-      if (upUnit.trim()) fd.append('unit', upUnit.trim());
-      const r = await api.upload(fu('/runtime'), fd);
+      let r;
+      if (/\.json$/i.test(file.name)) {
+        // JSON: {"items":[{label, meta:{cct,duv,cri,r9,rf,rg,tempF}}]} (readings for lights you already have) or full curves.
+        const j = JSON.parse(await file.text());
+        r = await api.post(fu('/runtime'), Array.isArray(j) ? { items: j } : j);
+      } else {
+        const fd = new FormData();
+        fd.append('file', file);
+        if (upGroup.trim()) fd.append('group', upGroup.trim());
+        if (upUnit.trim()) fd.append('unit', upUnit.trim());
+        r = await api.upload(fu('/runtime'), fd);
+      }
       setMsg(`Saved ${r.saved} light${r.saved === 1 ? '' : 's'}${r.skipped && r.skipped.length ? `, skipped ${r.skipped.length} (${r.skipped.slice(0, 3).map((s) => `${s.label || '?'}: ${s.reason}`).join('; ')}${r.skipped.length > 3 ? '…' : ''})` : ''}.`);
       setShowUp(false);
       await load();
@@ -197,6 +209,18 @@ export default function RuntimeTab({ T, isAdmin }) {
             ))}
           </div>
         )}
+        {hasMeta(c) && (
+          <>
+            <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 6px' }}>Meter readings</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, marginBottom: 14 }}>
+              {META.filter(([k]) => c.meta[k] != null).map(([k, lab, f]) => (
+                <div key={k} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 11, color: T.dim }}>{lab}</div><div style={{ fontWeight: 800, fontSize: 14 }}>{f(c.meta[k])}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <button style={btn('bad')} onClick={() => remove([c.id])}>Delete</button>
       </div>
     );
@@ -217,6 +241,7 @@ export default function RuntimeTab({ T, isAdmin }) {
             <thead><tr style={{ color: T.dim, textAlign: 'right' }}>
               <th style={{ textAlign: 'left', padding: '4px 8px' }}>Light</th><th style={{ padding: '4px 8px' }}>Start</th>
               {MARKS.map((m) => <th key={m} style={{ padding: '4px 8px' }}>@{m} min</th>)}<th style={{ padding: '4px 8px' }}>End</th>
+              {cs.some(hasMeta) && ['CCT', 'Duv', 'Ra', 'R9', 'Rf', 'Rg'].map((h) => <th key={h} style={{ padding: '4px 8px' }}>{h}</th>)}
             </tr></thead>
             <tbody>
               {cs.map((c, k) => { const st = stats(c); return (
@@ -225,6 +250,7 @@ export default function RuntimeTab({ T, isAdmin }) {
                   <td style={{ padding: '5px 8px' }}>{fmtVal(st.start)}</td>
                   {MARKS.map((m) => <td key={m} style={{ padding: '5px 8px' }}>{st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} · ${fmtPctV(st.at[m].pct)}`}</td>)}
                   <td style={{ padding: '5px 8px' }}>{fmtVal(st.end)} · {fmtPctV(st.endPct)}</td>
+                  {cs.some(hasMeta) && ['cct', 'duv', 'cri', 'r9', 'rf', 'rg'].map((k) => { const m = META.find((x) => x[0] === k); return <td key={k} style={{ padding: '5px 8px' }}>{c.meta && c.meta[k] != null ? m[2](c.meta[k]) : '–'}</td>; })}
                 </tr>); })}
             </tbody>
           </table>
@@ -259,12 +285,12 @@ export default function RuntimeTab({ T, isAdmin }) {
       )}
       {showUp && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Re-uploading a light replaces it.</div>
+          <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Re-uploading a light replaces its curve. {JSON_HINT}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <input style={{ ...input, width: 150 }} placeholder="Group (optional)" value={upGroup} onChange={(e) => setUpGroup(e.target.value)} />
             <input style={{ ...input, width: 110 }} placeholder="Unit, e.g. lm" value={upUnit} onChange={(e) => setUpUnit(e.target.value)} />
             <button style={btn('accent', busy)} disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>{busy ? 'Uploading…' : 'Choose file…'}</button>
-            <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={(e) => { upload(e.target.files[0]); e.target.value = ''; }} />
+            <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }} onChange={(e) => { upload(e.target.files[0]); e.target.value = ''; }} />
           </div>
         </div>
       )}
@@ -289,6 +315,7 @@ export default function RuntimeTab({ T, isAdmin }) {
                   <div style={{ fontWeight: 800, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</div>
                   {st && <div style={{ fontSize: 12, color: T.dim, marginTop: 3 }}>
                     {fmtVal(st.start)}{c.unit ? ' ' + c.unit : ''} start · {MARKS.filter((m) => valueAt(c, m) != null && m <= 10).map((m) => `${fmtPctV(st.at[m].pct)} @${m}m`).join(' · ')} · {fmtPctV(st.endPct)} @{Math.round(st.durationMin)}m
+                    {c.meta && c.meta.cct != null ? ` · ${Math.round(c.meta.cct)} K${c.meta.cri != null ? ` · Ra ${c.meta.cri.toFixed(1)}` : ''}` : ''}
                   </div>}
                 </div>
                 <Spark c={c} T={T} />

@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS runtime_curves (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   payload    MEDIUMTEXT NOT NULL,
+  meta       TEXT NULL,
   PRIMARY KEY (user_id, curve_id),
   KEY idx_user_group (user_id, group_name, label),
   CONSTRAINT fk_rc_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
+
+-- Existing installs: ALTER TABLE runtime_curves ADD COLUMN meta TEXT NULL;

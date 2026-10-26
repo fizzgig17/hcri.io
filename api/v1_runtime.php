@@ -11,6 +11,7 @@ declare(strict_types=1);
 //   POST   /api/v1/runtime  (Content-Type: text/csv, or multipart field "file")                      -> {"saved":N,"skipped":[...]}
 //          CSV: first column = minutes, every other column = one light (header = its label).
 //          Optional query: ?group=<name>&unit=<lumens>
+//          Optional per item: "meta":{"cct","duv","cri","r9","r12","rf","rg","tempF"}. An item with only label + meta updates the readings of an existing curve.
 //   DELETE /api/v1/runtime?id=<id>              -> {"deleted":1}
 //
 // The same endpoint is also served at /api/runtime for the website (session sign-in instead of an API token).
@@ -50,21 +51,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (isset($_GET['id'])) {
         $id = $_GET['id'];
         if (!runtime_curve_valid_id($id)) json_error('Bad id', 400);
-        $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, payload FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+        $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, payload, meta FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
         $s->execute([$uid, $id]);
         $r = $s->fetch();
         if (!$r) json_error('Not found', 404);
         $vals = json_decode((string)$r['payload'], true);
         json_out(['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                  'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'values' => is_array($vals) ? $vals : []]);
+                  'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(),
+                  'values' => is_array($vals) ? $vals : []]);
     }
     $full = !empty($_GET['full']); // ?full=1 also returns every curve's values (the website uses this)
-    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, updated_at' . ($full ? ', payload' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
+    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, meta, updated_at' . ($full ? ', payload' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
     $s->execute([$uid]);
     $items = [];
     foreach ($s->fetchAll() as $r) {
         $row = ['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'updatedAt' => $r['updated_at']];
+                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'updatedAt' => $r['updated_at']];
         if ($full) { $v = json_decode((string)$r['payload'], true); $row['values'] = is_array($v) ? $v : []; }
         $items[] = $row;
     }
@@ -108,15 +110,27 @@ $have = (int)$count->fetchColumn();
 
 $exists = $db->prepare('SELECT 1 FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
 $ins = $db->prepare(
-    'INSERT INTO runtime_curves (user_id, curve_id, label, group_name, unit, interval_s, points, payload) VALUES (?,?,?,?,?,?,?,?)
+    'INSERT INTO runtime_curves (user_id, curve_id, label, group_name, unit, interval_s, points, payload, meta) VALUES (?,?,?,?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE label = VALUES(label), group_name = VALUES(group_name), unit = VALUES(unit),
-                             interval_s = VALUES(interval_s), points = VALUES(points), payload = VALUES(payload)'
+                             interval_s = VALUES(interval_s), points = VALUES(points), payload = VALUES(payload),
+                             meta = COALESCE(VALUES(meta), meta)'
 );
+$setMeta = $db->prepare('UPDATE runtime_curves SET meta = ? WHERE user_id = ? AND curve_id = ?');
 
 $saved = 0;
 $skipped = [];
 foreach ($items as $it) {
     $label = is_array($it) ? trim((string)($it['label'] ?? '')) : '';
+    // {"label":..., "meta":{...}} with no values: attach meter readings to a curve that already exists.
+    if (is_array($it) && !isset($it['values']) && isset($it['meta'])) {
+        $mid = runtime_curve_id($label);
+        $exists->execute([$uid, $mid]);
+        if ($label === '' || !$exists->fetchColumn()) { $skipped[] = ['label' => $label, 'reason' => 'no such curve to attach readings to']; continue; }
+        $mm = runtime_meta_clean($it['meta']);
+        $setMeta->execute([$mm ? json_encode($mm) : null, $uid, $mid]);
+        $saved++;
+        continue;
+    }
     $c = runtime_curve_normalize($it);
     if (is_string($c)) { $skipped[] = ['label' => $label, 'reason' => $c]; continue; }
     $id = runtime_curve_id($c['label']);
@@ -125,7 +139,7 @@ foreach ($items as $it) {
     if ($isNew && $have >= RUNTIME_MAX_PER_USER) { $skipped[] = ['label' => $c['label'], 'reason' => 'curve limit reached (' . RUNTIME_MAX_PER_USER . ')']; continue; }
     $json = json_encode($c['values']);
     if ($json === false) { $skipped[] = ['label' => $c['label'], 'reason' => 'values could not be stored']; continue; }
-    $ins->execute([$uid, $id, $c['label'], $c['group'], $c['unit'], $c['interval'], count($c['values']), $json]);
+    $ins->execute([$uid, $id, $c['label'], $c['group'], $c['unit'], $c['interval'], count($c['values']), $json, $c['meta'] ? json_encode($c['meta']) : null]);
     $saved++;
     if ($isNew) $have++;
 }

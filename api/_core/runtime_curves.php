@@ -32,6 +32,22 @@ function runtime_curves_ensure(PDO $db): void {
         try { $db->exec("CREATE TABLE IF NOT EXISTS runtime_curves ($cols, CONSTRAINT fk_rc_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE)"); }
         catch (\Throwable $e) { $db->exec("CREATE TABLE IF NOT EXISTS runtime_curves ($cols)"); }
     } catch (\Throwable $e) { /* no CREATE privilege: run sql/runtime_curves.sql */ }
+    // Older installs: add the optional meter-reading column.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM runtime_curves LIKE 'meta'")->fetch()) $db->exec('ALTER TABLE runtime_curves ADD COLUMN meta TEXT NULL');
+    } catch (\Throwable $e) { /* run sql/runtime_curves.sql */ }
+}
+
+/** Optional meter readings kept with a curve. Unknown keys and non-numeric values are dropped. */
+function runtime_meta_clean(mixed $m): array {
+    $ranges = ['cct' => [500, 50000], 'duv' => [-0.2, 0.2], 'cri' => [-100, 120], 'r9' => [-300, 120], 'r12' => [-300, 120],
+               'rf' => [0, 120], 'rg' => [0, 200], 'tempF' => [-50, 1000]];
+    $out = [];
+    if (!is_array($m)) return $out;
+    foreach ($ranges as $k => [$lo, $hi]) {
+        if (isset($m[$k]) && is_numeric($m[$k]) && (float)$m[$k] >= $lo && (float)$m[$k] <= $hi) $out[$k] = $m[$k] + 0;
+    }
+    return $out;
 }
 
 /** Stable id for a label: a short readable slug plus a hash, so the same label always maps to the same row. */
@@ -74,6 +90,7 @@ function runtime_curve_normalize(mixed $it): array|string {
         'unit'     => mb_substr(trim((string)($it['unit'] ?? '')), 0, 16, 'UTF-8'),
         'interval' => (float)$interval,
         'values'   => $out,
+        'meta'     => runtime_meta_clean($it['meta'] ?? null),
     ];
 }
 
