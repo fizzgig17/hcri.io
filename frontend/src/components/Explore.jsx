@@ -5,7 +5,7 @@
 // single largest component in the app -- the public "Explore" experience,
 // and it also doubles as the signed-in user's "My Reports" library and the
 // site-wide "Insights" dashboards, all driven by one `tab` state value
-// (`browse` | `myreports` | `insights` | `finsights` | `myinsights` | `flicker`).
+// (`browse` | `myreports` | `insights` | `finsights` | `myinsights` | `flicker` | `runtime`).
 // There was no Explore feature at all in the stale frontend/src this
 // replaces -- folders, pinning results while viewing a report, bulk
 // categorize/delete, drag-and-drop folder assignment, the Compare
@@ -102,6 +102,7 @@ import CompareCard from './CompareCard';
 import OverlaySPD from './OverlaySPD';
 import ExploreStats from './ExploreStats';
 import FlickerTab from './FlickerTab';
+import RuntimeTab from './RuntimeTab';
 import QuickFieldsModal from './QuickFieldsModal';
 import AdminPanel from './AdminPanel';
 import { FeedbackModal } from './AuthScreen';
@@ -921,6 +922,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     if (val === 'insights' || val === 'finsights') return val;
     if (val === 'myinsights') return loggedIn ? 'myinsights' : 'browse';
     if (val === 'flicker') return loggedIn ? 'flicker' : 'browse';
+    if (val === 'runtime') return loggedIn ? 'runtime' : 'browse';
     return 'browse';
   };
 
@@ -2514,6 +2516,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     ...(filtersTouched ? [['finsights', 'Filtered Insights']] : []),
     ...(n ? [['myinsights', 'My Insights']] : []),
     ...(n ? [['flicker', 'Flicker']] : []),
+    ...(n ? [['runtime', 'Runtime']] : []),
   ];
   const tabBar = (
     <div style={{ display: 'flex', gap: 4, padding: '0 16px', borderTop: `1px solid ${r.border}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
@@ -2665,6 +2668,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     tab === 'insights' ? <ExploreStats theme={r} />
     : tab === 'finsights' ? <FilteredInsights q={window.__exploreQ || ''} T={r} heading="Filtered Insights" note="Statistics across every report matching your current Explore filters." />
     : tab === 'flicker' ? <FlickerTab T={r} onOpenReport={(rid) => { window.location.href = window.location.pathname + '?explore=mine&rid=' + rid; }} />
+    : tab === 'runtime' ? <RuntimeTab T={r} isAdmin={!!(n && n.isAdmin)} />
     : tab === 'myinsights' ? <FilteredInsights q={`userId=${(n && n.id) || 0}`} T={r} heading="My Insights" note="Statistics across your own reports, including private ones." />
     : listingBody;
 
