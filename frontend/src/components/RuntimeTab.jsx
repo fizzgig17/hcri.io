@@ -5,8 +5,9 @@
 // own chart. Upload a CSV (first column minutes, one column per light) or delete curves. Curves are private to you.
 // History: a light's page is `?explore=runtime&rt=<id>`, so Back and refresh work like the rest of the app.
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { api } from '../lib/api';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 import { MARKS, stats, valueAt, timeToFraction, fmtVal, fmtPctV, fmtMin } from '../lib/runtime';
 
 const PALETTE = ['#4aa3ff', '#ff8a3d', '#3dd68c', '#e5539b', '#f2c94c', '#9b7bff', '#2fc4c4', '#ff5d5d', '#a3c43a', '#c08a5a', '#7f8fa6', '#d36bff'];
@@ -130,15 +131,30 @@ export default function RuntimeTab({ T, isAdmin }) {
     if (!isAdmin) return;
     api.get('/admin/users').then((d) => setUsers(Array.isArray(d) ? d : d.users || [])).catch(() => {});
   }, [isAdmin]);
-  useEffect(() => {
-    const on = () => { setRt(rtFromUrl()); setComparing(false); };
-    window.addEventListener('popstate', on);
-    return () => window.removeEventListener('popstate', on);
-  }, []);
 
-  const push = (extra, url) => { try { window.history.pushState({ hcri: 1, view: 'explore', etab: 'runtime', ...extra }, '', url); } catch { /* history unavailable */ } };
-  const open = (id) => { push({ rt: id }, `${window.location.pathname}?explore=runtime&rt=${encodeURIComponent(id)}`); setRt(id); };
-  const back = () => { push({}, `${window.location.pathname}?explore=runtime`); setRt(null); setComparing(false); };
+  // A light's page and the comparison are "panels": the browser Back button closes them (same mechanism as the report
+  // pages in Explore), so Back never reloads the screen, and the list keeps its scroll position underneath.
+  const rootRef = useRef(null);
+  const savedTop = useRef(0);
+  const scroller = () => {
+    let el = rootRef.current && rootRef.current.parentElement;
+    while (el) { const o = getComputedStyle(el).overflowY; if (o === 'auto' || o === 'scroll') return el; el = el.parentElement; }
+    return null;
+  };
+  const remember = () => { const sc = scroller(); savedTop.current = sc ? sc.scrollTop : 0; };
+  const base = () => window.location.pathname + '?explore=runtime';
+  usePanelBackClose(!!rt, () => setRt(null), () => ({
+    state: { hcri: 1, view: 'explore', etab: 'runtime', rt }, url: `${base()}&rt=${encodeURIComponent(rt)}`,
+    closedState: { hcri: 1, view: 'explore', etab: 'runtime' }, closedUrl: base(),
+  }));
+  usePanelBackClose(comparing, () => setComparing(false));
+  useLayoutEffect(() => {
+    const sc = scroller();
+    if (!sc) return;
+    sc.scrollTop = rt || comparing ? 0 : savedTop.current;
+  }, [rt, comparing]);
+  const open = (id) => { remember(); setRt(id); };
+  const back = () => { setRt(null); setComparing(false); };
 
   const btn = (color = 'accent', off) => ({
     background: `${T[color] || T.accent}20`, border: `1.5px solid ${T[color] || T.accent}`, color: T[color] || T.accent,
@@ -188,11 +204,11 @@ export default function RuntimeTab({ T, isAdmin }) {
   // ── One light ────────────────────────────────────────────────────────────
   if (rt && list) {
     const c = byId[rt];
-    if (!c) return <div style={wrap}><button style={btn('dim')} onClick={back}>← Back to runtime</button><p style={{ color: T.dim }}>That curve no longer exists.</p></div>;
+    if (!c) return <div ref={rootRef} style={wrap}><button style={btn('dim')} onClick={back}>← Back to runtime</button><p style={{ color: T.dim }}>That curve no longer exists.</p></div>;
     const st = stats(c);
     const t90 = timeToFraction(c, 0.9), t50 = timeToFraction(c, 0.5);
     return (
-      <div style={wrap}>
+      <div ref={rootRef} style={wrap}>
         <button style={{ ...btn('dim'), marginBottom: 14 }} onClick={back}>← Back to runtime</button>
         <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>{c.label}</h2>
         <div style={{ color: T.dim, fontSize: 12, marginBottom: 12 }}>{c.group || 'Ungrouped'} · {c.points} samples every {+c.intervalSeconds.toFixed(2)} s · {fmtMin(st && st.durationMin)}</div>
@@ -230,7 +246,7 @@ export default function RuntimeTab({ T, isAdmin }) {
   if (comparing) {
     const cs = sel.map((id) => byId[id]).filter(Boolean);
     return (
-      <div style={wrap}>
+      <div ref={rootRef} style={wrap}>
         <button style={{ ...btn('dim'), marginBottom: 14 }} onClick={() => setComparing(false)}>← Back to runtime</button>
         <h2 style={{ margin: '0 0 10px', fontSize: 18 }}>Compare runtime <span style={{ color: T.dim, fontWeight: 400 }}>({cs.length})</span></h2>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', 'Absolute')}</div>
@@ -268,7 +284,7 @@ export default function RuntimeTab({ T, isAdmin }) {
   const input = { background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, padding: '6px 10px', fontSize: 13, fontFamily: 'monospace' };
 
   return (
-    <div style={wrap}>
+    <div ref={rootRef} style={wrap}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>Runtime <span style={{ color: T.dim, fontWeight: 400, fontSize: 13 }}>output over time · private to you</span></h2>
         <input style={{ ...input, width: 170 }} placeholder="Search lights…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -333,7 +349,7 @@ export default function RuntimeTab({ T, isAdmin }) {
           <span style={{ fontSize: 13, color: T.dim }}>{sel.length} selected</span>
           <button style={btn('dim')} onClick={() => setSel([])}>Clear</button>
           <button style={btn('bad')} onClick={() => remove(sel)}>Delete</button>
-          <button style={btn('accent', sel.length < 2 || sel.length > 12)} disabled={sel.length < 2 || sel.length > 12} title={sel.length > 12 ? 'Compare takes up to 12 lights' : ''} onClick={() => setComparing(true)}>{sel.length > 12 ? 'Compare (max 12)' : 'Compare →'}</button>
+          <button style={btn('accent', sel.length < 2 || sel.length > 12)} disabled={sel.length < 2 || sel.length > 12} title={sel.length > 12 ? 'Compare takes up to 12 lights' : ''} onClick={() => { remember(); setComparing(true); }}>{sel.length > 12 ? 'Compare (max 12)' : 'Compare →'}</button>
         </div>
       )}
     </div>

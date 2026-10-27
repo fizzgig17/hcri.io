@@ -1057,6 +1057,9 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     };
   });
   usePanelBackClose(comparing, () => setComparing(false));
+  // The comparison's Share Card and its opened-report overlay close with the browser Back button too.
+  usePanelBackClose(!!cmpCardUrl, () => setCmpCardUrl(null));
+  usePanelBackClose(!!cmpFull, () => setCmpFull(null));
   usePanelBackClose(catModalOpen, () => setCatModalOpen(false));
   usePanelBackClose(mrPasteOpen, () => setMrPasteOpen(false));
   usePanelBackClose(adminOpen, () => setAdminOpen(false));
@@ -1625,6 +1628,8 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     if (cmpSel.length < 2) return;
     setComparing(true);
     setCmpView('cards');
+    setCmpCardUrl(null);
+    setCmpFull(null);
     setCmpBusy(true);
     try {
       const ds = await Promise.all(cmpSel.map(async (r0) => {
