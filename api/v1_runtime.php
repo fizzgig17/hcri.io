@@ -13,6 +13,9 @@ declare(strict_types=1);
 //          Optional info rows under the header, first cell "#group", "#unit", "#cct", "#duv", "#cri", "#r9", "#r12", "#rf", "#rg", "#tempF".
 //          Optional query: ?group=<name>&unit=<lumens>
 //          Optional per item: "meta":{"cct","duv","cri","r9","r12","rf","rg","tempF"}. An item with only label + meta updates the readings of an existing curve.
+//   POST   /api/v1/runtime?share=<id>           -> {"shareToken":"..."}  (makes or reuses the curve's share link token)
+//   POST   /api/v1/runtime?unshare=<id>         -> {"shareToken":null}   (stops sharing; old links stop working)
+//   POST   /api/v1/runtime?trim=<id>            -> {"trimmed":N,"points":M}  (drops the near-dark readings before the light came on)
 //   DELETE /api/v1/runtime?id=<id>              -> {"deleted":1}
 //
 // The same endpoint is also served at /api/runtime for the website (session sign-in instead of an API token).
@@ -52,22 +55,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (isset($_GET['id'])) {
         $id = $_GET['id'];
         if (!runtime_curve_valid_id($id)) json_error('Bad id', 400);
-        $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, payload, meta FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+        $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, payload, meta, share_token FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
         $s->execute([$uid, $id]);
         $r = $s->fetch();
         if (!$r) json_error('Not found', 404);
         $vals = json_decode((string)$r['payload'], true);
         json_out(['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                  'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(),
+                  'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'shareToken' => $r['share_token'] ?? null,
                   'values' => is_array($vals) ? $vals : []]);
     }
     $full = !empty($_GET['full']); // ?full=1 also returns every curve's values (the website uses this)
-    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, meta, updated_at' . ($full ? ', payload' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
+    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, meta, share_token, updated_at' . ($full ? ', payload' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
     $s->execute([$uid]);
     $items = [];
     foreach ($s->fetchAll() as $r) {
         $row = ['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'updatedAt' => $r['updated_at']];
+                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'shareToken' => $r['share_token'] ?? null, 'updatedAt' => $r['updated_at']];
         if ($full) { $v = json_decode((string)$r['payload'], true); $row['values'] = is_array($v) ? $v : []; }
         $items[] = $row;
     }
@@ -83,6 +86,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Method not allowed', 405);
+
+if (isset($_GET['trim'])) {
+    $tid = $_GET['trim'];
+    if (!runtime_curve_valid_id($tid)) json_error('Bad id', 400);
+    $q = $db->prepare('SELECT interval_s, payload FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+    $q->execute([$uid, $tid]);
+    $row = $q->fetch();
+    if (!$row) json_error('Not found', 404);
+    $vals = json_decode((string)$row['payload'], true);
+    if (!is_array($vals)) json_error('Curve has no values', 422);
+    $new = runtime_trim_leading($vals, (float)$row['interval_s']);
+    $n = count($vals) - count($new);
+    if ($n > 0) {
+        $db->prepare('UPDATE runtime_curves SET payload = ?, points = ? WHERE user_id = ? AND curve_id = ?')->execute([json_encode($new), count($new), $uid, $tid]);
+    }
+    json_out(['trimmed' => $n, 'points' => count($new)]);
+}
+
+// Sharing: a curve stays private until its owner makes a link. Asking again returns the same token, so a link already handed
+// out is never silently replaced; unshare clears it and the old link stops working.
+foreach (['share', 'unshare'] as $act) {
+    if (!isset($_GET[$act])) continue;
+    $sid = $_GET[$act];
+    if (!runtime_curve_valid_id($sid)) json_error('Bad id', 400);
+    $cur = $db->prepare('SELECT share_token FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+    $cur->execute([$uid, $sid]);
+    $row = $cur->fetch();
+    if (!$row) json_error('Not found', 404);
+    if ($act === 'unshare') {
+        $db->prepare('UPDATE runtime_curves SET share_token = NULL WHERE user_id = ? AND curve_id = ?')->execute([$uid, $sid]);
+        json_out(['shareToken' => null]);
+    }
+    $tok = (string)($row['share_token'] ?? '');
+    if ($tok === '') {
+        $tok = runtime_new_share_token($db);
+        $db->prepare('UPDATE runtime_curves SET share_token = ? WHERE user_id = ? AND curve_id = ?')->execute([$tok, $uid, $sid]);
+    }
+    json_out(['shareToken' => $tok]);
+}
 
 if (rl_count('runtime', (string)$uid, 60) > 30) json_error('Too many requests, try again in a minute', 429);
 rl_hit('runtime', (string)$uid, 60);

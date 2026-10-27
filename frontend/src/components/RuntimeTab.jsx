@@ -107,6 +107,105 @@ function Legend({ curves, T }) {
   );
 }
 
+const pillFor = (T, mode, setMode) => (id, label) => (
+  <button key={id} onClick={() => setMode(id)} style={{ background: mode === id ? `${T.accent}30` : 'none', border: `1px solid ${mode === id ? T.accent : T.border}`,
+    color: mode === id ? T.accent : T.dim, borderRadius: 999, padding: '3px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>{label}</button>
+);
+
+/** One light's page: title, chart, numbers and meter readings. Used by the owner's page and by shared links. */
+export function RuntimeLight({ c, T }) {
+  const [mode, setMode] = useState('pct');
+  const pill = pillFor(T, mode, setMode);
+  const st = stats(c);
+  const t90 = timeToFraction(c, 0.9), t50 = timeToFraction(c, 0.5);
+  return (
+    <>
+    <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>{c.label}</h2>
+    <div style={{ color: T.dim, fontSize: 12, marginBottom: 12 }}>{c.group || 'Ungrouped'} · {c.points} samples every {+c.intervalSeconds.toFixed(2)} s · {fmtMin(st && st.durationMin)}</div>
+    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', c.unit ? `Absolute (${c.unit})` : 'Absolute')}</div>
+    <RuntimeChart curves={[c]} T={T} mode={mode} />
+    {st && (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, margin: '14px 0' }}>
+        {[['Start', fmtVal(st.start)], ...MARKS.map((m) => [`@ ${m} min`, st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} (${fmtPctV(st.at[m].pct)})`]),
+          ['End', `${fmtVal(st.end)} (${fmtPctV(st.endPct)})`], ['Peak', fmtVal(st.peak)], ['Minimum', fmtVal(st.min)],
+          ['Below 90%', t90 == null ? 'never' : fmtMin(t90)], ['Below 50%', t50 == null ? 'never' : fmtMin(t50)]].map(([k, v]) => (
+          <div key={k} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 11, color: T.dim }}>{k}</div><div style={{ fontWeight: 800, fontSize: 14 }}>{v}</div>
+          </div>
+        ))}
+      </div>
+    )}
+    {hasMeta(c) && (
+      <>
+        <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 6px' }}>Meter readings</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, marginBottom: 14 }}>
+          {META.filter(([k]) => c.meta[k] != null).map(([k, lab, f]) => (
+            <div key={k} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ fontSize: 11, color: T.dim }}>{lab}</div><div style={{ fontWeight: 800, fontSize: 14 }}>{f(c.meta[k])}</div>
+            </div>
+          ))}
+        </div>
+      </>
+    )}
+    </>
+  );
+}
+
+/** The overlay of several lights with its table. Used by the owner's page and by shared links. */
+export function RuntimeCompare({ cs, T }) {
+  const [mode, setMode] = useState('pct');
+  const pill = pillFor(T, mode, setMode);
+  return (
+    <>
+    <h2 style={{ margin: '0 0 10px', fontSize: 18 }}>Compare runtime <span style={{ color: T.dim, fontWeight: 400 }}>({cs.length})</span></h2>
+    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', 'Absolute')}</div>
+    <RuntimeChart curves={cs} T={T} mode={mode} />
+    <Legend curves={cs} T={T} />
+    <div style={{ overflowX: 'auto', marginTop: 16 }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
+        <thead><tr style={{ color: T.dim, textAlign: 'right' }}>
+          <th style={{ textAlign: 'left', padding: '4px 8px' }}>Light</th><th style={{ padding: '4px 8px' }}>Start</th>
+          {MARKS.map((m) => <th key={m} style={{ padding: '4px 8px' }}>@{m} min</th>)}<th style={{ padding: '4px 8px' }}>End</th>
+          {cs.some(hasMeta) && ['CCT', 'Duv', 'Ra', 'R9', 'Rf', 'Rg'].map((h) => <th key={h} style={{ padding: '4px 8px' }}>{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {cs.map((c, k) => { const st = stats(c); return (
+            <tr key={c.id} style={{ borderTop: `1px solid ${T.border}`, textAlign: 'right' }}>
+              <td style={{ textAlign: 'left', padding: '5px 8px', color: PALETTE[k % PALETTE.length], fontWeight: 700 }}>{c.label}</td>
+              <td style={{ padding: '5px 8px' }}>{fmtVal(st.start)}</td>
+              {MARKS.map((m) => <td key={m} style={{ padding: '5px 8px' }}>{st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} · ${fmtPctV(st.at[m].pct)}`}</td>)}
+              <td style={{ padding: '5px 8px' }}>{fmtVal(st.end)} · {fmtPctV(st.endPct)}</td>
+              {cs.some(hasMeta) && ['cct', 'duv', 'cri', 'r9', 'rf', 'rg'].map((k) => { const m = META.find((x) => x[0] === k); return <td key={k} style={{ padding: '5px 8px' }}>{c.meta && c.meta[k] != null ? m[2](c.meta[k]) : '–'}</td>; })}
+            </tr>); })}
+        </tbody>
+      </table>
+    </div>
+    </>
+  );
+}
+
+/** Public page for a ?runtime=<token>[,<token>...] link: one light, or a comparison when there are several. */
+export function SharedRuntime({ T, tokens }) {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    fetch(`./index.php/api/runtime_shared?t=${encodeURIComponent(tokens.join(','))}`)
+      .then((r) => r.json())
+      .then((d) => (d.error ? setErr(d.error) : setItems(d.items || [])))
+      .catch(() => setErr('Could not load this runtime link.'));
+  }, [tokens]);
+  const wrap = { maxWidth: 980, margin: '0 auto', padding: '16px 16px 60px', fontFamily: 'monospace', color: T.text };
+  if (err) return <div style={wrap}><p style={{ color: T.bad }}>{err}</p></div>;
+  if (!items) return <div style={wrap}><p style={{ color: T.dim }}>Loading…</p></div>;
+  const cs = items.map((c) => ({ ...c, meta: c.meta || {} }));
+  return (
+    <div style={wrap}>
+      {cs.length === 1 ? <RuntimeLight c={cs[0]} T={T} /> : <RuntimeCompare cs={cs} T={T} />}
+      <p style={{ color: T.dim, fontSize: 12, marginTop: 18 }}>Shared from hCRI.io by its owner. Output over time, measured with an integrating sphere.</p>
+    </div>
+  );
+}
+
 export default function RuntimeTab({ T, isAdmin }) {
   const [users, setUsers] = useState([]);
   const [forUser, setForUser] = useState('');
@@ -116,7 +215,6 @@ export default function RuntimeTab({ T, isAdmin }) {
   const [msg, setMsg] = useState('');
   const [sel, setSel] = useState([]);
   const [q, setQ] = useState('');
-  const [mode, setMode] = useState('pct');
   const [rt, setRt] = useState(rtFromUrl);
   const [comparing, setComparing] = useState(false);
   const [showUp, setShowUp] = useState(false);
@@ -160,10 +258,6 @@ export default function RuntimeTab({ T, isAdmin }) {
     background: `${T[color] || T.accent}20`, border: `1.5px solid ${T[color] || T.accent}`, color: T[color] || T.accent,
     borderRadius: 6, padding: '6px 14px', fontSize: 13, cursor: off ? 'default' : 'pointer', fontFamily: 'monospace', fontWeight: 700, opacity: off ? 0.45 : 1,
   });
-  const pill = (id, label) => (
-    <button key={id} onClick={() => setMode(id)} style={{ background: mode === id ? `${T.accent}30` : 'none', border: `1px solid ${mode === id ? T.accent : T.border}`,
-      color: mode === id ? T.accent : T.dim, borderRadius: 999, padding: '3px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>{label}</button>
-  );
   const wrap = { maxWidth: 980, margin: '0 auto', padding: '16px 16px 90px', fontFamily: 'monospace', color: T.text };
 
   const upload = async (file) => {
@@ -199,45 +293,53 @@ export default function RuntimeTab({ T, isAdmin }) {
     } catch (e) { setErr(e.message); }
   };
 
+  const linkFor = (tokens) => `${window.location.origin}${window.location.pathname}?runtime=${tokens.join(',')}`;
+  const copy = async (text) => {
+    try { await navigator.clipboard.writeText(text); return true; } catch { window.prompt('Copy this link:', text); return false; }
+  };
+  // Make (or reuse) a share token for each curve; the same token is returned every time, so links already given out keep working.
+  const shareLink = async (ids) => {
+    setErr(''); setMsg('');
+    try {
+      const tokens = [];
+      for (const id of ids) { const r = await api.post(fu('/runtime?share=' + encodeURIComponent(id)), {}); tokens.push(r.shareToken); }
+      await load();
+      const ok = await copy(linkFor(tokens));
+      setMsg(ok ? 'Link copied. Anyone with it can view this runtime, without signing in.' : 'Link ready.');
+    } catch (e) { setErr(e.message); }
+  };
+  const unshare = async (id) => {
+    if (!window.confirm('Stop sharing this light? Links already sent (including comparisons that use it) will stop working.')) return;
+    setErr(''); setMsg('');
+    try { await api.post(fu('/runtime?unshare=' + encodeURIComponent(id)), {}); await load(); setMsg('Sharing stopped.'); } catch (e) { setErr(e.message); }
+  };
+  const trim = async (id) => {
+    setErr(''); setMsg('');
+    try {
+      const r = await api.post(fu('/runtime?trim=' + encodeURIComponent(id)), {});
+      await load();
+      setMsg(r.trimmed > 0 ? `Trimmed ${r.trimmed} leading reading${r.trimmed === 1 ? '' : 's'} (before the light came on).` : 'Nothing to trim: this curve already starts when the light does.');
+    } catch (e) { setErr(e.message); }
+  };
+
   const byId = useMemo(() => Object.fromEntries((list || []).map((c) => [c.id, c])), [list]);
 
   // ── One light ────────────────────────────────────────────────────────────
   if (rt && list) {
     const c = byId[rt];
     if (!c) return <div ref={rootRef} style={wrap}><button style={btn('dim')} onClick={back}>← Back to runtime</button><p style={{ color: T.dim }}>That curve no longer exists.</p></div>;
-    const st = stats(c);
-    const t90 = timeToFraction(c, 0.9), t50 = timeToFraction(c, 0.5);
     return (
       <div ref={rootRef} style={wrap}>
         <button style={{ ...btn('dim'), marginBottom: 14 }} onClick={back}>← Back to runtime</button>
-        <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>{c.label}</h2>
-        <div style={{ color: T.dim, fontSize: 12, marginBottom: 12 }}>{c.group || 'Ungrouped'} · {c.points} samples every {+c.intervalSeconds.toFixed(2)} s · {fmtMin(st && st.durationMin)}</div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', c.unit ? `Absolute (${c.unit})` : 'Absolute')}</div>
-        <RuntimeChart curves={[c]} T={T} mode={mode} />
-        {st && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, margin: '14px 0' }}>
-            {[['Start', fmtVal(st.start)], ...MARKS.map((m) => [`@ ${m} min`, st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} (${fmtPctV(st.at[m].pct)})`]),
-              ['End', `${fmtVal(st.end)} (${fmtPctV(st.endPct)})`], ['Peak', fmtVal(st.peak)], ['Minimum', fmtVal(st.min)],
-              ['Below 90%', t90 == null ? 'never' : fmtMin(t90)], ['Below 50%', t50 == null ? 'never' : fmtMin(t50)]].map(([k, v]) => (
-              <div key={k} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px' }}>
-                <div style={{ fontSize: 11, color: T.dim }}>{k}</div><div style={{ fontWeight: 800, fontSize: 14 }}>{v}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {hasMeta(c) && (
-          <>
-            <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 6px' }}>Meter readings</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 8, marginBottom: 14 }}>
-              {META.filter(([k]) => c.meta[k] != null).map(([k, lab, f]) => (
-                <div key={k} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px' }}>
-                  <div style={{ fontSize: 11, color: T.dim }}>{lab}</div><div style={{ fontWeight: 800, fontSize: 14 }}>{f(c.meta[k])}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        <button style={btn('bad')} onClick={() => remove([c.id])}>Delete</button>
+        <RuntimeLight c={c} T={T} />
+        {err && <div style={{ color: T.bad, fontSize: 13, margin: '10px 0' }}>{err}</div>}
+        {msg && <div style={{ color: T.good, fontSize: 13, margin: '10px 0' }}>{msg}</div>}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={btn('accent')} onClick={() => shareLink([c.id])}>{c.shareToken ? 'Copy share link' : 'Share link'}</button>
+          {c.shareToken && <button style={btn('dim')} onClick={() => unshare(c.id)}>Stop sharing</button>}
+          <button style={btn('dim')} onClick={() => trim(c.id)} title="Drops the near-dark readings before the light came on">Trim leading zeros</button>
+          <button style={btn('bad')} onClick={() => remove([c.id])}>Delete</button>
+        </div>
       </div>
     );
   }
@@ -248,28 +350,12 @@ export default function RuntimeTab({ T, isAdmin }) {
     return (
       <div ref={rootRef} style={wrap}>
         <button style={{ ...btn('dim'), marginBottom: 14 }} onClick={() => setComparing(false)}>← Back to runtime</button>
-        <h2 style={{ margin: '0 0 10px', fontSize: 18 }}>Compare runtime <span style={{ color: T.dim, fontWeight: 400 }}>({cs.length})</span></h2>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', 'Absolute')}</div>
-        <RuntimeChart curves={cs} T={T} mode={mode} />
-        <Legend curves={cs} T={T} />
-        <div style={{ overflowX: 'auto', marginTop: 16 }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }}>
-            <thead><tr style={{ color: T.dim, textAlign: 'right' }}>
-              <th style={{ textAlign: 'left', padding: '4px 8px' }}>Light</th><th style={{ padding: '4px 8px' }}>Start</th>
-              {MARKS.map((m) => <th key={m} style={{ padding: '4px 8px' }}>@{m} min</th>)}<th style={{ padding: '4px 8px' }}>End</th>
-              {cs.some(hasMeta) && ['CCT', 'Duv', 'Ra', 'R9', 'Rf', 'Rg'].map((h) => <th key={h} style={{ padding: '4px 8px' }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {cs.map((c, k) => { const st = stats(c); return (
-                <tr key={c.id} style={{ borderTop: `1px solid ${T.border}`, textAlign: 'right' }}>
-                  <td style={{ textAlign: 'left', padding: '5px 8px', color: PALETTE[k % PALETTE.length], fontWeight: 700 }}>{c.label}</td>
-                  <td style={{ padding: '5px 8px' }}>{fmtVal(st.start)}</td>
-                  {MARKS.map((m) => <td key={m} style={{ padding: '5px 8px' }}>{st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} · ${fmtPctV(st.at[m].pct)}`}</td>)}
-                  <td style={{ padding: '5px 8px' }}>{fmtVal(st.end)} · {fmtPctV(st.endPct)}</td>
-                  {cs.some(hasMeta) && ['cct', 'duv', 'cri', 'r9', 'rf', 'rg'].map((k) => { const m = META.find((x) => x[0] === k); return <td key={k} style={{ padding: '5px 8px' }}>{c.meta && c.meta[k] != null ? m[2](c.meta[k]) : '–'}</td>; })}
-                </tr>); })}
-            </tbody>
-          </table>
+        <RuntimeCompare cs={cs} T={T} />
+        {err && <div style={{ color: T.bad, fontSize: 13, margin: '10px 0' }}>{err}</div>}
+        {msg && <div style={{ color: T.good, fontSize: 13, margin: '10px 0' }}>{msg}</div>}
+        <div style={{ marginTop: 14 }}>
+          <button style={btn('accent')} onClick={() => shareLink(cs.map((x) => x.id))}>Share comparison link</button>
+          <span style={{ color: T.dim, fontSize: 12, marginLeft: 10 }}>Makes a link for these {cs.length} lights; anyone with it can view them.</span>
         </div>
       </div>
     );
@@ -286,7 +372,7 @@ export default function RuntimeTab({ T, isAdmin }) {
   return (
     <div ref={rootRef} style={wrap}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>Runtime <span style={{ color: T.dim, fontWeight: 400, fontSize: 13 }}>output over time · private to you</span></h2>
+        <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>Runtime <span style={{ color: T.dim, fontWeight: 400, fontSize: 13 }}>output over time · private until you share a link</span></h2>
         <input style={{ ...input, width: 170 }} placeholder="Search lights…" value={q} onChange={(e) => setQ(e.target.value)} />
         {shown.length > 0 && <button style={btn('dim')} onClick={() => setSel(shown.every((c) => sel.includes(c.id)) ? [] : shown.map((c) => c.id))}>{shown.every((c) => sel.includes(c.id)) ? 'Clear all' : `Select all (${shown.length})`}</button>}
         <button style={btn('accent')} onClick={() => setShowUp((v) => !v)}>Upload CSV</button>
@@ -331,7 +417,7 @@ export default function RuntimeTab({ T, isAdmin }) {
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', marginBottom: 6, background: T.surface, border: `1px solid ${on ? T.accent : T.border}`, borderRadius: 8 }}>
                 <input type="checkbox" checked={on} onChange={() => toggle(c.id)} title="Select to compare" style={{ width: 18, height: 18, flexShrink: 0, accentColor: T.accent }} />
                 <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => open(c.id)}>
-                  <div style={{ fontWeight: 800, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}{c.shareToken && <span style={{ color: T.accent, fontSize: 11, fontWeight: 700, marginLeft: 8 }}>shared</span>}</div>
                   {st && <div style={{ fontSize: 12, color: T.dim, marginTop: 3 }}>
                     {fmtVal(st.start)}{c.unit ? ' ' + c.unit : ''} start · {MARKS.filter((m) => valueAt(c, m) != null && m <= 10).map((m) => `${fmtPctV(st.at[m].pct)} @${m}m`).join(' · ')} · {fmtPctV(st.endPct)} @{Math.round(st.durationMin)}m
                     {c.meta && c.meta.cct != null ? ` · ${Math.round(c.meta.cct)} K${c.meta.cri != null ? ` · Ra ${c.meta.cri.toFixed(1)}` : ''}` : ''}

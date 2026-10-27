@@ -19,3 +19,5 @@ CREATE TABLE IF NOT EXISTS runtime_curves (
 );
 
 -- Existing installs: ALTER TABLE runtime_curves ADD COLUMN meta TEXT NULL;
+
+-- Share links: ALTER TABLE runtime_curves ADD COLUMN share_token VARCHAR(32) NULL; ALTER TABLE runtime_curves ADD UNIQUE KEY uq_rc_share (share_token);

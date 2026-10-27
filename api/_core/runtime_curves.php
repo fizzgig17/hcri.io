@@ -32,6 +32,13 @@ function runtime_curves_ensure(PDO $db): void {
         try { $db->exec("CREATE TABLE IF NOT EXISTS runtime_curves ($cols, CONSTRAINT fk_rc_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE)"); }
         catch (\Throwable $e) { $db->exec("CREATE TABLE IF NOT EXISTS runtime_curves ($cols)"); }
     } catch (\Throwable $e) { /* no CREATE privilege: run sql/runtime_curves.sql */ }
+    // Share link: a curve is private until its owner shares it; the token is what the share/compare links carry.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM runtime_curves LIKE 'share_token'")->fetch()) {
+            $db->exec('ALTER TABLE runtime_curves ADD COLUMN share_token VARCHAR(32) NULL');
+            $db->exec('ALTER TABLE runtime_curves ADD UNIQUE KEY uq_rc_share (share_token)');
+        }
+    } catch (\Throwable $e) { /* run sql/runtime_curves.sql */ }
     // Older installs: add the optional meter-reading column.
     try {
         if (!$db->query("SHOW COLUMNS FROM runtime_curves LIKE 'meta'")->fetch()) $db->exec('ALTER TABLE runtime_curves ADD COLUMN meta TEXT NULL');
@@ -139,4 +146,37 @@ function runtime_curves_from_csv(string $csv, string $group = '', string $unit =
         $items[] = ['label' => $label, 'group' => $i['group'] ?? $group, 'unit' => $i['unit'] ?? $unit, 'intervalSeconds' => round($interval, 3), 'values' => $vals, 'meta' => $meta];
     }
     return ['items' => $items, 'error' => null];
+}
+
+/** A fresh unused share token (16 hex characters, same shape as report share tokens). */
+function runtime_new_share_token(PDO $db): string {
+    $exists = $db->prepare('SELECT 1 FROM runtime_curves WHERE share_token = ?');
+    do {
+        $t = bin2hex(random_bytes(8));
+        $exists->execute([$t]);
+    } while ($exists->fetchColumn());
+    return $t;
+}
+
+function runtime_valid_share_token(mixed $t): bool {
+    return is_string($t) && preg_match('/^[a-f0-9]{16}$/', $t) === 1;
+}
+
+/**
+ * Drops the near-dark readings at the start of a curve (before the light came on): everything before the output first reaches
+ * 2 percent of the curve's peak, keeping about one second of lead-in. Same rule the Companion app applies when a run is stopped.
+ * @param array<int,int|float> $vals
+ * @return array<int,int|float> the same list when there is nothing to trim
+ */
+function runtime_trim_leading(array $vals, float $interval): array {
+    if (count($vals) < 2) return $vals;
+    $peak = max($vals);
+    if (!($peak > 0)) return $vals;
+    $first = null;
+    foreach ($vals as $i => $v) { if ($v >= $peak * 0.02) { $first = $i; break; } }
+    if ($first === null || $first <= 0) return $vals;
+    $keep = (int)ceil(1.0 / max(0.01, $interval));
+    $start = max(0, $first - $keep);
+    if ($start <= 0 || count($vals) - $start < RUNTIME_MIN_POINTS) return $vals;
+    return array_values(array_slice($vals, $start));
 }
