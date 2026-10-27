@@ -220,6 +220,8 @@ export default function RuntimeTab({ T, isAdmin }) {
   const [showUp, setShowUp] = useState(false);
   const [upGroup, setUpGroup] = useState('');
   const [upUnit, setUpUnit] = useState('');
+  const [upInterval, setUpInterval] = useState('');
+  const [upName, setUpName] = useState('');
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
 
@@ -274,6 +276,8 @@ export default function RuntimeTab({ T, isAdmin }) {
         fd.append('file', file);
         if (upGroup.trim()) fd.append('group', upGroup.trim());
         if (upUnit.trim()) fd.append('unit', upUnit.trim());
+        if (Number(upInterval) > 0) fd.append('interval', String(Number(upInterval)));
+        if (upName.trim()) fd.append('name', upName.trim());
         r = await api.upload(fu('/runtime'), fd);
       }
       setMsg(`Saved ${r.saved} light${r.saved === 1 ? '' : 's'}${r.skipped && r.skipped.length ? `, skipped ${r.skipped.length} (${r.skipped.slice(0, 3).map((s) => `${s.label || '?'}: ${s.reason}`).join('; ')}${r.skipped.length > 3 ? '…' : ''})` : ''}.`);
@@ -313,6 +317,18 @@ export default function RuntimeTab({ T, isAdmin }) {
     setErr(''); setMsg('');
     try { await api.post(fu('/runtime?unshare=' + encodeURIComponent(id)), {}); await load(); setMsg('Sharing stopped.'); } catch (e) { setErr(e.message); }
   };
+  const setDuration = async (c) => {
+    const cur = ((c.points - 1) * (c.sourceIntervalSeconds || c.intervalSeconds)) / 60;
+    const a = window.prompt(`How long did this run really last, in minutes? (It currently shows ${+cur.toFixed(1)} min.)`, String(+cur.toFixed(1)));
+    const mins = Number(a);
+    if (a == null || !(mins > 0)) return;
+    setErr(''); setMsg('');
+    try {
+      await api.post(fu(`/runtime?duration=${encodeURIComponent(c.id)}&minutes=${mins}`), {});
+      await load();
+      setMsg(`Duration set to ${mins} min.`);
+    } catch (e) { setErr(e.message); }
+  };
   const trim = async (id) => {
     setErr(''); setMsg('');
     try {
@@ -349,6 +365,7 @@ export default function RuntimeTab({ T, isAdmin }) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button style={btn('accent')} onClick={() => shareLink([c.id])}>{c.shareToken ? 'Copy share link' : 'Share link'}</button>
           {c.shareToken && <button style={btn('dim')} onClick={() => unshare(c.id)}>Stop sharing</button>}
+          <button style={btn('dim')} onClick={() => setDuration(c)} title="Fix the time spacing if the length is wrong">Set duration…</button>
           <button style={btn('dim')} onClick={() => trim(c.id)} title="Drops the near-dark readings before the light came on">Trim leading zeros</button>
           <button style={btn('bad')} onClick={() => remove([c.id])}>Delete</button>
         </div>
@@ -400,10 +417,12 @@ export default function RuntimeTab({ T, isAdmin }) {
       )}
       {showUp && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Optional rows under the header starting #group, #unit, #cct, #duv, #cri, #r9, #r12, #rf, #rg, #tempF set each light’s info. Re-uploading a light replaces its curve. {JSON_HINT}</div>
+          <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Optional rows under the header starting #group, #unit, #cct, #duv, #cri, #r9, #r12, #rf, #rg, #tempF set each light’s info. Re-uploading a light replaces its curve. {JSON_HINT} A TKLamp tester's Output CSV (a row number in the first column, then lumen, candela and lux) also works: type the seconds between readings, which is its Metadata file's Sampling time in ms divided by 1000.</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <input style={{ ...input, width: 150 }} placeholder="Group (optional)" value={upGroup} onChange={(e) => setUpGroup(e.target.value)} />
             <input style={{ ...input, width: 110 }} placeholder="Unit, e.g. lm" value={upUnit} onChange={(e) => setUpUnit(e.target.value)} />
+            <input style={{ ...input, width: 150 }} placeholder="Name (optional)" title="Put in front of each light's name" value={upName} onChange={(e) => setUpName(e.target.value)} />
+            <input style={{ ...input, width: 190 }} inputMode="decimal" placeholder="Seconds between readings" title="Use when the first column is a row number, not minutes (a TKLamp Output CSV). Its Metadata file's Sampling time is in ms: divide by 1000." value={upInterval} onChange={(e) => setUpInterval(e.target.value)} />
             <button style={btn('accent', busy)} disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>{busy ? 'Uploading…' : 'Choose file…'}</button>
             <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }} onChange={(e) => { upload(e.target.files[0]); e.target.value = ''; }} />
           </div>

@@ -11,7 +11,9 @@ declare(strict_types=1);
 //   POST   /api/v1/runtime  (Content-Type: text/csv, or multipart field "file")                      -> {"saved":N,"skipped":[...]}
 //          CSV: first column = minutes, every other column = one light (header = its label).
 //          Optional info rows under the header, first cell "#group", "#unit", "#cct", "#duv", "#cri", "#r9", "#r12", "#rf", "#rg", "#tempF".
-//          Optional query: ?group=<name>&unit=<lumens>
+//          Optional query: ?group=<name>&unit=<lumens>&interval=<seconds between readings>&name=<label prefix>
+//          interval: use it when the first column is just a row number (a TKLamp Output*.csv); the readings are that many seconds apart.
+//   POST   /api/v1/runtime?duration=<id>&minutes=<n>  -> {"intervalSeconds":s}  (fixes the spacing of a curve so it lasts n minutes)
 //          Optional per item: "meta":{"cct","duv","cri","r9","r12","rf","rg","tempF"}. An item with only label + meta updates the readings of an existing curve.
 //   POST   /api/v1/runtime?share=<id>           -> {"shareToken":"..."}  (makes or reuses the curve's share link token)
 //   POST   /api/v1/runtime?unshare=<id>         -> {"shareToken":null}   (stops sharing; old links stop working)
@@ -100,6 +102,20 @@ if (isset($_GET['delete'])) {   // same as DELETE ?id=, for clients and hosts th
     json_out(['deleted' => $d->rowCount()]);
 }
 
+if (isset($_GET['duration'])) {
+    $did = $_GET['duration'];
+    $mins = (float)($_GET['minutes'] ?? 0);
+    if (!runtime_curve_valid_id($did)) json_error('Bad id', 400);
+    $q = $db->prepare('SELECT points FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+    $q->execute([$uid, $did]);
+    $pts = $q->fetchColumn();
+    if ($pts === false) json_error('Not found', 404);
+    $iv = $mins > 0 && (int)$pts > 1 ? $mins * 60.0 / ((int)$pts - 1) : 0.0;
+    if ($iv < 0.01 || $iv > 3600) json_error('That length does not fit this curve (readings must be 0.01 s to 1 hour apart)', 400);
+    $db->prepare('UPDATE runtime_curves SET interval_s = ? WHERE user_id = ? AND curve_id = ?')->execute([$iv, $uid, $did]);
+    json_out(['intervalSeconds' => $iv, 'minutes' => $mins]);
+}
+
 if (isset($_GET['trim'])) {
     $tid = $_GET['trim'];
     if (!runtime_curve_valid_id($tid)) json_error('Bad id', 400);
@@ -146,11 +162,11 @@ rl_hit('runtime', (string)$uid, 60);
 $type = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
 $items = null;
 if (!empty($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name'])) {
-    $parsed = runtime_curves_from_csv((string)file_get_contents($_FILES['file']['tmp_name']), trim((string)($_POST['group'] ?? $_GET['group'] ?? '')), trim((string)($_POST['unit'] ?? $_GET['unit'] ?? '')));
+    $parsed = runtime_curves_from_csv((string)file_get_contents($_FILES['file']['tmp_name']), trim((string)($_POST['group'] ?? $_GET['group'] ?? '')), trim((string)($_POST['unit'] ?? $_GET['unit'] ?? '')), (float)($_POST['interval'] ?? $_GET['interval'] ?? 0), trim((string)($_POST['name'] ?? $_GET['name'] ?? '')));
     if ($parsed['error']) json_error($parsed['error'], 400);
     $items = $parsed['items'];
 } elseif (str_contains($type, 'text/csv') || str_contains($type, 'text/plain')) {
-    $parsed = runtime_curves_from_csv((string)file_get_contents('php://input'), trim((string)($_GET['group'] ?? '')), trim((string)($_GET['unit'] ?? '')));
+    $parsed = runtime_curves_from_csv((string)file_get_contents('php://input'), trim((string)($_GET['group'] ?? '')), trim((string)($_GET['unit'] ?? '')), (float)($_GET['interval'] ?? 0), trim((string)($_GET['name'] ?? '')));
     if ($parsed['error']) json_error($parsed['error'], 400);
     $items = $parsed['items'];
 } else {
