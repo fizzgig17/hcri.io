@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 // api/flicker.php -- flicker readings.
 //
-//   GET    /api/flicker                 your readings (no waveforms); ?unattached=1, ?report_id=N
+//   GET    /api/flicker                 your readings (no waveforms); ?unattached=1, ?report_id=N; admins: ?for_user=<id>
 //   GET    /api/flicker/{id}            one reading with its waveform (yours, or attached to a report you may view)
 //   POST   /api/flicker                 create (JSON). Also at /api/v1/flicker for API-token clients (the app)
 //   PATCH  /api/flicker/{id}            change label / notes / reportId (null detaches)
@@ -52,7 +52,11 @@ if ($presented !== '' && str_starts_with($presented, 'hcri_')) {
     } catch (\Throwable $e) {}
 }
 if ($myId > 0) {
-    try { $q = $db->prepare('SELECT is_super_admin FROM users WHERE id=?'); $q->execute([$myId]); $isSuper = ((int)$q->fetchColumn()) === 1; } catch (\Throwable $e) {}
+    // Admins (is_admin or is_super_admin) may view and manage any user's readings.
+    try { $q = $db->prepare('SELECT is_admin, is_super_admin FROM users WHERE id=?'); $q->execute([$myId]); $ar = $q->fetch(); $isSuper = $ar && ((int)$ar['is_admin'] === 1 || (int)($ar['is_super_admin'] ?? 0) === 1); }
+    catch (\Throwable $e) {
+        try { $q = $db->prepare('SELECT is_admin FROM users WHERE id=?'); $q->execute([$myId]); $isSuper = ((int)$q->fetchColumn()) === 1; } catch (\Throwable $e2) {}
+    }
 }
 
 $shareTok = (string)($_GET['t'] ?? '');
@@ -80,8 +84,17 @@ if ($method === 'GET') {
         json_out(flicker_out($row, true));
     }
     if ($myId <= 0) json_error('Sign in required', 401);
+    // Admins: ?for_user=<id> lists that user's readings instead of their own.
+    $listFor = $myId;
+    $forUser = (int)($_GET['for_user'] ?? 0);
+    if ($forUser > 0 && $forUser !== $myId) {
+        if (!$isSuper) json_error('Admins only', 403);
+        $t = $db->prepare('SELECT 1 FROM users WHERE id=?'); $t->execute([$forUser]);
+        if (!$t->fetchColumn()) json_error('No such user', 404);
+        $listFor = $forUser;
+    }
     $sql = flicker_select_sql(false) . ' WHERE f.user_id=?';
-    $args = [$myId];
+    $args = [$listFor];
     if (!empty($_GET['unattached'])) $sql .= ' AND r.id IS NULL';
     if (!empty($_GET['report_id']))  { $sql .= ' AND f.report_id=?'; $args[] = (int)$_GET['report_id']; }
     $sql .= ' ORDER BY COALESCE(f.captured_at, f.created_at) DESC, f.id DESC LIMIT 500';

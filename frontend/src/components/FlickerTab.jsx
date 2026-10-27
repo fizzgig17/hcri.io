@@ -4,8 +4,9 @@
 // overlaid waveforms / risk chart / table; click a title for its own page. History: a reading's page is
 // `?explore=flicker&fid=<id>`, so Back and refresh work like the rest of the app.
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { api } from '../lib/api';
+import usePanelBackClose from '../hooks/usePanelBackClose';
 import { fmtHz, fmtPct, fmtWhen, readingTitle } from '../lib/flicker';
 import { RiskBadge, FlickerComparison } from './FlickerCharts';
 import FlickerDetail from './FlickerDetail';
@@ -14,7 +15,9 @@ const fidFromUrl = () => {
   try { const v = new URLSearchParams(window.location.search).get('fid'); return v ? parseInt(v, 10) || null : null; } catch { return null; }
 };
 
-export default function FlickerTab({ T, onOpenReport }) {
+export default function FlickerTab({ T, onOpenReport, isAdmin }) {
+  const [users, setUsers] = useState([]);
+  const [forUser, setForUser] = useState('');
   const [list, setList] = useState(null);
   const [err, setErr] = useState('');
   const [sel, setSel] = useState([]);
@@ -23,24 +26,36 @@ export default function FlickerTab({ T, onOpenReport }) {
   const [comparing, setComparing] = useState(false);
   const [cmpData, setCmpData] = useState(null);
 
-  const load = useCallback(() => api.get('/flicker').then((d) => { setList(d.readings || []); setErr(''); }).catch((e) => setErr(e.message)), []);
+  const load = useCallback(() => api.get('/flicker' + (forUser ? `?for_user=${forUser}` : '')).then((d) => { setList(d.readings || []); setErr(''); }).catch((e) => setErr(e.message)), [forUser]);
   useEffect(() => { load(); }, [load]);
-
-  // Browser Back/Forward between the list and a reading's page.
   useEffect(() => {
-    const on = () => { setFid(fidFromUrl()); setComparing(false); };
-    window.addEventListener('popstate', on);
-    return () => window.removeEventListener('popstate', on);
-  }, []);
+    if (!isAdmin) return;
+    api.get('/admin/users').then((d) => setUsers(Array.isArray(d) ? d : d.users || [])).catch(() => {});
+  }, [isAdmin]);
 
-  const open = (id) => {
-    try { window.history.pushState({ hcri: 1, view: 'explore', etab: 'flicker', fid: id }, '', `${window.location.pathname}?explore=flicker&fid=${id}`); } catch { /* history unavailable */ }
-    setFid(id);
+  // A reading's page and the comparison are "panels": the browser Back button closes them (same mechanism as the report
+  // pages in Explore), so Back never reloads the screen, and the list keeps its scroll position underneath.
+  const rootRef = useRef(null);
+  const savedTop = useRef(0);
+  const scroller = () => {
+    let el = rootRef.current && rootRef.current.parentElement;
+    while (el) { const o = getComputedStyle(el).overflowY; if (o === 'auto' || o === 'scroll') return el; el = el.parentElement; }
+    return null;
   };
-  const back = () => {
-    try { window.history.pushState({ hcri: 1, view: 'explore', etab: 'flicker' }, '', `${window.location.pathname}?explore=flicker`); } catch { /* history unavailable */ }
-    setFid(null); setComparing(false);
-  };
+  const remember = () => { const sc = scroller(); savedTop.current = sc ? sc.scrollTop : 0; };
+  const base = () => window.location.pathname + '?explore=flicker';
+  usePanelBackClose(!!fid, () => setFid(null), () => ({
+    state: { hcri: 1, view: 'explore', etab: 'flicker', fid }, url: `${base()}&fid=${fid}`,
+    closedState: { hcri: 1, view: 'explore', etab: 'flicker' }, closedUrl: base(),
+  }));
+  usePanelBackClose(comparing, () => setComparing(false));
+  useLayoutEffect(() => {
+    const sc = scroller();
+    if (!sc) return;
+    sc.scrollTop = fid || comparing ? 0 : savedTop.current;
+  }, [fid, comparing]);
+  const open = (id) => { remember(); setFid(id); };
+  const back = () => { setFid(null); setComparing(false); };
 
   const btn = (color = 'accent', off) => ({
     background: `${T[color] || T.accent}20`, border: `1.5px solid ${T[color] || T.accent}`, color: T[color] || T.accent,
@@ -48,6 +63,7 @@ export default function FlickerTab({ T, onOpenReport }) {
   });
 
   const startCompare = async () => {
+    remember();
     setComparing(true); setCmpData(null);
     try {
       const rows = await Promise.all(sel.map((id) => api.get(`/flicker/${id}`)));
@@ -56,12 +72,12 @@ export default function FlickerTab({ T, onOpenReport }) {
   };
 
   if (fid) {
-    return <FlickerDetail key={fid} id={fid} T={T} onBack={back} onChanged={load} onDeleted={() => { load(); back(); }} onOpenReport={onOpenReport} />;
+    return <div ref={rootRef}><FlickerDetail key={fid} id={fid} T={T} onBack={back} onChanged={load} onDeleted={() => { load(); back(); }} onOpenReport={onOpenReport} /></div>;
   }
 
   if (comparing) {
     return (
-      <div style={{ maxWidth: 980, margin: '0 auto', padding: '16px 16px 40px', fontFamily: 'monospace', color: T.text }}>
+      <div ref={rootRef} style={{ maxWidth: 980, margin: '0 auto', padding: '16px 16px 40px', fontFamily: 'monospace', color: T.text }}>
         <button onClick={() => setComparing(false)} style={{ ...btn('dim'), marginBottom: 14 }}>← Back to flicker readings</button>
         <h2 style={{ margin: '0 0 14px', fontSize: 18 }}>Compare flicker <span style={{ color: T.dim, fontWeight: 400 }}>({sel.length})</span></h2>
         {!cmpData ? <div style={{ color: T.dim }}>Loading…</div> : <FlickerComparison readings={cmpData} T={T} onOpen={(r) => open(r.id)} />}
@@ -77,7 +93,17 @@ export default function FlickerTab({ T, onOpenReport }) {
   );
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: '16px 16px 90px', fontFamily: 'monospace', color: T.text }}>
+    <div ref={rootRef} style={{ maxWidth: 980, margin: '0 auto', padding: '16px 16px 90px', fontFamily: 'monospace', color: T.text }}>
+      {isAdmin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13 }}>
+          <span style={{ color: T.dim }}>Admin: working on</span>
+          <select style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, padding: '6px 10px', fontSize: 13, fontFamily: 'monospace', maxWidth: 320 }} value={forUser}
+            onChange={(e) => { setForUser(e.target.value); setList(null); setSel([]); }}>
+            <option value="">My own readings</option>
+            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}
+          </select>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>Flicker readings</h2>
         {pill('all', 'All')}{pill('attached', 'On a report')}{pill('standalone', 'Standalone')}
