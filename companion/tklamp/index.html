@@ -1,0 +1,330 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TKLamp Live Logger — hCRI Companion</title>
+<meta name="description" content="A free script for Mac, Windows and Linux that logs a TKLamp TK2303D tester live with exact start and end times, then uploads the run to Runtime on hCRI.io.">
+<link rel="canonical" href="https://www.hcri.io/companion/tklamp/">
+<script>
+  (function(){
+    try {
+      var t = localStorage.getItem('hcri_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root{
+    --bg:#060a0f; --surface:#0a1628; --surface2:#0b1929; --border:#2d3645;
+    --text:#e8f4ff; --dim:#7aaccc; --accent:#00d4ff; --accent-dim:rgba(0,212,255,.14);
+    --good:#3dff9a; --warn:#ffcc33; --bad:#ff4466;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2f7; --surface:#ffffff; --surface2:#dce6f0; --border:rgba(40,90,160,0.25);
+    --text:#0d1f30; --dim:#2a5070; --accent:#005baa; --accent-dim:rgba(0,91,170,.14);
+    --good:#0a6e2e; --warn:#8a5a00; --bad:#aa1133;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box}
+  html,body{background:var(--bg);transition:background-color .15s,color .15s}
+  body{
+    margin:0; color:var(--text); line-height:1.6;
+    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    padding-inline:16px;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  img,svg{max-width:100%}
+  code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:.92em;color:var(--text)}
+
+  header.top{
+    display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between;
+    padding-block:18px; border-bottom:1px solid var(--border); max-width:1080px;margin:0 auto;
+  }
+  .brand{font-size:19px;font-weight:900;letter-spacing:.2px;display:flex;align-items:baseline;gap:8px}
+  .brand .dot{color:var(--accent)}
+  .brand .tag{
+    font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.4px;
+    border:1px solid var(--border);border-radius:999px;padding:2px 8px;
+  }
+  nav.links{display:flex;gap:18px;font-size:13px;flex-wrap:wrap;align-items:center}
+  nav.links a{color:var(--dim)}
+  nav.links a:hover{color:var(--text)}
+  .btn-sm{
+    display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+    border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);
+    border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .btn-sm:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
+  .btn-sm svg{width:14px;height:14px}
+
+  .page{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:48px;padding-block:36px 72px}
+  @media (max-width:860px){ .page{grid-template-columns:1fr} }
+
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:12.5px;max-height:calc(100vh - 40px);overflow:auto}
+  @media (max-width:860px){ nav.toc{position:static;max-height:none;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface)} }
+  nav.toc .toc-title{color:var(--dim);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:sec}
+  nav.toc li{counter-increment:sec;margin-bottom:7px}
+  nav.toc li a{color:var(--dim);display:block}
+  nav.toc li a:hover{color:var(--text)}
+  nav.toc li a::before{content:counter(sec) '. ';color:var(--accent);font-weight:700}
+
+  main{min-width:0}
+  .doc-title{font-size:clamp(26px,4vw,36px);margin:0 0 6px;letter-spacing:-.01em}
+  .doc-meta{color:var(--dim);font-size:12.5px;margin-bottom:38px}
+  .doc-meta a{color:var(--dim)}
+
+  section{padding-block:30px;border-top:1px solid var(--border)}
+  section:first-of-type{border-top:none;padding-top:0}
+  h2{font-size:21px;margin:0 0 14px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px}
+  h2 .num{color:var(--accent);font-size:15px;font-weight:700}
+  h3{font-size:15px;margin:22px 0 8px}
+  p{margin:0 0 12px;font-size:13.5px}
+  p.dim{color:var(--dim)}
+  ul,ol{margin:0 0 12px;padding-left:22px;font-size:13.5px}
+  li{margin-bottom:6px}
+  .lede{color:var(--dim);font-size:14.5px;max-width:68ch}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;margin:14px 0;
+  }
+  .card h4{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;font-size:13px;color:var(--dim)}
+  .card.tip h4{color:var(--good)}
+  .card.warn h4{color:var(--warn)}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+  td code{font-size:12px}
+
+  .steps{list-style:none;margin:0;padding:0;counter-reset:step}
+  .steps li{
+    counter-increment:step;position:relative;padding-left:40px;margin-bottom:16px;font-size:13.5px;
+  }
+  .steps li::before{
+    content:counter(step);position:absolute;left:0;top:-1px;
+    width:26px;height:26px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--accent) 40%,transparent);
+    color:var(--accent);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;
+  }
+  .steps li strong{display:block;margin-bottom:2px}
+  .steps li span{color:var(--dim)}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .chip{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600}
+
+  footer{border-top:1px solid var(--border);padding-block:24px;max-width:1080px;margin:0 auto;font-size:12.5px;color:var(--dim)}
+  footer a{color:var(--dim)}
+  footer a:hover{color:var(--accent)}
+
+  @media print{
+    nav.toc, header .links, .btn-sm, .no-print{display:none!important}
+    :root{ --bg:#fff; --surface:#fff; --surface2:#f3f3f3; --border:#ccc; --text:#111; --dim:#555; --accent:#1a4fb4; color-scheme: light; }
+    body{padding:0}
+    .page{display:block;max-width:none;padding:0}
+    header.top{max-width:none}
+    section{break-inside:avoid-page;border-top:1px solid #ccc}
+    h2{break-after:avoid}
+    a{color:#1a4fb4;text-decoration:underline}
+    .card{break-inside:avoid-page}
+  }
+
+  /* Floating back-to-top arrow -- same treatment as the main Companion
+     page (see companion/index.html), hidden on print via .no-print above. */
+  #back-to-top{
+    position:fixed; right:18px; bottom:calc(18px + env(safe-area-inset-bottom,0px));
+    width:40px; height:40px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; visibility:hidden; transform:translateY(8px);
+    transition:opacity .2s,transform .2s,visibility .2s,background-color .15s,border-color .15s;
+    box-shadow:0 2px 10px rgba(0,0,0,.25); z-index:50;
+  }
+  #back-to-top.visible{opacity:1; visibility:visible; transform:translateY(0)}
+  #back-to-top:hover{background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
+  #back-to-top svg{width:18px;height:18px}
+</style>
+<link rel="stylesheet" href="/assets/site-pages.css">
+<script defer src="/assets/site-pages.js"></script>
+</head><body>
+
+<header class="top">
+  <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
+    <span class="tag">TKLamp logger</span>
+  </div>
+  <nav class="links">
+    <a href="../">← Companion home</a>
+    <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a>
+    <a href="../manual/">Manual</a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme" style="background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text);padding:0">🌙</button>
+  </nav>
+</header>
+<div class="bar"></div>
+<style>
+.news{max-width:1100px;margin:14px auto 0;padding:11px 16px;border:1px solid var(--accent);background:var(--accent-dim);border-radius:10px;font-size:13.5px;line-height:1.5;color:var(--text)}
+.news strong{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:11.5px;margin-right:6px}
+.news a{color:var(--accent);font-weight:600}
+@media (max-width:1140px){.news{margin-inline:16px}}
+</style>
+<div class="news" role="note"><strong>New</strong>hCRI Companion now supports the <b>TKLamp TK2303D</b> integrating-sphere tester through the ESP32 bridge: live lumens on your phone, recorded runtimes, and one-tap upload to Runtime on hCRI.io. <a href="#tklamp">Jump to Using a TKLamp tester</a> · <a href="../manual/#tklamp">Manual</a></div>
+
+<div class="page">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#what">What it does</a></li>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#token">Connect to hCRI.io</a></li>
+      <li><a href="#run">Record a run</a></li>
+      <li><a href="#after">After the run</a></li>
+      <li><a href="#scale">Calibrating the scale</a></li>
+      <li><a href="#options">All options</a></li>
+      <li><a href="#files">The files it saves</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <h1 class="doc-title">TKLamp Live Logger</h1>
+    <div class="doc-meta">Last updated October 27, 2026 · Works on Windows, macOS and Linux · <a href="tklamp_live.py" download>Download tklamp_live.py</a></div>
+
+    <section id="what">
+      <h2><span class="num">01</span> What it does</h2>
+      <p class="lede">The TKLamp TK2303D tester sends its lumen reading over USB about four times a second while it is on. This small Python script listens to that stream on your computer, shows the live number, records a run on the computer's clock, and uploads the finished run to your Runtime list on hCRI.io.</p>
+      <div class="card tip"><h4>Why use it instead of Transfer Data?</h4>
+        <p>The tester's own Transfer Data sends the stored readings after the test, with no date or time, so the real start and end of the run are unknown. Because this script records while the test is running, the start time, end time and length are exact. You choose the name, and it can upload and make a share link for you.</p></div>
+      <div class="card"><h4>Prefer your phone?</h4>
+        <p>hCRI Companion does the same with the ESP32 bridge, no computer needed. See <a href="../bridge/#tklamp">Using a TKLamp tester</a> and the <a href="../manual/#tklamp">manual</a>.</p></div>
+    </section>
+
+    <section id="install">
+      <h2><span class="num">02</span> Install</h2>
+      <ol class="steps">
+        <li><strong>Install Python 3</strong><span>From <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> if you do not have it. On Windows, tick "Add Python to PATH" in the installer.</span></li>
+        <li><strong>Install the serial library</strong><span>Open Terminal (Mac) or Command Prompt (Windows) and run <code>pip install pyserial</code>.</span></li>
+        <li><strong>Download the script</strong><span><a href="tklamp_live.py" download>tklamp_live.py</a>. Save it in a folder you will find again, such as Documents.</span></li>
+        <li><strong>Plug in the tester</strong><span>Connect the tester's USB cable to the computer and switch the tester on. It must be on and sending readings. The computer sees it as a CH340 USB serial device. Windows may need the free <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340 driver</a> if no port appears; recent macOS and Linux include it.</span></li>
+      </ol>
+    </section>
+
+    <section id="token">
+      <h2><span class="num">03</span> Connect to hCRI.io (optional)</h2>
+      <p>To upload from the script it needs an API token, the same kind hCRI Companion uses. The script can create one for you, the same way Companion's Settings does.</p>
+      <ol class="steps">
+        <li><strong>Sign in once</strong><span>Run <code>python tklamp_live.py --login</code>. Enter your hCRI.io email or username and password (the password is not shown). The script signs in, creates a token named "TKLamp logger (your computer)" and remembers it in a file in your home folder (<code>.hcri_tklamp.json</code>), readable only by you. Your password is sent only to hCRI.io, once, and is never saved or printed.</span></li>
+        <li><strong>Or let it ask</strong><span>If you finish a run with no token saved, the script offers to sign in right then, and uploads straight after.</span></li>
+        <li><strong>Or paste a token</strong><span>Make one on hCRI.io (account settings, API tokens, Create token) and run <code>python tklamp_live.py --token YOUR_TOKEN --save-token</code>, or set the <code>HCRI_TOKEN</code> environment variable.</span></li>
+      </ol>
+      <div class="card warn"><h4>Keep the token private</h4>
+        <p>Anyone with the token can add curves to your account. Do not paste it into a chat, a screenshot or a shared file. You can delete a token from your account settings at any time.</p></div>
+    </section>
+
+    <section id="run">
+      <h2><span class="num">04</span> Record a run</h2>
+      <ol class="steps">
+        <li><strong>Start the script</strong><span>Run <code>python tklamp_live.py</code>. It finds the tester's port by itself (or asks you to pick one; you can also give <code>--port COM5</code> or <code>--port /dev/tty.usbserial-1420</code>). The live lumens appear on one line.</span></li>
+        <li><strong>Put the light in the sphere</strong><span>Wait until the number looks right.</span></li>
+        <li><strong>Press Enter to start</strong><span>The line shows <code>REC</code> with the elapsed time and the number of readings. The start time is taken from your computer's clock.</span></li>
+        <li><strong>Press Enter again to stop</strong><span>Or use <code>--duration 30</code> to stop by itself after 30 minutes. Ctrl+C also stops and keeps what was recorded. While recording, a <code>.partial.csv</code> copy is written every couple of seconds, so a crash does not lose the run.</span></li>
+      </ol>
+      <p class="dim">Keep the computer awake and the cable in for the whole run. For a 24 hour run, turn off sleep first.</p>
+    </section>
+
+    <section id="after">
+      <h2><span class="num">05</span> After the run</h2>
+      <ol class="steps">
+        <li><strong>Check the summary</strong><span>It shows the length, the number of readings, the first and last lumens, and the exact start and end times. The dark readings before the light came on are trimmed (use <code>--no-trim</code> to keep them).</span></li>
+        <li><strong>Name it</strong><span>Press Enter to accept the suggested name (<em>TKLamp run 2026-10-27 18:00</em>) or type your own. The same name on hCRI.io replaces an earlier run.</span></li>
+        <li><strong>Upload</strong><span>If a token is set it asks whether to upload to Runtime. Answer Y. The run appears in Explore, then Runtime, as a private curve.</span></li>
+        <li><strong>Share (optional)</strong><span>It asks whether to make a share link and prints it. Anyone with the link can view the run without signing in. You can stop sharing from the light's page.</span></li>
+      </ol>
+      <p>If the upload fails, or you said no, the run is already saved. Upload it later with <code>python tklamp_live.py --upload TKLamp_2026-10-27-18.00.00.json</code>, or use Upload CSV on the Runtime page with the saved <code>.csv</code>.</p>
+    </section>
+
+    <section id="scale">
+      <h2><span class="num">06</span> Calibrating the scale</h2>
+      <p>The tester sends a raw sensor count, and the script divides it by <em>counts per lumen</em> to show lumens. The default, 313.2, was measured on one calibrated tester using its 2150 lm calibration lamp. Each tester, and each recalibration, can differ a little.</p>
+      <p>To set it for yours, put a lamp of known output in the sphere, wait for it to settle and run <code>python tklamp_live.py --calibrate 2150</code> (use the lamp's lumens). It reads for 8 seconds, shows the new scale and saves it. This is the same as Set scale in hCRI Companion.</p>
+    </section>
+
+    <section id="options">
+      <h2><span class="num">07</span> All options</h2>
+      <table>
+        <tr><th>Option</th><th>What it does</th></tr>
+        <tr><td><code>--port PORT</code></td><td>Serial port, if it is not found automatically.</td></tr>
+        <tr><td><code>--calibrate LUMENS</code></td><td>Set and save the scale from a lamp of known output.</td></tr>
+        <tr><td><code>--scale N</code></td><td>Use this counts-per-lumen for this run only.</td></tr>
+        <tr><td><code>--duration MIN</code></td><td>Stop by itself after this many minutes.</td></tr>
+        <tr><td><code>--no-trim</code></td><td>Keep the dark readings before the light came on.</td></tr>
+        <tr><td><code>--output-dir DIR</code></td><td>Where to save runs (default: the current folder).</td></tr>
+        <tr><td><code>--login</code></td><td>Sign in with your hCRI.io email/username and password, create a token and remember it.</td></tr>
+        <tr><td><code>--token T</code>, <code>--save-token</code></td><td>Use an API token you made on the website, and remember it.</td></tr>
+        <tr><td><code>--site URL</code></td><td>Another hCRI.io address (default https://hcri.io).</td></tr>
+        <tr><td><code>--upload FILE.json</code></td><td>Upload a run saved earlier, then exit.</td></tr>
+        <tr><td><code>--simulate</code></td><td>No tester needed: a made-up fading light, to try the script.</td></tr>
+      </table>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">08</span> The files it saves</h2>
+      <ul>
+        <li><code>TKLamp_&lt;date&gt;.json</code>: the run (name, spacing, lumens) plus its start and end times, length, number of readings and the scale used.</li>
+        <li><code>TKLamp_&lt;date&gt;.csv</code>: minutes in the first column and the lumens in the second, ready for Upload CSV on the Runtime page.</li>
+      </ul>
+      <p class="dim">Runs are stored at one point per second (wider spacing beyond about 27 hours, hCRI.io's 100,000 point limit). hCRI.io does not store the start and end times yet, so they stay in the saved <code>.json</code>.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2><span class="num">09</span> Troubleshooting</h2>
+      <table>
+        <tr><th>Symptom</th><th>Try</th></tr>
+        <tr><td>"No serial ports found"</td><td>Check the USB cable is a data cable and the tester is plugged in. On Windows, install the CH340 driver.</td></tr>
+        <tr><td>"no readings (tester on? cable in?)"</td><td>Switch the tester on and leave it sending. If it is a different port, use <code>--port</code>.</td></tr>
+        <tr><td>"pip is not recognised"</td><td>Try <code>python -m pip install pyserial</code> (or <code>py -m pip ...</code> on Windows).</td></tr>
+        <tr><td>Permission denied on Linux</td><td>Add yourself to the <code>dialout</code> group, then log out and in.</td></tr>
+        <tr><td>The number differs from the tester's screen</td><td>Run <code>--calibrate</code> with a lamp of known output.</td></tr>
+        <tr><td>"Sign-in failed: Invalid credentials"</td><td>Check the email or username and password. You can also make a token on the website and use <code>--token</code>.</td></tr>
+        <tr><td>"hCRI.io said 401"</td><td>The token is wrong or was deleted. Run <code>--login</code> again to create a new one.</td></tr>
+        <tr><td>The upload says the account limit is reached</td><td>Delete some runtime curves on hCRI.io, then upload again with <code>--upload</code>.</td></tr>
+      </table>
+      <p>Using the tester's own Transfer Data instead? The <a href="../manual/#tklamp">manual</a> and the Runtime page's Upload CSV explain how to set the seconds between readings for that file.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  TKLamp Live Logger · <a href="../">Companion home</a> · <a href="../manual/">Manual</a> · <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a><br>© 2026 fizzgig · Bridge firmware is GPLv3. The ColorMunki driver code is derived from ArgyllCMS (AGPL-3.0) · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Source ↗</a>
+</footer>
+
+<button id="back-to-top" class="no-print" type="button" title="Back to top" aria-label="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+<script>
+  (function(){
+    var btn = document.getElementById('back-to-top');
+    function sync(){
+      if (window.scrollY > 400) btn.classList.add('visible');
+      else btn.classList.remove('visible');
+    }
+    sync();
+    window.addEventListener('scroll', sync, { passive: true });
+    btn.addEventListener('click', function(){
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  })();
+</script>
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
+</body></html>
