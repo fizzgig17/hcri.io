@@ -229,7 +229,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.27.1, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.27.2)</h3>
+      <ul>
+        <li><strong>Update without leaving the app (Android).</strong> Tap <code>Update</code> on the banner or <code>Update now</code> in Settings &rarr; Update, confirm once in Google Play's dialog, keep using the app while it downloads, then tap <code>Restart</code>.</li>
+      </ul>
+      <h3>Android 2026.10.27.1, iOS 1.28</h3>
       <ul>
         <li><strong>TKLamp TK2303D integrating-sphere tester</strong> through the ESP32 bridge: a live lumen reading, a chart with a fixed lumen scale and a time axis along the bottom, recorded runtimes, and upload to Runtime on hCRI.io. See <a href="#tklamp">Using a TKLamp tester</a>. Needs the latest bridge firmware.</li>
         <li><strong>History &rarr; Runtime</strong> keeps every recorded run on your phone; tap its chart to open it full size.</li>
@@ -793,7 +797,7 @@
         drag a row and reorder it. <code>Reset to Default</code> restores CCT, Ra, Duv, Lux, Rf, R9, Rg in
         that order.</p>
       <p>On Android, Settings has three tabs at the top: <code>Settings</code>, <code>Update</code> and <code>About</code>, so About is one
-        tap away instead of at the bottom of a long scroll. <code>Update</code> shows what Google Play reports about newer versions and has the button that opens the app's Play Store page; it carries a dot when an update is waiting. On iPhone there is no Update tab (updates come through the App Store / TestFlight), so Settings has just <code>Settings</code> and <code>About</code>.</p>
+        tap away instead of at the bottom of a long scroll. <code>Update</code> shows what Google Play reports about newer versions. Tap <code>Update now</code> (or <code>Update</code> on the banner), confirm once in Google Play's small dialog, and the update downloads in the background while you keep using the app. When it is ready the button changes to <code>Restart to finish updating</code>; tapping it installs the update and reopens the app. It carries a dot when an update is waiting. If Google Play can't run the update in the app, the button opens the app's Play Store page instead. On iPhone there is no Update tab (updates come through the App Store / TestFlight), so Settings has just <code>Settings</code> and <code>About</code>.</p>
       <h3>About</h3>
       <p>The current list of supported meter models (and which are independently verified), a
         <code>Send Feedback</code> button that opens a pre-addressed email, and a link back to this
