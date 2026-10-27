@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>hCRI ESP32 Bridge — Setup Guide</title>
-<meta name="description" content="Build the hCRI ESP32 bridge: which LilyGO board to buy, how to wire it to a Torch Bearer or ColorMunki, and how to install the firmware.">
+<meta name="description" content="Build the hCRI ESP32 bridge: which LilyGO board to buy, how to wire it to a Torch Bearer, ColorMunki or TKLamp tester, and how to install the firmware.">
 <link rel="canonical" href="https://www.hcri.io/companion/bridge/">
 <script>
   (function(){
@@ -160,6 +160,13 @@
   </nav>
 </header>
 <div class="bar"></div>
+<style>
+.news{max-width:1100px;margin:14px auto 0;padding:11px 16px;border:1px solid var(--accent);background:var(--accent-dim);border-radius:10px;font-size:13.5px;line-height:1.5;color:var(--text)}
+.news strong{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:11.5px;margin-right:6px}
+.news a{color:var(--accent);font-weight:600}
+@media (max-width:1140px){.news{margin-inline:16px}}
+</style>
+<div class="news" role="note"><strong>New</strong>hCRI Companion now supports the <b>TKLamp TK2303D</b> integrating-sphere tester through the ESP32 bridge: live lumens on your phone, recorded runtimes, and one-tap upload to Runtime on hCRI.io. <a href="#tklamp">Jump to Using a TKLamp tester</a> · <a href="../manual/#tklamp">Manual</a></div>
 
 <div class="page">
   <nav class="toc" aria-label="Table of contents">
@@ -173,6 +180,7 @@
       <li><a href="#first">First connection</a></li>
       <li><a href="#colormunki">Using a ColorMunki</a></li>
       <li><a href="#torchbearer">Using a Torch Bearer</a></li>
+      <li><a href="#tklamp">Using a TKLamp tester</a></li>
       <li><a href="#updating">Updating the firmware</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
     </ol>
@@ -180,15 +188,15 @@
 
   <main>
     <h1 class="doc-title">ESP32 Bridge — Setup Guide</h1>
-    <div class="doc-meta">Last updated October 15, 2026 · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Firmware source on GitHub ↗</a></div>
+    <div class="doc-meta">Last updated October 27, 2026 · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Firmware source on GitHub ↗</a></div>
 
     <section id="what">
       <h2><span class="num">01</span> What the bridge does</h2>
-      <p class="lede">The Torch Bearer and the X-Rite ColorMunki Photo / Design are USB spectrometers with no Bluetooth.
+      <p class="lede">The Torch Bearer and the X-Rite ColorMunki Photo / Design are USB spectrometers with no Bluetooth, and the TKLamp TK2303D integrating-sphere tester is a USB device with no Bluetooth either.
         The bridge is a small LilyGO ESP32-S3 board that plugs into the instrument as a USB host, takes the measurement,
         and passes the spectrum to the hCRI Companion app over Bluetooth LE. Total cost is roughly the price of the board plus a cable adapter.</p>
       <div class="card"><h4>Supported instruments</h4>
-        <p>Torch Bearer, ColorMunki Photo and ColorMunki Design (USB ID 0971:2007). The ColorMunki Display and ColorMunki Smile are different instruments and do not work. The firmware detects which instrument is plugged in automatically; the same file runs both.</p></div>
+        <p>Torch Bearer, ColorMunki Photo and ColorMunki Design (USB ID 0971:2007), and the TKLamp TK2303D tester (which streams lumen readings over its own USB cable). The ColorMunki Display and ColorMunki Smile are different instruments and do not work. The firmware detects which instrument is plugged in automatically; the same file runs all of them.</p></div>
       <div class="card warn"><h4>Not supported</h4>
         <p>Boards that cannot act as a USB host will not work, including the LilyGO T-Echo (nRF52840) and plain ESP32 / ESP32-S2 boards. You need an ESP32-S3.</p></div>
     </section>
@@ -258,14 +266,14 @@
         <li><strong>Attach the adapter</strong><span>Plug the OTG adapter into the board's USB-C port.</span></li>
         <li><strong>Plug in the instrument</strong><span>Put the instrument's USB-A plug into the adapter's female USB-A.</span></li>
         <li><strong>Add power</strong><span>Standard S3: plug the power bank into the adapter's female USB-C. Pro: optional.</span></li>
-        <li><strong>Wait for the screen</strong><span>Until an instrument is plugged in the screen says HCRI BRIDGE with a red NO USB. Once it finds the instrument the header changes to TORCH BEARER or COLORMUNKI and it goes to its ready screen.</span></li>
+        <li><strong>Wait for the screen</strong><span>Until an instrument is plugged in the screen says HCRI BRIDGE with a red NO USB. Once it finds the instrument the header changes to TORCH BEARER, COLORMUNKI or TKLAMP and it goes to its ready screen.</span></li>
       </ol>
     </section>
 
     <section id="first">
       <h2><span class="num">06</span> First connection</h2>
       <p>Open hCRI Companion and use the meter picker (the connect button on the Main tab). The bridge appears in the list.
-        The bridge is listed as <strong>hCRI Bridge · Torch Bearer</strong> or <strong>hCRI Bridge · ColorMunki</strong>, because the latest firmware tells the app what is plugged in even before you connect. A bridge with nothing plugged in is left out of the list. Older firmware can't say, so it is listed as plain <strong>hCRI Bridge</strong>. Tap it to connect; once connected, the app reads which instrument is attached and shows its name, Torch Bearer or ColorMunki, in the header.</p>
+        The bridge is listed as <strong>hCRI Bridge · Torch Bearer</strong> or <strong>hCRI Bridge · ColorMunki</strong> (or <strong>hCRI Bridge · TKLamp</strong>), because the latest firmware tells the app what is plugged in even before you connect. A bridge with nothing plugged in is left out of the list. Older firmware can't say, so it is listed as plain <strong>hCRI Bridge</strong>. Tap it to connect; once connected, the app reads which instrument is attached and shows its name, Torch Bearer or ColorMunki, in the header.</p>
       <p>The bridge accepts one Bluetooth connection at a time and stops advertising while connected. If the app cannot see it, close other Bluetooth tools (nRF Connect, a second phone) and try again. Firmware from before October 14, 2026 advertises as "Torch Bearer" instead of "hCRI Bridge"; the app accepts both. Reflash to get the new name (see <a href="#updating">Updating the firmware</a>), and update the app first.</p>
     </section>
 
@@ -288,18 +296,34 @@
         <a href="../manual/#torchbearer">manual</a> for the full workflow.</p>
     </section>
 
+    <section id="tklamp">
+      <h2><span class="num">09</span> Using a TKLamp tester</h2>
+      <p>The TKLamp TK2303D sends its readings on its own, about four times a second, over a USB serial link (it shows up as a CH340 device). Plug its USB cable into the OTG adapter like any other instrument, then:</p>
+      <ol class="steps">
+        <li><strong>Switch the tester on</strong><span>The bridge can only recognise the tester while it is sending readings, so power it on and leave it on. The bridge listens for a couple of seconds and then shows TKLAMP in its header with the live lumen number.</span></li>
+        <li><strong>Connect from the app</strong><span>The bridge is listed as <strong>hCRI Bridge · TKLamp</strong>. Once connected, the Main tab shows the live lumens, a chart and a Record button.</span></li>
+        <li><strong>Check the scale</strong><span>The app turns the tester's raw count into lumens with a scale (counts per lumen, default 313.2). Put a lamp of known output in the sphere and use <em>Set scale</em> if the app and the tester's screen disagree.</span></li>
+      </ol>
+      <div class="card"><h4>Needs the latest firmware and app</h4>
+        <p>TKLamp support is in the current <code>prod-latest</code> firmware and in the newest Companion builds. The full workflow (live chart, Clear screen, recording, History &rarr; Runtime, upload) is in the <a href="../manual/#tklamp">manual</a>.</p></div>
+      <div class="card warn"><h4>A tester that is on but silent</h4>
+        <p>If the tester is plugged in but not sending (for example it is off), the bridge stays on its "plug in an instrument" screen. Switch the tester on, or unplug and re-plug it.</p></div>
+    </section>
+
     <section id="updating">
-      <h2><span class="num">09</span> Updating the firmware</h2>
+      <h2><span class="num">10</span> Updating the firmware</h2>
       <p>Updates are not delivered over Bluetooth. To update, repeat <a href="#firmware">Installing the firmware</a>: put the board in download mode and flash the new file. Settings in the app are kept. The newest tested release is always <code>prod-latest</code>.</p>
     </section>
 
     <section id="troubleshooting">
-      <h2><span class="num">10</span> Troubleshooting</h2>
+      <h2><span class="num">11</span> Troubleshooting</h2>
       <table>
         <tr><th>Symptom</th><th>Try</th></tr>
         <tr><td>App can't find the bridge</td><td>Bridge powered and showing the ready screen? Close other Bluetooth apps; only one connection at a time. Check phone Bluetooth and location/nearby-devices permissions.</td></tr>
         <tr><td>No port appears when flashing</td><td>Use a data-capable USB-C cable. Enter download mode (BOOT + RST). On Windows, try a different USB port.</td></tr>
         <tr><td>Screen says no instrument</td><td>Re-seat the instrument cable. Check the OTG adapter really has a female USB-A. Add a power bank.</td></tr>
+        <tr><td>TKLamp not detected</td><td>Switch the tester on so it is sending readings, check its USB cable is seated in the adapter, then re-plug it. The bridge screen should change to TKLAMP.</td></tr>
+        <tr><td>TKLamp number differs from the tester's screen</td><td>Use Set scale on the Main tab with a lamp of known output, or edit Settings &rarr; TKLamp tester &rarr; Counts per lumen.</td></tr>
         <tr><td>ColorMunki "Calibrate first"</td><td>Turn the dial to calibration, tap Calibrate. Recalibrate when the age limit passes.</td></tr>
         <tr><td>"Calibration failed" or wrong dial</td><td>Dial must sit in the calibration position and the instrument must be still. Try again.</td></tr>
         <tr><td>"Too bright" / "no data"</td><td>Move the instrument back from the light or use the diffuser. Check the dial is in ambient.</td></tr>
