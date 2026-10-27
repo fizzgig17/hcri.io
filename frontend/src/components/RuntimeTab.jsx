@@ -285,7 +285,7 @@ export default function RuntimeTab({ T, isAdmin }) {
   const remove = async (ids) => {
     if (!window.confirm(ids.length === 1 ? 'Delete this runtime curve?' : `Delete ${ids.length} runtime curves?`)) return;
     try {
-      for (const id of ids) await api.del(fu('/runtime?id=' + encodeURIComponent(id)));
+      for (const id of ids) await api.post(fu('/runtime?delete=' + encodeURIComponent(id)), {});
       setSel((s) => s.filter((x) => !ids.includes(x)));
       setMsg(`Deleted ${ids.length}.`);
       await load();

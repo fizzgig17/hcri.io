@@ -16,7 +16,7 @@ declare(strict_types=1);
 //   POST   /api/v1/runtime?share=<id>           -> {"shareToken":"..."}  (makes or reuses the curve's share link token)
 //   POST   /api/v1/runtime?unshare=<id>         -> {"shareToken":null}   (stops sharing; old links stop working)
 //   POST   /api/v1/runtime?trim=<id>            -> {"trimmed":N,"points":M}  (drops the near-dark readings before the light came on)
-//   DELETE /api/v1/runtime?id=<id>              -> {"deleted":1}
+//   DELETE /api/v1/runtime?id=<id>              -> {"deleted":1}   (or POST ?delete=<id>)
 //
 // The same endpoint is also served at /api/runtime for the website (session sign-in instead of an API token).
 // Admins: add ?for_user=<id> to any call to act on that user's curves.
@@ -86,6 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('Method not allowed', 405);
+
+if (isset($_GET['delete'])) {   // same as DELETE ?id=, for clients and hosts that only allow GET and POST
+    $did = $_GET['delete'];
+    if (!runtime_curve_valid_id($did)) json_error('Bad id', 400);
+    $d = $db->prepare('DELETE FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+    $d->execute([$uid, $did]);
+    json_out(['deleted' => $d->rowCount()]);
+}
 
 if (isset($_GET['trim'])) {
     $tid = $_GET['trim'];

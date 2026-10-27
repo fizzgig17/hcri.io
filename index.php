@@ -253,6 +253,12 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/og/runtime.png') {
+
+        require __DIR__ . '/api/og_runtime.php'; exit;
+
+    }
+
     if ($uri === '/api/og/compare.png') {
 
         require __DIR__ . '/api/og_compare.php'; exit;
@@ -1054,6 +1060,7 @@ if ($rtRaw !== '' && $shareTok === '' && $reportId === 0 && $cmpRaw === '') {
                 $ogDesc  = 'Light output over time' . (count($rtLabels) === 1 ? '' : ': ' . implode(', ', array_slice($rtLabels, 0, 4)) . (count($rtLabels) > 4 ? ' and more' : '')) . ', on hCRI.io.';
                 $ogUrl   = $ogBase . '?runtime=' . rawurlencode(implode(',', $rtToks));
                 $ogType  = 'article';
+                if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/runtime.png?t=' . rawurlencode(implode(',', $rtToks));
             }
         } catch (\Throwable $e) { /* fall back to site defaults */ }
     }
