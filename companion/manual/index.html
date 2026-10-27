@@ -163,6 +163,13 @@
   </nav>
 </header>
 <div class="bar"></div>
+<style>
+.news{max-width:1100px;margin:14px auto 0;padding:11px 16px;border:1px solid var(--accent);background:var(--accent-dim);border-radius:10px;font-size:13.5px;line-height:1.5;color:var(--text)}
+.news strong{color:var(--accent);letter-spacing:.04em;text-transform:uppercase;font-size:11.5px;margin-right:6px}
+.news a{color:var(--accent);font-weight:600}
+@media (max-width:1140px){.news{margin-inline:16px}}
+</style>
+<div class="news" role="note"><strong>New</strong>hCRI Companion now supports the <b>TKLamp TK2303D</b> integrating-sphere tester through the ESP32 bridge: live lumens on your phone, recorded runtimes, and one-tap upload to Runtime on hCRI.io. <a href="#tklamp">Jump to Using a TKLamp tester</a> · <a href="../bridge/#tklamp">Bridge setup</a></div>
 
 <div class="page">
   <nav class="toc" aria-label="Table of contents">
@@ -190,7 +197,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.28 · Last updated October 15, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers app version 1.28 · Last updated October 27, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -209,19 +216,26 @@
         <span class="chip">HPCS-330P</span>
         <span class="chip">HPCS330Pro</span>
         <span class="chip">Torch Bearer (via ESP32 bridge)</span>
+        <span class="chip">TKLamp TK2303D tester (via ESP32 bridge)</span>
       </div>
       <p class="dim">The app detects which model you're connected to from its advertised Bluetooth name and
         reads its data with that model's own field layout automatically — nothing to configure. The full,
         up-to-date list (including which models are independently verified against a real captured
         reading) is always on the app's own Settings → About tab.</p>
       <div class="card warn">
-        <h4>The Torch Bearer and ColorMunki need the ESP32 bridge</h4>
-        <p>The Torch Bearer and the X-Rite ColorMunki Photo / Design have no Bluetooth of their own. A LilyGO T-Display S3 (or S3 Pro) board running the
+        <h4>The Torch Bearer, ColorMunki and TKLamp tester need the ESP32 bridge</h4>
+        <p>The Torch Bearer, the X-Rite ColorMunki Photo / Design and the TKLamp TK2303D tester have no Bluetooth of their own. A LilyGO T-Display S3 (or S3 Pro) board running the
           open-source hCRI bridge firmware connects to them by USB and talks to the app over Bluetooth. The
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.22.3, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.27.1, iOS 1.28)</h3>
+      <ul>
+        <li><strong>TKLamp TK2303D integrating-sphere tester</strong> through the ESP32 bridge: a live lumen reading, a chart with a fixed lumen scale and a time axis along the bottom, recorded runtimes, and upload to Runtime on hCRI.io. See <a href="#tklamp">Using a TKLamp tester</a>. Needs the latest bridge firmware.</li>
+        <li><strong>History &rarr; Runtime</strong> keeps every recorded run on your phone; tap its chart to open it full size.</li>
+        <li><strong>Settings &rarr; TKLamp tester</strong> holds the counts-per-lumen scale and the chart width.</li>
+      </ul>
+      <h3>Android 2026.10.22.3</h3>
       <ul>
         <li><strong>Share card.</strong> A new card icon at the right end of the chart dots on Main (and a <code>Card</code> button on each History row, next to <code>TM-30</code>) makes the same one-page summary card as hCRI.io: Rf and Rg, CCT, Duv, Ra, R9, the spectrum, the color vector graphic (drawn like the TM-30 report&rsquo;s) and the local fidelity bars, using the numbers the app shows for the reading, in light or dark to match the app. <code>Save image</code> keeps it (Android: Pictures &rsaquo; hCRI; iPhone: choose Save Image in the share sheet) and <code>Copy image</code> puts it on the clipboard so you can paste it into a message. Long-press the icon for its tooltip.</li>
         <li><strong>iOS: update notice.</strong> The iPhone app now tells you when a newer production version is available in TestFlight. A banner appears at the top, <code>Settings → Update</code> has a <code>Check for updates</code> button, and either one opens TestFlight so you can install it.</li>
@@ -474,7 +488,7 @@
     </section>
 
     <section id="torchbearer">
-      <h2><span class="num">06</span> Using a Torch Bearer</h2>
+      <h2><span class="num">06</span> Using a Torch Bearer, ColorMunki or TKLamp</h2>
       <p>The Torch Bearer (and the X-Rite ColorMunki Photo / Design) reaches the app through the hCRI ESP32 bridge,
         a small LilyGO ESP32-S3 board. You need:</p>
       <ul>
@@ -494,7 +508,24 @@
         up to 4.5&nbsp;s and averages several integrations, so a reading can take 10–15&nbsp;s. Tap the main button again to
         cancel. The spectrum is the ColorMunki's own (Argyll / X-Rite factory calibration), with no correction of ours. In normal light it uses the ColorMunki's high-resolution mode (3.3&nbsp;nm bands, an effective
         resolution of about 4&nbsp;nm instead of 11&nbsp;nm); in very dim light it uses the standard 10&nbsp;nm spectrum.</p>
+      <h3 id="tklamp">Using a TKLamp tester</h3>
+      <p>The TKLamp TK2303D is an integrating-sphere tester that measures a light's total output in lumens. It has no Bluetooth, so it plugs into the bridge with the tester's own USB cable. The app then shows its reading live and can record how the output changes over time.</p>
+      <ol>
+        <li><strong>Connect.</strong> Plug the tester into the bridge (see the <a href="../bridge/#tklamp">bridge guide</a>), switch the tester on, and connect from the meter picker as usual. The bridge recognises the tester because it is sending readings, so it must be on. The bridge's screen header says <code>TKLAMP</code> and the app shows <code>TKLamp</code>.</li>
+        <li><strong>Read.</strong> The Main tab shows the output in lumens (a one second average, updating several times a second) and a chart. The chart's vertical scale starts at 0 and only grows, so a slow fade looks like a slow fade. Time labels run along the bottom. The chart shows the width set in Settings (default 120&nbsp;s); swipe it sideways to look back, and tap <code>Latest</code> to jump to now.</li>
+        <li><strong>Clear screen.</strong> The <code>Clear screen</code> button wipes the number and the chart so you can start fresh. It is not available while recording.</li>
+        <li><strong>Record.</strong> Tap <code>Record run</code> and <code>Stop recording</code> when done. The run is saved on your phone straight away, in History &rarr; Runtime. Give it a name and tap <code>Upload to Runtime</code> to send it to your Runtime list on hCRI.io (the same name replaces an earlier run). The dark readings before the light came on are trimmed automatically (see Settings).</li>
+        <li><strong>Review.</strong> History &rarr; Runtime lists your runs with length, start and end lumens and the percent left. Tap a run's chart to open it full size, tap its name to rename it, and use the cloud icon to upload it later.</li>
+      </ol>
+      <h3>The scale (counts per lumen)</h3>
+      <p>The tester sends a raw sensor count and the app divides it by <em>counts per lumen</em> to show lumens. The default, 313.2, was measured on a calibrated tester against its 2150&nbsp;lm calibration lamp. If the app and the tester's own screen disagree (for example after you recalibrate the tester), put a lamp of known output in the sphere, wait for a steady number, tap the <code>Scale:</code> line under the chart, enter the lamp's lumens and tap <code>Set scale</code>. You can also type the number in Settings &rarr; TKLamp tester. A bigger number shows fewer lumens.</p>
       <h3>Good to know</h3>
+      <ul>
+        <li>The TKLamp gives lumens only: there is no spectrum, CCT or CRI, and Live spectrum and Flicker are not available.</li>
+        <li>Runs are stored at one point per second, so a 24 hour run is 86,400 points. hCRI.io accepts up to 100,000 points per curve; a run longer than about 27 hours is stored with wider spacing to fit. The website's list and shared pages average very long curves down for drawing (to a few thousand points), while the stored curve keeps every point.</li>
+        <li>If readings stop for 5 seconds the app says so. Check that the tester is on and the cable is seated.</li>
+      </ul>
+      <h3>Good to know (bridge)</h3>
       <ul>
         <li>The bridge allows one Bluetooth connection at a time and stops advertising while connected — close
           other Bluetooth tools (such as nRF Connect) if the app can't see it.</li>
@@ -679,7 +710,7 @@
 
     <section id="history-tab">
       <h2><span class="num">11</span> The History tab</h2>
-      <p>A switch at the top chooses between two lists: <code>Readings</code> and <code>Flicker</code> (saved flicker samples, described below).</p>
+      <p>A switch at the top chooses between three lists: <code>Readings</code>, <code>Flicker</code> (saved flicker samples, described below) and <code>Runtime</code> (runs recorded with a TKLamp tester; see <a href="#tklamp">Using a TKLamp tester</a>).</p>
       <p>Your most recent readings (up to 100), grouped by day, newest first. From here you can:</p>
       <ul>
         <li><strong>View</strong> a past reading's full measurement grid, spectrum, chromaticity, and
@@ -746,6 +777,8 @@
       <p><code>Restore readings from backup</code> (shown once a token is saved) adds back any readings and saved flickers the app doesn't have, newest first, and never removes or changes anything. History still keeps its usual 100 readings (up to 200 if unuploaded), so a very large backup restores only the most recent. On a fresh install with your token already saved, the app also offers to restore once.</p>
       <h3>Bridge</h3>
       <p><code>Flip screen</code> turns the hCRI Bridge's screen 180° (for a Torch Bearer or a ColorMunki), so it reads upright the other way round. It takes effect right away while the bridge is connected and needs the latest bridge firmware. It does not affect HPCS meters. The Torch Bearer spectrum is sent exactly as the meter reports it, so there is no correction setting.</p>
+      <h3>TKLamp tester</h3>
+      <p><code>Counts per lumen</code> (default 313.2) is the scale from the tester's raw count to lumens; <code>Chart width (seconds)</code> (default 120) is how much time the live and saved charts show across the screen before you swipe. <code>Trim the dark start of a run</code> (on by default) drops the near-dark readings before the light came on when you stop a run, so the saved and uploaded curve starts when the light does. See <a href="#tklamp">Using a TKLamp tester</a>.</p>
       <h3>ColorMunki</h3>
       <p><code>Calibration limit (hours)</code>: how old the ColorMunki's calibration may be before the app asks you to calibrate again. The default is 1 hour; 0 turns the check off. The bridge itself still needs one calibration after it powers up.</p>
       <h3>Readings</h3>

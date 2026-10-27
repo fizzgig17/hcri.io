@@ -253,6 +253,12 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/og/runtime.png') {
+
+        require __DIR__ . '/api/og_runtime.php'; exit;
+
+    }
+
     if ($uri === '/api/og/compare.png') {
 
         require __DIR__ . '/api/og_compare.php'; exit;
@@ -304,6 +310,12 @@ if (str_starts_with($uri, '/api/')) {
     if ($uri === '/api/v1/backup') {
 
         require __DIR__ . '/api/v1_backup.php'; exit;
+
+    }
+
+    if (preg_match('#^/api/runtime_shared/?$#', $uri)) {
+
+        require __DIR__ . '/api/runtime_shared.php'; exit;
 
     }
 
@@ -1029,6 +1041,29 @@ if ($cmpRaw !== '' && $shareTok === '' && $reportId === 0) {
 
     }
 
+}
+
+$rtRaw = isset($_GET['runtime']) ? (string)$_GET['runtime'] : '';
+if ($rtRaw !== '' && $shareTok === '' && $reportId === 0 && $cmpRaw === '') {
+    $rtToks = array_slice(array_values(array_filter(array_map('trim', explode(',', $rtRaw)), fn($t) => preg_match('/^[a-f0-9]{16}$/', $t) === 1)), 0, 12);
+    if ($rtToks) {
+        try {
+            require_once __DIR__ . '/api/_core/db.php';
+            require_once __DIR__ . '/api/_core/runtime_curves.php';
+            $rtDb = get_db();
+            runtime_curves_ensure($rtDb);
+            $rtq = $rtDb->prepare('SELECT label FROM runtime_curves WHERE share_token = ?');
+            $rtLabels = [];
+            foreach ($rtToks as $rtT) { $rtq->execute([$rtT]); $rl = $rtq->fetchColumn(); if ($rl !== false) $rtLabels[] = (string)$rl; }
+            if ($rtLabels) {
+                $ogTitle = count($rtLabels) === 1 ? 'Runtime: ' . $rtLabels[0] . ' — hCRI.io' : 'Runtime comparison of ' . count($rtLabels) . ' lights — hCRI.io';
+                $ogDesc  = 'Light output over time' . (count($rtLabels) === 1 ? '' : ': ' . implode(', ', array_slice($rtLabels, 0, 4)) . (count($rtLabels) > 4 ? ' and more' : '')) . ', on hCRI.io.';
+                $ogUrl   = $ogBase . '?runtime=' . rawurlencode(implode(',', $rtToks));
+                $ogType  = 'article';
+                if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/runtime.png?t=' . rawurlencode(implode(',', $rtToks));
+            }
+        } catch (\Throwable $e) { /* fall back to site defaults */ }
+    }
 }
 
 $ogH = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
