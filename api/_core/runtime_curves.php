@@ -107,9 +107,11 @@ function runtime_curve_normalize(mixed $it): array|string {
  * Reads a wide CSV: the first column is time in minutes, every other column is one light (the header is its label).
  * Optional rows right under the header start with "#" and give per-light info: #group, #unit, #cct, #duv, #cri, #r9, #r12, #rf, #rg, #tempF.
  * Blank cells at the end of a column are ignored. The interval is the median gap between times.
+ * $sampleSeconds > 0 says the first column is only a row number (as in a TKLamp tester's Output*.csv: ,lumen,candela,lux) and the readings are
+ * that many seconds apart. $name is put in front of each light's label. Columns named lumen/candela/lux get unit lm/cd/lx when no unit is given.
  * @return array{items:array<int,array>,error:?string}
  */
-function runtime_curves_from_csv(string $csv, string $group = '', string $unit = ''): array {
+function runtime_curves_from_csv(string $csv, string $group = '', string $unit = '', float $sampleSeconds = 0.0, string $name = ''): array {
     $csv = preg_replace('/^\xEF\xBB\xBF/', '', $csv) ?? $csv;
     $lines = preg_split('/\r\n|\n|\r/', trim($csv)) ?: [];
     if (count($lines) < 1 + RUNTIME_MIN_POINTS) return ['items' => [], 'error' => 'The CSV needs a header row and at least ' . RUNTIME_MIN_POINTS . ' data rows'];
@@ -127,15 +129,18 @@ function runtime_curves_from_csv(string $csv, string $group = '', string $unit =
             for ($c = 1; $c < count($head); $c++) if (isset($row[$c]) && trim((string)$row[$c]) !== '') $info[$c][$k] = trim((string)$row[$c]);
             continue;
         }
-        if (!isset($row[0]) || !is_numeric($row[0])) return ['items' => [], 'error' => 'The first column must be time in minutes (numbers)'];
-        $times[] = (float)$row[0];
+        if ($sampleSeconds > 0) { $times[] = (float)count($times); }   // row number: the real spacing is $sampleSeconds
+        else {
+            if (!isset($row[0]) || !is_numeric($row[0])) return ['items' => [], 'error' => 'The first column must be time in minutes (numbers). If it is a row number, give the seconds between readings.'];
+            $times[] = (float)$row[0];
+        }
         for ($c = 1; $c < count($head); $c++) $cols[$c][] = $row[$c] ?? '';
     }
     $gaps = [];
     for ($i = 1; $i < count($times); $i++) if ($times[$i] > $times[$i - 1]) $gaps[] = $times[$i] - $times[$i - 1];
     if (!$gaps) return ['items' => [], 'error' => 'The time column must increase'];
     sort($gaps);
-    $interval = $gaps[intdiv(count($gaps), 2)] * 60.0;
+    $interval = $sampleSeconds > 0 ? $sampleSeconds : $gaps[intdiv(count($gaps), 2)] * 60.0;
     $items = [];
     for ($c = 1; $c < count($head); $c++) {
         $label = trim((string)$head[$c]);
@@ -145,7 +150,8 @@ function runtime_curves_from_csv(string $csv, string $group = '', string $unit =
         $i = $info[$c] ?? [];
         $meta = [];
         foreach (['cct', 'duv', 'cri', 'r9', 'r12', 'rf', 'rg', 'tempF'] as $mk) if (isset($i[$mk])) $meta[$mk] = $i[$mk];
-        $items[] = ['label' => $label, 'group' => $i['group'] ?? $group, 'unit' => $i['unit'] ?? $unit, 'intervalSeconds' => round($interval, 3), 'values' => $vals, 'meta' => $meta];
+        $autoUnit = ['lumen' => 'lm', 'candela' => 'cd', 'lux' => 'lx'][strtolower($label)] ?? '';
+        $items[] = ['label' => $name !== '' ? $name . ' · ' . $label : $label, 'group' => $i['group'] ?? $group, 'unit' => $i['unit'] ?? ($unit !== '' ? $unit : $autoUnit), 'intervalSeconds' => round($interval, 3), 'values' => $vals, 'meta' => $meta];
     }
     return ['items' => $items, 'error' => null];
 }
