@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 const RUNTIME_MAX_PER_USER   = 2000;    // curves kept per account
 const RUNTIME_MAX_PER_BATCH  = 500;     // curves per request
-const RUNTIME_MAX_POINTS     = 5000;    // samples per curve
+const RUNTIME_MAX_POINTS     = 100000;  // samples per curve (24 hours at one reading a second is 86,400)
+const RUNTIME_MAX_TOTAL_POINTS = 6000000; // samples across all of one account's curves (about 40 MB of JSON)
+const RUNTIME_LIST_POINTS    = 5000;    // longest curve the website list and shared pages draw; longer ones are averaged down to this
 const RUNTIME_MIN_POINTS     = 2;
 
 function runtime_curves_ensure(PDO $db): void {
@@ -179,4 +181,22 @@ function runtime_trim_leading(array $vals, float $interval): array {
     $start = max(0, $first - $keep);
     if ($start <= 0 || count($vals) - $start < RUNTIME_MIN_POINTS) return $vals;
     return array_values(array_slice($vals, $start));
+}
+
+/**
+ * Averages a long curve down to at most $max points for drawing. Returns [values, intervalSeconds]; the curve is unchanged when it
+ * already fits. The stored curve and GET ?id=<id> keep every point.
+ * @param array<int,int|float> $vals
+ * @return array{0:array<int,int|float>,1:float}
+ */
+function runtime_downsample(array $vals, float $interval, int $max = RUNTIME_LIST_POINTS): array {
+    $n = count($vals);
+    if ($n <= $max) return [$vals, $interval];
+    $k = (int)ceil($n / $max);
+    $out = [];
+    for ($i = 0; $i < $n; $i += $k) {
+        $chunk = array_slice($vals, $i, $k);
+        $out[] = round(array_sum($chunk) / count($chunk), 2);
+    }
+    return [$out, $interval * $k];
 }

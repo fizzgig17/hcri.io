@@ -35,9 +35,10 @@ foreach ($toks as $t) {
     $r = $s->fetch();
     if (!$r) continue;
     $v = json_decode((string)$r['payload'], true);
+    [$dv, $di] = runtime_downsample(is_array($v) ? $v : [], (float)$r['interval_s']);   // long curves are averaged down for drawing
     $items[] = ['id' => $t, 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'],
-                'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'values' => is_array($v) ? $v : []];
+                'intervalSeconds' => $di, 'points' => (int)$r['points'],
+                'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'values' => $dv];
 }
 if (!$items) json_error('This runtime link is not shared (any more)', 404);
 json_out(['items' => $items, 'requested' => count($toks)]);

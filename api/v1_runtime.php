@@ -71,7 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     foreach ($s->fetchAll() as $r) {
         $row = ['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
                 'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'shareToken' => $r['share_token'] ?? null, 'updatedAt' => $r['updated_at']];
-        if ($full) { $v = json_decode((string)$r['payload'], true); $row['values'] = is_array($v) ? $v : []; }
+        if ($full) {
+            $v = json_decode((string)$r['payload'], true);
+            [$dv, $di] = runtime_downsample(is_array($v) ? $v : [], (float)$r['interval_s']);
+            $row['values'] = $dv;
+            if ($di !== (float)$r['interval_s']) { $row['intervalSeconds'] = $di; $row['downsampled'] = true; $row['sourceIntervalSeconds'] = (float)$r['interval_s']; }
+        }
         $items[] = $row;
     }
     json_out(['items' => $items, 'total' => count($items)]);
@@ -188,6 +193,10 @@ foreach ($items as $it) {
     $exists->execute([$uid, $id]);
     $isNew = !$exists->fetchColumn();
     if ($isNew && $have >= RUNTIME_MAX_PER_USER) { $skipped[] = ['label' => $c['label'], 'reason' => 'curve limit reached (' . RUNTIME_MAX_PER_USER . ')']; continue; }
+    // Account-wide ceiling on stored samples (counting this curve's replacement, not its old copy).
+    $tot = $db->prepare('SELECT COALESCE(SUM(points), 0) FROM runtime_curves WHERE user_id = ? AND curve_id <> ?');
+    $tot->execute([$uid, $id]);
+    if ((int)$tot->fetchColumn() + count($c['values']) > RUNTIME_MAX_TOTAL_POINTS) { $skipped[] = ['label' => $c['label'], 'reason' => 'account storage limit reached (' . number_format(RUNTIME_MAX_TOTAL_POINTS) . ' points in total); delete some curves first']; continue; }
     $json = json_encode($c['values']);
     if ($json === false) { $skipped[] = ['label' => $c['label'], 'reason' => 'values could not be stored']; continue; }
     $ins->execute([$uid, $id, $c['label'], $c['group'], $c['unit'], $c['interval'], count($c['values']), $json, $c['meta'] ? json_encode($c['meta']) : null]);

@@ -324,9 +324,21 @@ export default function RuntimeTab({ T, isAdmin }) {
 
   const byId = useMemo(() => Object.fromEntries((list || []).map((c) => [c.id, c])), [list]);
 
+  // The list carries long curves averaged down to a few thousand points; a light's own page loads its full curve.
+  const [fullState, setFullState] = useState({ list: null, map: {} });
+  const fullById = fullState.list === list ? fullState.map : {};
+  const listC = rt && byId[rt];
+  useEffect(() => {
+    if (!rt || !listC || !listC.downsampled || fullById[rt]) return;
+    let live = true;
+    api.get(fu('/runtime?id=' + encodeURIComponent(rt))).then((d) => { if (live) setFullState((st) => ({ list, map: { ...(st.list === list ? st.map : {}), [rt]: d } })); }).catch(() => {});
+    return () => { live = false; };
+  }, [rt, listC && listC.downsampled]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── One light ────────────────────────────────────────────────────────────
   if (rt && list) {
-    const c = byId[rt];
+    const c0 = byId[rt];
+    const c = c0 && fullById[rt] ? { ...c0, values: fullById[rt].values, intervalSeconds: fullById[rt].intervalSeconds, downsampled: false } : c0;
     if (!c) return <div ref={rootRef} style={wrap}><button style={btn('dim')} onClick={back}>← Back to runtime</button><p style={{ color: T.dim }}>That curve no longer exists.</p></div>;
     return (
       <div ref={rootRef} style={wrap}>
