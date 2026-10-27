@@ -1,0 +1,7 @@
+# Serve the logger script as a plain-text download (never run it as CGI).
+<Files "tklamp_live.py">
+  RemoveHandler .py
+  ForceType text/plain
+  Header set Content-Disposition "attachment; filename=tklamp_live.py"
+  Header set X-Content-Type-Options "nosniff"
+</Files>
