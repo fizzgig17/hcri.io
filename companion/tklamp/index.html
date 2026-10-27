@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TKLamp Live Logger — hCRI Companion</title>
-<meta name="description" content="A free script for Mac, Windows and Linux that logs a TKLamp TK2303D tester live with exact start and end times, then uploads the run to Runtime on hCRI.io.">
+<meta name="description" content="A free script and window app for Mac, Windows and Linux that logs a TKLamp TK2303D tester live with exact start and end times, keeps a history, and uploads and shares runs on hCRI.io.">
 <link rel="canonical" href="https://www.hcri.io/companion/tklamp/">
 <script>
   (function(){
@@ -166,7 +166,7 @@
 .news a{color:var(--accent);font-weight:600}
 @media (max-width:1140px){.news{margin-inline:16px}}
 </style>
-<div class="news" role="note"><strong>New</strong>hCRI Companion now supports the <b>TKLamp TK2303D</b> integrating-sphere tester through the ESP32 bridge: live lumens on your phone, recorded runtimes, and one-tap upload to Runtime on hCRI.io. <a href="#tklamp">Jump to Using a TKLamp tester</a> · <a href="../manual/#tklamp">Manual</a></div>
+<div class="news" role="note"><strong>New</strong>Log a <b>TKLamp TK2303D</b> tester from your Mac, Windows or Linux computer: a window with a live chart, history, rename, upload and share to hCRI.io. <a href="#install">Install</a> · <a href="#window">The window</a> · <a href="../bridge/#tklamp">Using your phone instead</a></div>
 
 <div class="page">
   <nav class="toc" aria-label="Table of contents">
@@ -175,22 +175,32 @@
       <li><a href="#what">What it does</a></li>
       <li><a href="#install">Install</a></li>
       <li><a href="#token">Connect to hCRI.io</a></li>
-      <li><a href="#run">Record a run</a></li>
-      <li><a href="#after">After the run</a></li>
+      <li><a href="#window">The window</a></li>
+      <li><a href="#history">History: view, rename, upload, share</a></li>
+      <li><a href="#terminal">Terminal mode</a></li>
       <li><a href="#scale">Calibrating the scale</a></li>
       <li><a href="#options">All options</a></li>
       <li><a href="#files">The files it saves</a></li>
+      <li><a href="#platforms">Mac, Windows and Linux</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
     </ol>
   </nav>
 
   <main>
     <h1 class="doc-title">TKLamp Live Logger</h1>
-    <div class="doc-meta">Last updated October 27, 2026 · Works on Windows, macOS and Linux · <a href="tklamp_live.py" download>Download tklamp_live.py</a></div>
+    <div class="doc-meta">Last updated October 27, 2026 · Windows, macOS and Linux · <a href="tklamp_live.py" download>Download tklamp_live.py</a></div>
 
     <section id="what">
       <h2><span class="num">01</span> What it does</h2>
-      <p class="lede">The TKLamp TK2303D tester sends its lumen reading over USB about four times a second while it is on. This small Python script listens to that stream on your computer, shows the live number, records a run on the computer's clock, and uploads the finished run to your Runtime list on hCRI.io.</p>
+      <p class="lede">The TKLamp TK2303D tester sends its lumen reading over USB about four times a second while it is on. This free Python script opens a window on your computer that shows that reading live, records a run on the computer's clock, keeps a history of your runs, and uploads them to your Runtime list on hCRI.io. If you prefer, the same script runs in the terminal.</p>
+      <ul>
+        <li><strong>Live reading and chart</strong> with a scale that stays put as the run grows, plus a line of time and lumens every second that you can turn off.</li>
+        <li><strong>Start and Stop</strong> a run, or stop it automatically after a number of minutes.</li>
+        <li><strong>Exact start and end times</strong> from the computer's clock, and the dark start trimmed off.</li>
+        <li><strong>Calibrate</strong> the counts-per-lumen scale with a lamp of known output.</li>
+        <li><strong>History</strong> of every run with its chart, <strong>rename</strong>, <strong>upload</strong> to hCRI.io, <strong>share link</strong>, stop sharing and delete.</li>
+        <li><strong>Sign in</strong> from the window to create the hCRI.io token for you, the same way Companion's Settings does.</li>
+      </ul>
       <div class="card tip"><h4>Why use it instead of Transfer Data?</h4>
         <p>The tester's own Transfer Data sends the stored readings after the test, with no date or time, so the real start and end of the run are unknown. Because this script records while the test is running, the start time, end time and length are exact. You choose the name, and it can upload and make a share link for you.</p></div>
       <div class="card"><h4>Prefer your phone?</h4>
@@ -200,63 +210,93 @@
     <section id="install">
       <h2><span class="num">02</span> Install</h2>
       <ol class="steps">
-        <li><strong>Install Python 3</strong><span>From <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> if you do not have it. On Windows, tick "Add Python to PATH" in the installer.</span></li>
+        <li><strong>Install Python 3</strong><span>From <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> if you do not have it. Use the python.org installer, because it includes the window toolkit (tkinter). On Windows, tick "Add Python to PATH". See <a href="#platforms">Mac, Windows and Linux</a> for the other Pythons.</span></li>
         <li><strong>Install the serial library</strong><span>Open Terminal (Mac) or Command Prompt (Windows) and run <code>pip install pyserial</code>.</span></li>
         <li><strong>Download the script</strong><span><a href="tklamp_live.py" download>tklamp_live.py</a>. Save it in a folder you will find again, such as Documents.</span></li>
-        <li><strong>Plug in the tester</strong><span>Connect the tester's USB cable to the computer and switch the tester on. It must be on and sending readings. The computer sees it as a CH340 USB serial device. Windows may need the free <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340 driver</a> if no port appears; recent macOS and Linux include it.</span></li>
+        <li><strong>Plug in the tester</strong><span>Connect the tester's USB cable to the computer and switch the tester on. It must be on and sending readings. The computer sees it as a CH340 USB serial device, which may need a driver (see <a href="#platforms">Mac, Windows and Linux</a>).</span></li>
+        <li><strong>Run it</strong><span>In the folder where you saved it, run <code>python tklamp_live.py</code> (on a Mac you may need <code>python3</code>). The window opens. Use <code>--cli</code> for the terminal version.</span></li>
       </ol>
+      <p class="dim">No tester to hand? <code>python tklamp_live.py --simulate</code> makes a made-up fading light so you can try everything.</p>
     </section>
 
     <section id="token">
       <h2><span class="num">03</span> Connect to hCRI.io (optional)</h2>
-      <p>To upload from the script it needs an API token, the same kind hCRI Companion uses. The script can create one for you, the same way Companion's Settings does.</p>
+      <p>To upload from the script it needs an API token, the same kind hCRI Companion uses. The script can create one for you.</p>
       <ol class="steps">
-        <li><strong>Sign in once</strong><span>Run <code>python tklamp_live.py --login</code>. Enter your hCRI.io email or username and password (the password is not shown). The script signs in, creates a token named "TKLamp logger (your computer)" and remembers it in a file in your home folder (<code>.hcri_tklamp.json</code>), readable only by you. Your password is sent only to hCRI.io, once, and is never saved or printed.</span></li>
-        <li><strong>Or let it ask</strong><span>If you finish a run with no token saved, the script offers to sign in right then, and uploads straight after.</span></li>
+        <li><strong>In the window</strong><span>Click <em>Sign in...</em> at the top right, enter your hCRI.io email or username and password, and click Sign in. The script creates a token named "TKLamp logger (your computer)" and remembers it in a file in your home folder (<code>.hcri_tklamp.json</code>), readable only by you. The top right then shows <em>hCRI.io: your name</em> with a Sign out button, which forgets the token on this computer.</span></li>
+        <li><strong>Or let it ask</strong><span>If you tick Upload when saving a run and are not signed in, it opens the sign-in box first, then uploads.</span></li>
+        <li><strong>In the terminal</strong><span>Run <code>python tklamp_live.py --login</code>. The password is not shown.</span></li>
         <li><strong>Or paste a token</strong><span>Make one on hCRI.io (account settings, API tokens, Create token) and run <code>python tklamp_live.py --token YOUR_TOKEN --save-token</code>, or set the <code>HCRI_TOKEN</code> environment variable.</span></li>
       </ol>
+      <p>Your password is sent only to hCRI.io, once, and is never saved or printed. You can delete the token from your account settings at any time.</p>
       <div class="card warn"><h4>Keep the token private</h4>
-        <p>Anyone with the token can add curves to your account. Do not paste it into a chat, a screenshot or a shared file. You can delete a token from your account settings at any time.</p></div>
+        <p>Anyone with the token can add curves to your account. Do not paste it into a chat, a screenshot or a shared file.</p></div>
     </section>
 
-    <section id="run">
-      <h2><span class="num">04</span> Record a run</h2>
-      <ol class="steps">
-        <li><strong>Start the script</strong><span>Run <code>python tklamp_live.py</code>. It finds the tester's port by itself (or asks you to pick one; you can also give <code>--port COM5</code> or <code>--port /dev/tty.usbserial-1420</code>). The live lumens appear on one line.</span></li>
-        <li><strong>Put the light in the sphere</strong><span>Wait until the number looks right.</span></li>
-        <li><strong>Press Enter to start</strong><span>The line shows <code>REC</code> with the elapsed time and the number of readings. The start time is taken from your computer's clock.</span></li>
-        <li><strong>Press Enter again to stop</strong><span>Or use <code>--duration 30</code> to stop by itself after 30 minutes. Ctrl+C also stops and keeps what was recorded. While recording, a <code>.partial.csv</code> copy is written every couple of seconds, so a crash does not lose the run.</span></li>
-      </ol>
-      <p class="dim">Keep the computer awake and the cable in for the whole run. For a 24 hour run, turn off sleep first.</p>
+    <section id="window">
+      <h2><span class="num">04</span> The window</h2>
+      <p>The Live tab is where you record. Top row: pick the tester and click <em>Connect</em> (it is chosen for you when it is found; <em>Refresh</em> looks again). The big number is the live lumens.</p>
+      <table>
+        <tr><th>Control</th><th>What it does</th></tr>
+        <tr><td>Start run / Stop run</td><td>Starts recording from the computer's clock, then stops it. When you stop, a box shows the length, readings, first and last lumens and the exact start and end times, and asks for a name (see below).</td></tr>
+        <tr><td>The chart</td><td>Lumens against time. The vertical scale starts at zero and only grows, so the line does not jump about. Before you start it shows the live reading; while recording it shows the run.</td></tr>
+        <tr><td>Chart width</td><td>30 seconds, 2 minutes or 10 minutes (the chart scrolls with the run), or Whole run to fit everything on screen.</td></tr>
+        <tr><td>Clear</td><td>Clears the live chart (not available while recording).</td></tr>
+        <tr><td>Stop after</td><td>Minutes after which the run stops by itself. Blank means you stop it.</td></tr>
+        <tr><td>Trim the dark start</td><td>Drops the dark seconds before the light came on (on by default).</td></tr>
+        <tr><td>Show readings</td><td>Shows a line of clock time, elapsed time and lumens every second under the chart, with REC marking the recorded ones. Untick it to hide the list; the setting is remembered. In the terminal the same line is turned off with <code>--no-readout</code>.</td></tr>
+        <tr><td>Calibrate...</td><td>Put a lamp of known output in the sphere, enter its lumens and click Measure. It averages 8 seconds and shows the new counts-per-lumen scale; Save scale keeps it. See <a href="#scale">Calibrating the scale</a>.</td></tr>
+        <tr><td>Sign in / Sign out</td><td>Creates or forgets the hCRI.io token (see above).</td></tr>
+      </table>
+      <p><strong>Saving a run.</strong> When you stop, give it a name (suggested: <em>TKLamp run 2026-10-27 18:00</em>) and choose whether to upload it to Runtime on hCRI.io and whether to make a share link. Click Save. Discard throws the run away. A <code>.partial.csv</code> copy is written every couple of seconds while recording, so a crash does not lose the run. Keep the computer awake and the cable in for the whole run; for a 24 hour run turn off sleep first. If the cable comes out mid-run, the run so far is kept and you can still Stop and save it. You cannot close the window while a run is recording.</p>
     </section>
 
-    <section id="after">
-      <h2><span class="num">05</span> After the run</h2>
+    <section id="history">
+      <h2><span class="num">05</span> History: view, rename, upload, share</h2>
+      <p>Every saved run appears on the History tab, newest first, with its name, start time, length, first and last lumens and whether it is on hCRI.io. Click a run to see its details and chart (start and end times, points, percentage of output left, the scale used).</p>
+      <table>
+        <tr><th>Button</th><th>What it does</th></tr>
+        <tr><td>View</td><td>Opens the run's chart and details in a larger window (double-clicking a run does the same).</td></tr>
+        <tr><td>Rename...</td><td>Changes the name and the saved files. If the run is on hCRI.io it asks whether to rename it there too (re-uploaded under the new name, and the old copy deleted; an old share link stops working).</td></tr>
+        <tr><td>Upload</td><td>Sends the run to your Runtime list on hCRI.io (Explore, then Runtime). The same name replaces an earlier run.</td></tr>
+        <tr><td>Share link</td><td>Makes a link anyone can open without signing in, and copies it. It uploads the run first if needed. Pressing it again shows and copies the same link.</td></tr>
+        <tr><td>Stop sharing</td><td>Turns the link off; the old link stops working.</td></tr>
+        <tr><td>Open on hCRI.io</td><td>Opens the share link if the run has one, otherwise hCRI.io.</td></tr>
+        <tr><td>Delete</td><td>Deletes the run from this computer, and asks whether to delete it from hCRI.io too.</td></tr>
+        <tr><td>Open folder</td><td>Opens the folder where the runs are saved (<em>TKLamp runs</em> in your home folder, or the folder you gave with <code>--output-dir</code>).</td></tr>
+      </table>
+      <p>If an upload fails, the run is still saved here; try Upload again later. A run saved with the terminal version in the same folder shows up here too.</p>
+    </section>
+
+    <section id="terminal">
+      <h2><span class="num">06</span> Terminal mode</h2>
+      <p>Run <code>python tklamp_live.py --cli</code>. The script also uses the terminal by itself when this Python has no tkinter or there is no screen.</p>
       <ol class="steps">
-        <li><strong>Check the summary</strong><span>It shows the length, the number of readings, the first and last lumens, and the exact start and end times. The dark readings before the light came on are trimmed (use <code>--no-trim</code> to keep them).</span></li>
-        <li><strong>Name it</strong><span>Press Enter to accept the suggested name (<em>TKLamp run 2026-10-27 18:00</em>) or type your own. The same name on hCRI.io replaces an earlier run.</span></li>
-        <li><strong>Upload</strong><span>If a token is set it asks whether to upload to Runtime. Answer Y. The run appears in Explore, then Runtime, as a private curve.</span></li>
-        <li><strong>Share (optional)</strong><span>It asks whether to make a share link and prints it. Anyone with the link can view the run without signing in. You can stop sharing from the light's page.</span></li>
+        <li><strong>Start the script</strong><span>It finds the tester's port by itself (or asks you to pick one; you can also give <code>--port COM5</code> or <code>--port /dev/cu.usbserial-1420</code>). The live lumens appear on one line.</span></li>
+        <li><strong>Press Enter to start</strong><span>The line shows <code>REC</code> with the elapsed time and the number of readings, and a line of clock time, elapsed time and lumens is printed every second. Add <code>--no-readout</code> to turn those lines off and keep only the one updating line.</span></li>
+        <li><strong>Press Enter again to stop</strong><span>Or use <code>--duration 30</code> to stop after 30 minutes. Ctrl+C also stops and keeps what was recorded.</span></li>
+        <li><strong>Name, upload, share</strong><span>It shows the summary with the exact start and end times, asks for a name, offers to upload (signing in first if needed) and offers a share link. If the upload fails, the run is already saved: <code>python tklamp_live.py --upload TKLamp_2026-10-27-18.00.00.json</code> sends it later.</span></li>
       </ol>
-      <p>If the upload fails, or you said no, the run is already saved. Upload it later with <code>python tklamp_live.py --upload TKLamp_2026-10-27-18.00.00.json</code>, or use Upload CSV on the Runtime page with the saved <code>.csv</code>.</p>
     </section>
 
     <section id="scale">
-      <h2><span class="num">06</span> Calibrating the scale</h2>
+      <h2><span class="num">07</span> Calibrating the scale</h2>
       <p>The tester sends a raw sensor count, and the script divides it by <em>counts per lumen</em> to show lumens. The default, 313.2, was measured on one calibrated tester using its 2150 lm calibration lamp. Each tester, and each recalibration, can differ a little.</p>
-      <p>To set it for yours, put a lamp of known output in the sphere, wait for it to settle and run <code>python tklamp_live.py --calibrate 2150</code> (use the lamp's lumens). It reads for 8 seconds, shows the new scale and saves it. This is the same as Set scale in hCRI Companion.</p>
+      <p>To set it for yours, put a lamp of known output in the sphere and wait for it to settle. In the window click <em>Calibrate...</em>, enter the lamp's lumens and click Measure, then Save scale. In the terminal run <code>python tklamp_live.py --calibrate 2150</code> (use the lamp's lumens). It reads for 8 seconds, shows the new scale and saves it for later runs. This is the same as Set scale in hCRI Companion. Calibrate again if you recalibrate the tester.</p>
     </section>
 
     <section id="options">
-      <h2><span class="num">07</span> All options</h2>
+      <h2><span class="num">08</span> All options</h2>
       <table>
         <tr><th>Option</th><th>What it does</th></tr>
+        <tr><td><code>--cli</code></td><td>Use the terminal instead of the window.</td></tr>
+        <tr><td><code>--no-readout</code></td><td>Do not print (or show) the time and lumens line each second.</td></tr>
         <tr><td><code>--port PORT</code></td><td>Serial port, if it is not found automatically.</td></tr>
-        <tr><td><code>--calibrate LUMENS</code></td><td>Set and save the scale from a lamp of known output.</td></tr>
+        <tr><td><code>--calibrate LUMENS</code></td><td>Set and save the scale from a lamp of known output (terminal).</td></tr>
         <tr><td><code>--scale N</code></td><td>Use this counts-per-lumen for this run only.</td></tr>
-        <tr><td><code>--duration MIN</code></td><td>Stop by itself after this many minutes.</td></tr>
+        <tr><td><code>--duration MIN</code></td><td>Stop by itself after this many minutes (also fills the window's Stop after box).</td></tr>
         <tr><td><code>--no-trim</code></td><td>Keep the dark readings before the light came on.</td></tr>
-        <tr><td><code>--output-dir DIR</code></td><td>Where to save runs (default: the current folder).</td></tr>
+        <tr><td><code>--output-dir DIR</code></td><td>Where to save runs. Default: the current folder in the terminal, <em>TKLamp runs</em> in your home folder in the window.</td></tr>
         <tr><td><code>--login</code></td><td>Sign in with your hCRI.io email/username and password, create a token and remember it.</td></tr>
         <tr><td><code>--token T</code>, <code>--save-token</code></td><td>Use an API token you made on the website, and remember it.</td></tr>
         <tr><td><code>--site URL</code></td><td>Another hCRI.io address (default https://hcri.io).</td></tr>
@@ -266,26 +306,40 @@
     </section>
 
     <section id="files">
-      <h2><span class="num">08</span> The files it saves</h2>
+      <h2><span class="num">09</span> The files it saves</h2>
       <ul>
-        <li><code>TKLamp_&lt;date&gt;.json</code>: the run (name, spacing, lumens) plus its start and end times, length, number of readings and the scale used.</li>
+        <li><code>TKLamp_&lt;date&gt;.json</code>: the run (name, spacing, lumens) plus its start and end times, length, number of readings, the scale used, and whether it was uploaded or shared.</li>
         <li><code>TKLamp_&lt;date&gt;.csv</code>: minutes in the first column and the lumens in the second, ready for Upload CSV on the Runtime page.</li>
+        <li><code>~/.hcri_tklamp.json</code>: your settings (scale, token, whether to show the readings). Readable only by you.</li>
       </ul>
       <p class="dim">Runs are stored at one point per second (wider spacing beyond about 27 hours, hCRI.io's 100,000 point limit). hCRI.io does not store the start and end times yet, so they stay in the saved <code>.json</code>.</p>
     </section>
 
+    <section id="platforms">
+      <h2><span class="num">10</span> Mac, Windows and Linux</h2>
+      <p>The window needs <strong>tkinter</strong> with Tk 8.6 or newer. The script checks this when it starts and tells you if it is old or missing; without tkinter it falls back to the terminal.</p>
+      <table>
+        <tr><th>System</th><th>Notes</th></tr>
+        <tr><td>Mac</td><td>Use Python from <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a>: it includes a current Tk. Homebrew Python needs <code>brew install python-tk</code>. Apple's own <code>python3</code> (from the Xcode tools) has an old Tk 8.5 that can look wrong or draw badly, especially in dark mode, and the script warns you. The tester appears as <code>/dev/cu.usbserial-…</code> or <code>/dev/cu.wchusbserial…</code>. Recent macOS has the CH340 driver built in; on an older Mac install the CH340 driver from wch-ic.com.</td></tr>
+        <tr><td>Windows</td><td>Use the python.org installer, tick "Add Python to PATH" and keep "tcl/tk and IDLE" ticked. If the tester does not show up (Device Manager, then Ports should list a USB-SERIAL CH340 as COM5 or similar), install the free <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340 driver</a> (CH341SER) and plug it in again. If <code>pip</code> is not recognised, use <code>py -m pip install pyserial</code> and run the script with <code>py tklamp_live.py</code>.</td></tr>
+        <tr><td>Linux</td><td>Install <code>python3-tk</code> for the window. Add yourself to the <code>dialout</code> group (<code>sudo usermod -aG dialout $USER</code>, then log out and in) to open the port.</td></tr>
+      </table>
+    </section>
+
     <section id="troubleshooting">
-      <h2><span class="num">09</span> Troubleshooting</h2>
+      <h2><span class="num">11</span> Troubleshooting</h2>
       <table>
         <tr><th>Symptom</th><th>Try</th></tr>
-        <tr><td>"No serial ports found"</td><td>Check the USB cable is a data cable and the tester is plugged in. On Windows, install the CH340 driver.</td></tr>
-        <tr><td>"no readings (tester on? cable in?)"</td><td>Switch the tester on and leave it sending. If it is a different port, use <code>--port</code>.</td></tr>
-        <tr><td>"pip is not recognised"</td><td>Try <code>python -m pip install pyserial</code> (or <code>py -m pip ...</code> on Windows).</td></tr>
+        <tr><td>The window does not open, the terminal is used</td><td>This Python has no tkinter, or there is no screen. Install Python from python.org (Mac, Windows) or <code>python3-tk</code> (Linux).</td></tr>
+        <tr><td>"Old Tk" warning</td><td>This Python's Tk is older than 8.6. Install Python from python.org and run the script with that one.</td></tr>
+        <tr><td>No tester listed, or "No tester found"</td><td>Check the cable is a data cable and the tester is plugged in and on. Install the CH340 driver on Windows or an older Mac, and see the notes above. Then click Refresh.</td></tr>
+        <tr><td>The number shows "--"</td><td>No readings are coming in. Switch the tester on and leave it sending; check you picked the right port.</td></tr>
+        <tr><td>"No module named serial" or "needs pyserial"</td><td>Run <code>pip install pyserial</code> (or <code>python -m pip install pyserial</code>, or <code>py -m pip ...</code> on Windows).</td></tr>
         <tr><td>Permission denied on Linux</td><td>Add yourself to the <code>dialout</code> group, then log out and in.</td></tr>
-        <tr><td>The number differs from the tester's screen</td><td>Run <code>--calibrate</code> with a lamp of known output.</td></tr>
+        <tr><td>The number differs from the tester's screen</td><td>Calibrate with a lamp of known output.</td></tr>
         <tr><td>"Sign-in failed: Invalid credentials"</td><td>Check the email or username and password. You can also make a token on the website and use <code>--token</code>.</td></tr>
-        <tr><td>"hCRI.io said 401"</td><td>The token is wrong or was deleted. Run <code>--login</code> again to create a new one.</td></tr>
-        <tr><td>The upload says the account limit is reached</td><td>Delete some runtime curves on hCRI.io, then upload again with <code>--upload</code>.</td></tr>
+        <tr><td>"hCRI.io said 401"</td><td>The token is wrong or was deleted. Click Sign out, then Sign in again (or run <code>--login</code>).</td></tr>
+        <tr><td>The upload says the account limit is reached</td><td>Delete some runtime curves on hCRI.io, then click Upload again.</td></tr>
       </table>
       <p>Using the tester's own Transfer Data instead? The <a href="../manual/#tklamp">manual</a> and the Runtime page's Upload CSV explain how to set the seconds between readings for that file.</p>
     </section>
