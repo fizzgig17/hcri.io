@@ -164,12 +164,38 @@ $nice = function (float $hi, int $n) {
     foreach ([1, 2, 2.5, 5, 10] as $m) if ($m * $mag >= $raw) return $m * $mag;
     return $raw;
 };
-$yStep = $nice($yMax, 4);
 $xStep = $nice($xMax, 6);
 imagesetthickness($im, 1);
-for ($gv = 0.0; $gv <= $yMax + 1e-9; $gv += $yStep) {
+// Output in absolute units: faint dots every 50, dotted every 100, solid every 500 (scales with the output), with a tick on
+// the axis and a number on every few of them. Percent charts keep their round steps.
+$yEvery = 1;
+if ($pct) {
+    $yStep = $nice($yMax, 4);
+} else {
+    // Smallest 1-2-5 step that keeps the chart to 30 lines or fewer (50 up to 1500 lm, 100 up to 3000 ...).
+    $needY = $yMax / 30.0; $kk = pow(10, floor(log10($needY))); $yStep = 10 * $kk;
+    foreach ([1, 2, 5, 10] as $m) if ($m * $kk >= $needY - 1e-12) { $yStep = $m * $kk; break; }
+    $need = (int)ceil(24 / max(1.0, ($yStep / $yMax) * $ah));
+    $yEvery = 20; foreach ([1, 2, 5, 10, 20] as $k) if ($k >= $need) { $yEvery = $k; break; }
+}
+$DOT  = [$GRID, IMG_COLOR_TRANSPARENT, IMG_COLOR_TRANSPARENT, IMG_COLOR_TRANSPARENT];
+$G100 = imagecolorallocate($im, 54, 63, 75);
+$DOT2 = [$G100, $G100, IMG_COLOR_TRANSPARENT, IMG_COLOR_TRANSPARENT];
+$GRIDHI = imagecolorallocate($im, 70, 80, 92);
+$Hh = (!$pct) ? pow(10, floor(log10(5 * $yStep))) : 1;
+$isM = function($v, $m) { return abs($v / $m - round($v / $m)) < 1e-6; };
+$yi = 0;
+for ($gv = 0.0; $gv <= $yMax + 1e-9; $gv += $yStep, $yi++) {
     $gy = (int)round($ay0 + $ah - ($gv / $yMax) * $ah);
-    imageline($im, $ax0, $gy, $ax0 + $aw, $gy, $GRID);
+    if ($pct) {
+        imageline($im, $ax0, $gy, $ax0 + $aw, $gy, $GRID);
+    } else {
+        if ($isM($gv, 5 * $Hh)) { imageline($im, $ax0, $gy, $ax0 + $aw, $gy, $GRIDHI); $tk = 9; }
+        elseif ($isM($gv, $Hh)) { imagesetstyle($im, $DOT2); imageline($im, $ax0, $gy, $ax0 + $aw, $gy, IMG_COLOR_STYLED); $tk = 7; }
+        else { imagesetstyle($im, $DOT); imageline($im, $ax0, $gy, $ax0 + $aw, $gy, IMG_COLOR_STYLED); $tk = 5; }
+        imageline($im, $ax0 + 36 - $tk, $gy, $ax0 + 36, $gy, $DIM);
+        if ($yi % $yEvery !== 0) continue;
+    }
     $lbl = $pct ? (int)round($gv) . '%' : (string)(abs($gv) >= 100 ? (int)round($gv) : round($gv, 1));
     $text(14, $plot_x + 6, $gy - 8, $DIM, $F_MONO_R, $lbl);
 }

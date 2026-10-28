@@ -397,6 +397,26 @@ function niceStep(span) {
 }
 function lowerBound(a, x) { var lo = 0, hi = a.length; while (lo < hi) { var m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; }
 function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+// Grid: finest lines at the smallest 1-2-5 step that keeps the chart to 30 lines or fewer (50 lm up to 1500 lm, 100 up to 3000 ...);
+// faint fine dots, dotted every 100, solid every 500 (scaled to the chart); a tick on the axis for each.
+function gridStep(yMax) {
+  if (!(yMax > 0)) return 1;
+  var need = yMax / 30, k = Math.pow(10, Math.floor(Math.log10(need))), m = [1, 2, 5, 10];
+  for (var i = 0; i < m.length; i++) if (m[i] * k >= need - 1e-12) return +(m[i] * k).toPrecision(6);
+  return 10 * k;
+}
+function gridLevel(v, minor) {
+  var H = Math.pow(10, Math.floor(Math.log10(5 * minor)));
+  function is(m) { return Math.abs(v / m - Math.round(v / m)) < 1e-6; }
+  if (is(5 * H)) return { alpha: 0.75, dash: [], tick: 7 };
+  if (is(H)) return { alpha: 0.5, dash: [2, 4], tick: 5 };
+  return { alpha: 0.28, dash: [1, 3], tick: 3 };
+}
+function gridLabelEvery(px) {
+  var need = Math.ceil(24 / Math.max(1, px)), a = [1, 2, 5, 10, 20];
+  for (var i = 0; i < a.length; i++) if (a[i] >= need) return a[i];
+  return 20;
+}
 function drawChart(cv, ts, vs, windowS, ymax) {
   var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   if (!w || !h) return 0;
@@ -419,7 +439,14 @@ function drawChart(cv, ts, vs, windowS, ymax) {
   g.font = '10px sans-serif'; g.lineWidth = 1; g.strokeStyle = grid; g.fillStyle = dim;
   g.strokeRect(L + .5, T + .5, pw, ph);
   g.textAlign = 'right'; g.textBaseline = 'middle';
-  for (var k = 0; k <= 4; k++) { var v = topV * k / 4, y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.fillText(String(+v.toPrecision(6)), L - 6, y); }
+  var minor = gridStep(topV), every = gridLabelEvery(Math.abs(Y(minor) - Y(0)));
+  for (var k = 0; k * minor <= topV + 1e-9; k++) {
+    var v = +(k * minor).toPrecision(8), y = Math.round(Y(v)) + .5, lv = gridLevel(v, minor);
+    g.save(); g.strokeStyle = dim; g.globalAlpha = lv.alpha; g.setLineDash(lv.dash);
+    g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.restore();
+    g.beginPath(); g.moveTo(L - lv.tick, y); g.lineTo(L, y); g.stroke();
+    if (k % every === 0) g.fillText(String(+v.toPrecision(6)), L - 8, y);
+  }
   g.textAlign = 'right'; g.fillText('lm', L - 6, 6);
   var stp = niceStep(t1 - t0), tt = Math.ceil(t0 / stp) * stp;
   g.textAlign = 'center'; g.textBaseline = 'top';

@@ -28,6 +28,27 @@ function ticks(lo, hi, n = 5) {
   return out;
 }
 
+/** Spacing of the finest grid lines: the smallest 1-2-5 step that keeps the chart to 30 lines or fewer (50 up to 1500 lm, 100 up to 3000 ...). */
+export function gridStep(yMax) {
+  if (!(yMax > 0)) return 1;
+  const need = yMax / 30, k = Math.pow(10, Math.floor(Math.log10(need)));
+  for (const m of [1, 2, 5, 10]) if (m * k >= need - 1e-12) return +(m * k).toPrecision(6);
+  return 10 * k;
+}
+/** How a grid line looks: faint fine dots (50), dotted (every 100), solid (every 500); scales with the chart. */
+export function gridLevel(v, minor) {
+  const H = Math.pow(10, Math.floor(Math.log10(5 * minor)));
+  const is = (m) => Math.abs(v / m - Math.round(v / m)) < 1e-6;
+  if (is(5 * H)) return { level: 3, dash: undefined, opacity: 0.7 };
+  if (is(H)) return { level: 1, dash: '2 4', opacity: 0.45 };
+  return { level: 0, dash: '1 3', opacity: 0.25 };
+}
+/** Every how many grid lines gets a number (no closer than about 14 px in the chart's own units). */
+export function gridLabelEvery(pxPerStep) {
+  const need = Math.ceil(14 / Math.max(0.5, pxPerStep));
+  return [1, 2, 5, 10, 20].find((k) => k >= need) || 20;
+}
+
 function Spark({ c, T, w = 110, h = 30 }) {
   const v = c.values || [];
   if (v.length < 2) return null;
@@ -50,7 +71,15 @@ export function RuntimeChart({ curves, T, mode, height = 300 }) {
   const yMax = mode === 'pct' ? Math.max(100, yMaxRaw) * 1.04 : yMaxRaw * 1.06;
   const px = (x) => L + (x / xMax) * (W - L - R);
   const py = (y) => Tp + (1 - y / yMax) * (height - Tp - B);
-  const yT = ticks(0, yMax, 5), xT = ticks(0, xMax, 6);
+  const xT = ticks(0, xMax, 6);
+  // Output in absolute units: faint dots every 50, dotted every 100, solid every 500 (see gridStep / gridLevel). Percent charts keep their round steps.
+  let yT, yEvery = 1, gMinor = 0;
+  if (mode === 'pct') yT = ticks(0, yMax, 5);
+  else {
+    const gs = gridStep(yMax); gMinor = gs;
+    yT = []; for (let k = 0; k * gs <= yMax + 1e-9; k++) yT.push(+(k * gs).toFixed(6));
+    yEvery = gridLabelEvery(Math.abs(py(gs) - py(0)) * (W / 720));
+  }
   const unit = curves[0] && curves[0].unit;
   const onMove = (ev) => {
     const r = ev.currentTarget.getBoundingClientRect();
@@ -62,12 +91,18 @@ export function RuntimeChart({ curves, T, mode, height = 300 }) {
     <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label="Output over time"
       onMouseMove={onMove} onMouseLeave={() => setHover(null)}
       style={{ width: '100%', maxWidth: 820, height: 'auto', display: 'block', background: T.chartBg, borderRadius: 6, border: `1px solid ${T.border}` }}>
-      {yT.map((v) => (
-        <g key={'y' + v}>
-          <line x1={L} x2={W - R} y1={py(v)} y2={py(v)} stroke={T.gridLine} />
-          <text x={L - 6} y={py(v) + 4} textAnchor="end" fontSize="11" fill={T.axisLabel} fontFamily="monospace">{mode === 'pct' ? `${v}%` : fmtVal(v)}</text>
-        </g>
-      ))}
+      {yT.map((v, i) => {
+        const dotted = mode !== 'pct';
+        const labelled = !dotted || i % yEvery === 0;
+        const lv = dotted ? gridLevel(v, gMinor) : null;
+        return (
+          <g key={'y' + v}>
+            <line x1={L} x2={W - R} y1={py(v)} y2={py(v)} stroke={T.gridLine} strokeDasharray={dotted ? lv.dash : undefined} opacity={dotted ? lv.opacity : 1} />
+            {dotted && <line x1={L - 3 - (lv.level === 3 ? 4 : lv.level === 1 ? 2 : 0)} x2={L} y1={py(v)} y2={py(v)} stroke={T.axisLabel} />}
+            {labelled && <text x={L - 7} y={py(v) + 4} textAnchor="end" fontSize="11" fill={T.axisLabel} fontFamily="monospace">{mode === 'pct' ? `${v}%` : fmtVal(v)}</text>}
+          </g>
+        );
+      })}
       {xT.map((v) => (
         <g key={'x' + v}>
           <line x1={px(v)} x2={px(v)} y1={Tp} y2={height - B} stroke={T.gridLine} />

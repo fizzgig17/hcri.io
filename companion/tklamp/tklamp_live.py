@@ -756,7 +756,7 @@ ICON_B64 = (
 
 
 SIM_LABEL = "Simulated tester (no hardware)"
-CHART = {"bg": "#ffffff", "grid": "#e1e4e8", "axis": "#6a737d", "line": "#0b7a55", "text": "#24292e"}
+CHART = {"bg": "#ffffff", "grid": "#e1e4e8", "grid0": "#eceff2", "grid1": "#cfd5db", "grid5": "#a9b1ba", "axis": "#6a737d", "line": "#0b7a55", "text": "#24292e"}
 
 
 def nice_ceil(v):
@@ -783,6 +783,40 @@ def tick_label(s):
     if s < 3600:
         return f"{s // 60}:{s % 60:02d}"
     return f"{s // 3600}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
+def grid_step(y_max):
+    """Spacing of the finest horizontal grid lines: the smallest 1-2-5 step that keeps the chart to 30 lines or fewer."""
+    if not y_max > 0:
+        return 1.0
+    need = y_max / 30.0
+    k = 10 ** math.floor(math.log10(need))
+    for m in (1, 2, 5, 10):
+        if m * k >= need - 1e-12:
+            return round(m * k, 6)
+    return 10 * k
+
+
+def grid_level(v, minor):
+    """(colour key, dash, tick length): faint fine dots (50 lm), dotted (every 100), solid (every 500); scales with the chart."""
+    h = 10 ** math.floor(math.log10(5 * minor))
+
+    def is_m(m):
+        return abs(v / m - round(v / m)) < 1e-6
+    if is_m(5 * h):
+        return "grid5", None, 7
+    if is_m(h):
+        return "grid1", (2, 4), 5
+    return "grid0", (1, 3), 3
+
+
+def grid_label_every(px_per_step):
+    """Every how many grid lines gets a number (numbers no closer than about 24 px)."""
+    need = math.ceil(24 / max(1.0, px_per_step))
+    for k in (1, 2, 5, 10, 20):
+        if k >= need:
+            return k
+    return 20
 
 
 def draw_chart(cv, ts, vs, window_s=0, ymax=None):
@@ -815,11 +849,18 @@ def draw_chart(cv, ts, vs, window_s=0, ymax=None):
         return top + ph - (v / top_v) * ph if top_v else top + ph
 
     cv.create_rectangle(left, top, left + pw, top + ph, outline=CHART["grid"])
-    for k in range(5):
-        v = top_v * k / 4.0
+    minor = grid_step(top_v)
+    every = grid_label_every(abs(Y(minor) - Y(0)))
+    k = 0
+    while k * minor <= top_v + 1e-9:
+        v = round(k * minor, 6)
         y = Y(v)
-        cv.create_line(left, y, left + pw, y, fill=CHART["grid"])
-        cv.create_text(left - 6, y, text=f"{v:g}", anchor="e", fill=CHART["axis"], font=("Helvetica", 9))
+        lv = grid_level(v, minor)
+        cv.create_line(left, y, left + pw, y, fill=CHART[lv[0]], dash=lv[1] or None)
+        cv.create_line(left - lv[2], y, left, y, fill=CHART["axis"])
+        if k % every == 0:
+            cv.create_text(left - 6, y, text=f"{v:g}", anchor="e", fill=CHART["axis"], font=("Helvetica", 9))
+        k += 1
     stp = nice_step(t1 - t0)
     t = math.ceil(t0 / stp) * stp
     while t <= t1 + 1e-9:
