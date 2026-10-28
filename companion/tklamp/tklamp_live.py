@@ -35,6 +35,7 @@ import json
 import math
 import os
 import platform
+import ssl
 import stat
 import sys
 import time
@@ -353,6 +354,43 @@ spool_written = [0]
 # hCRI.io upload
 # ----------------------------------------------------------------------------------------------------------------------
 
+_SSL = []
+
+
+def ssl_context():
+    """A verifying SSL context that also works with Python from python.org on a Mac, which ships without root
+    certificates until 'Install Certificates.command' is run. Order: Python's own, then certifi, then (Mac) the system's."""
+    if _SSL:
+        return _SSL[0]
+    ctx = ssl.create_default_context()
+    if ctx.cert_store_stats().get("x509_ca", 0) == 0:
+        try:
+            import certifi
+            ctx.load_verify_locations(certifi.where())
+        except Exception:
+            pass
+    if ctx.cert_store_stats().get("x509_ca", 0) == 0 and sys.platform == "darwin":
+        try:
+            import subprocess
+            pem = subprocess.run(["security", "find-certificate", "-a", "-p",
+                                  "/System/Library/Keychains/SystemRootCertificates.keychain"],
+                                 capture_output=True, text=True, timeout=30).stdout
+            if pem.strip():
+                ctx.load_verify_locations(cadata=pem)
+        except Exception:
+            pass
+    _SSL.append(ctx)
+    return ctx
+
+
+def net_error(e):
+    r = getattr(e, "reason", e)
+    if isinstance(r, ssl.SSLError) or "CERTIFICATE_VERIFY_FAILED" in str(r):
+        return ("Could not verify hCRI.io's certificate. On a Mac with Python from python.org, open the Python folder in "
+                "Applications and double-click 'Install Certificates.command', then try again. (" + str(r) + ")")
+    return f"Could not reach hCRI.io: {r}"
+
+
 def api(site, token, method, path, body=None):
     url = site.rstrip("/") + "/index.php/api" + path
     data = json.dumps(body).encode("utf-8") if body is not None else (b"{}" if method == "POST" else None)
@@ -361,7 +399,7 @@ def api(site, token, method, path, body=None):
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as r:
             return json.loads(r.read().decode("utf-8") or "{}")
     except urllib.error.HTTPError as e:
         try:
@@ -370,7 +408,7 @@ def api(site, token, method, path, body=None):
             msg = ""
         raise RuntimeError(f"hCRI.io said {e.code}: {msg or e.reason}")
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Could not reach hCRI.io: {e.reason}")
+        raise RuntimeError(net_error(e))
 
 
 def raw_post(site, path, body, token=None):
@@ -381,7 +419,7 @@ def raw_post(site, path, body, token=None):
     if token:
         req.add_header("Authorization", "Bearer " + token)
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as r:
             return json.loads(r.read().decode("utf-8") or "{}")
     except urllib.error.HTTPError as e:
         try:
@@ -390,7 +428,7 @@ def raw_post(site, path, body, token=None):
             msg = ""
         raise RuntimeError(msg or f"hCRI.io said {e.code}")
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Could not reach hCRI.io: {e.reason}")
+        raise RuntimeError(net_error(e))
 
 
 def create_token(site, who, pw):
