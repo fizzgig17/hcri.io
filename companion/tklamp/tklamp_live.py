@@ -596,6 +596,47 @@ try:
 except ImportError:              # no tkinter in this Python: the terminal version is used instead
     tk = None
 
+ICON_B64 = (
+    "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"
+)   # the hCRI.io icon (64 px PNG) for the window, taskbar and dock
+
+
 SIM_LABEL = "Simulated tester (no hardware)"
 CHART = {"bg": "#ffffff", "grid": "#e1e4e8", "axis": "#6a737d", "line": "#0b7a55", "text": "#24292e"}
 
@@ -735,6 +776,11 @@ class TkApp:
     def build_ui(self):
         r = self.root
         r.title("TKLamp Live Logger - hCRI.io")
+        try:
+            self.icon = tk.PhotoImage(data=ICON_B64)
+            r.iconphoto(True, self.icon)
+        except Exception:
+            pass
         r.geometry("960x720")
         r.minsize(760, 600)
         r.protocol("WM_DELETE_WINDOW", self.on_close)
