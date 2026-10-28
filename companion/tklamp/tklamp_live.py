@@ -756,7 +756,7 @@ ICON_B64 = (
 
 
 SIM_LABEL = "Simulated tester (no hardware)"
-CHART = {"bg": "#ffffff", "grid": "#e1e4e8", "grid0": "#eceff2", "grid1": "#cfd5db", "grid5": "#a9b1ba", "axis": "#6a737d", "line": "#0b7a55", "text": "#24292e"}
+CHART = {"bg": "#ffffff", "grid": "#e1e4e8", "grid0": "#eef0f2", "grid1": "#dde1e5", "grid5": "#bcc3ca", "axis": "#6a737d", "line": "#0b7a55", "text": "#24292e"}
 
 
 def nice_ceil(v):
@@ -806,8 +806,8 @@ def grid_level(v, minor):
     if is_m(5 * h):
         return "grid5", None, 7
     if is_m(h):
-        return "grid1", (2, 4), 5
-    return "grid0", (1, 3), 3
+        return "grid1", (1, 3), 5
+    return "grid0", (1, 5), 3
 
 
 def grid_label_every(px_per_step):
@@ -823,7 +823,7 @@ def draw_chart(cv, ts, vs, window_s=0, ymax=None):
     """Draws lumens against time on a canvas. window_s > 0: the last window_s seconds (scrolls); 0: the whole run."""
     cv.delete("all")
     w, h = cv.winfo_width(), cv.winfo_height()
-    left, right, top, bottom = 56, 14, 16, 28
+    left, right, top, bottom = 56, 14, 24, 28
     pw, ph = w - left - right, h - top - bottom
     if pw < 40 or ph < 30:
         return 0.0
@@ -857,7 +857,8 @@ def draw_chart(cv, ts, vs, window_s=0, ymax=None):
         y = Y(v)
         lv = grid_level(v, minor)
         cv.create_line(left, y, left + pw, y, fill=CHART[lv[0]], dash=lv[1] or None)
-        cv.create_line(left - lv[2], y, left, y, fill=CHART["axis"])
+        if k % every == 0 or lv[0] == "grid5":
+            cv.create_line(left - lv[2], y, left, y, fill=CHART["axis"])
         if k % every == 0:
             cv.create_text(left - 6, y, text=f"{v:g}", anchor="e", fill=CHART["axis"], font=("Helvetica", 9))
         k += 1
@@ -868,7 +869,7 @@ def draw_chart(cv, ts, vs, window_s=0, ymax=None):
         cv.create_line(x, top, x, top + ph, fill=CHART["grid"])
         cv.create_text(x, top + ph + 4, text=tick_label(t), anchor="n", fill=CHART["axis"], font=("Helvetica", 9))
         t += stp
-    cv.create_text(left - 6, 2, text="lm", anchor="ne", fill=CHART["axis"], font=("Helvetica", 9))
+    cv.create_text(left - 6, 3, text="lm", anchor="ne", fill=CHART["axis"], font=("Helvetica", 9))
     pts = [(X(min(max(a, t0), t1)), Y(b)) for a, b in zip(seg_t, seg_v) if a <= t1]
     if len(pts) >= 2:
         cv.create_line(*[c for p in pts for c in p], fill=CHART["line"], width=2)
