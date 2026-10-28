@@ -197,6 +197,7 @@
         <li><strong>Live reading and chart</strong> with a scale that stays put as the run grows, plus a line of time and lumens every second that you can turn off.</li>
         <li><strong>Start and Stop</strong> a run, or stop it automatically after a number of minutes.</li>
         <li><strong>Exact start and end times</strong> from the computer's clock, and the dark start trimmed off.</li>
+        <li><strong>Run limits</strong>: start when the light reaches a level, stop when it falls below a level, stop after a set time, and stop automatically when the tester has sent no readings for 5 minutes (changeable). The values are remembered.</li>
         <li><strong>Calibrate</strong> the counts-per-lumen scale with a lamp of known output.</li>
         <li><strong>History</strong> of every run with its chart, <strong>rename</strong>, <strong>upload</strong> to hCRI.io, <strong>share link</strong>, stop sharing and delete.</li>
         <li><strong>Sign in</strong> from the window to create the hCRI.io token for you, the same way Companion's Settings does.</li>
@@ -245,6 +246,7 @@
         <tr><td>Chart width</td><td>30 seconds, 2 minutes or 10 minutes (the chart scrolls with the run), or Whole run to fit everything on screen.</td></tr>
         <tr><td>Clear</td><td>Clears the live chart (not available while recording).</td></tr>
         <tr><td>Stop after</td><td>Minutes after which the run stops by itself. Blank means you stop it.</td></tr>
+        <tr><td>Run limits</td><td>Four boxes, all remembered between runs (blank = off): <em>Start at</em> (Start run waits until the light reaches this many lumens, and the button says Cancel while it waits), <em>Stop below</em> (ends the run when the output stays below this level for 3 seconds, only after it has been above it), <em>Stop after</em> (minutes) and <em>No readings for</em> (minutes, default 5: ends the run when the tester has been silent that long, and the run ends at the last reading). A run that stops by itself is saved at once under its suggested name, with a note saying why, and you rename or upload it from History.</td></tr>
         <tr><td>Trim the dark start</td><td>Drops the dark seconds before the light came on (on by default).</td></tr>
         <tr><td>Show readings</td><td>Shows a line of clock time, elapsed time and lumens every second under the chart, with REC marking the recorded ones. Untick it to hide the list; the setting is remembered. In the terminal the same line is turned off with <code>--no-readout</code>.</td></tr>
         <tr><td>Calibrate...</td><td>Put a lamp of known output in the sphere, enter its lumens and click Measure. It averages 8 seconds and shows the new counts-per-lumen scale; Save scale keeps it. See <a href="#scale">Calibrating the scale</a>.</td></tr>
@@ -275,7 +277,7 @@
       <p>Run <code>python tklamp_live.py --cli</code>. The script also uses the terminal by itself when this Python has no tkinter or there is no screen.</p>
       <ol class="steps">
         <li><strong>Start the script</strong><span>It finds the tester's port by itself (or asks you to pick one; you can also give <code>--port COM5</code> or <code>--port /dev/cu.usbserial-1420</code>). The live lumens appear on one line.</span></li>
-        <li><strong>Press Enter to start</strong><span>The line shows <code>REC</code> with the elapsed time and the number of readings, and a line of clock time, elapsed time and lumens is printed every second. Add <code>--no-readout</code> to turn those lines off and keep only the one updating line.</span></li>
+        <li><strong>Press Enter to start</strong><span>If you gave <code>--start-at</code> it waits until the light reaches that level and then starts by itself (Enter cancels the wait). The line shows <code>REC</code> with the elapsed time and the number of readings, and a line of clock time, elapsed time and lumens is printed every second. Add <code>--no-readout</code> to turn those lines off and keep only the one updating line.</span></li>
         <li><strong>Press Enter again to stop</strong><span>Or use <code>--duration 30</code> to stop after 30 minutes. Ctrl+C also stops and keeps what was recorded.</span></li>
         <li><strong>Name, upload, share</strong><span>It shows the summary with the exact start and end times, asks for a name, offers to upload (signing in first if needed) and offers a share link. If the upload fails, the run is already saved: <code>python tklamp_live.py --upload TKLamp_2026-10-27-18.00.00.json</code> sends it later.</span></li>
       </ol>
@@ -296,7 +298,11 @@
         <tr><td><code>--port PORT</code></td><td>Serial port, if it is not found automatically.</td></tr>
         <tr><td><code>--calibrate LUMENS</code></td><td>Set and save the scale from a lamp of known output (terminal).</td></tr>
         <tr><td><code>--scale N</code></td><td>Use this counts-per-lumen for this run only.</td></tr>
-        <tr><td><code>--duration MIN</code></td><td>Stop by itself after this many minutes (also fills the window's Stop after box).</td></tr>
+        <tr><td><code>--start-at LM</code></td><td>Wait until the light reaches this many lumens, then start recording.</td></tr>
+        <tr><td><code>--stop-below LM</code></td><td>Stop when the output stays below this many lumens for 3 seconds (only after it has been above it).</td></tr>
+        <tr><td><code>--duration MIN</code></td><td>Stop by itself after this many minutes.</td></tr>
+        <tr><td><code>--idle-timeout MIN</code></td><td>Stop when no reading has arrived for this many minutes (default 5; 0 = off).</td></tr>
+        <tr><td><code>--save-settings</code></td><td>Remember the four limits above for next time. The window remembers them by itself.</td></tr>
         <tr><td><code>--no-trim</code></td><td>Keep the dark readings before the light came on.</td></tr>
         <tr><td><code>--output-dir DIR</code></td><td>Where to save runs. Default: the current folder in the terminal, <em>TKLamp runs</em> in your home folder in the window.</td></tr>
         <tr><td><code>--login</code></td><td>Sign in with your hCRI.io email/username and password, create a token and remember it.</td></tr>
@@ -312,7 +318,7 @@
       <ul>
         <li><code>TKLamp_&lt;date&gt;.json</code>: the run (name, spacing, lumens) plus its start and end times, length, number of readings, the scale used, and whether it was uploaded or shared.</li>
         <li><code>TKLamp_&lt;date&gt;.csv</code>: minutes in the first column and the lumens in the second, ready for Upload CSV on the Runtime page.</li>
-        <li><code>~/.hcri_tklamp.json</code>: your settings (scale, token, whether to show the readings). Readable only by you.</li>
+        <li><code>~/.hcri_tklamp.json</code>: your settings (scale, token, run limits, whether to show the readings). Readable only by you.</li>
       </ul>
       <p class="dim">Runs are stored at one point per second (wider spacing beyond about 27 hours, hCRI.io's 100,000 point limit). hCRI.io does not store the start and end times yet, so they stay in the saved <code>.json</code>.</p>
     </section>
