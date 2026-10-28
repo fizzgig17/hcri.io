@@ -1885,6 +1885,13 @@ def run_gui(args, cfg):
               "Linux: install python3-tk. Or use Python from python.org.)")
         return False
     try:
+        if sys.platform == "win32":
+            # Own taskbar identity, so Windows shows the hCRI.io icon instead of grouping the window under Python.
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("io.hcri.tklamplive")
+            except Exception:
+                pass
         root = tk.Tk()
     except tk.TclError as e:
         print(f"Could not open a window ({e}); using the terminal version. Use --cli to skip this check.")
