@@ -337,6 +337,7 @@
         <tr><td>"No module named serial" or "needs pyserial"</td><td>Run <code>pip install pyserial</code> (or <code>python -m pip install pyserial</code>, or <code>py -m pip ...</code> on Windows).</td></tr>
         <tr><td>Permission denied on Linux</td><td>Add yourself to the <code>dialout</code> group, then log out and in.</td></tr>
         <tr><td>The number differs from the tester's screen</td><td>Calibrate with a lamp of known output.</td></tr>
+        <tr><td>"certificate verify failed" (Mac)</td><td>Python from python.org has no root certificates until you run its certificate step. The script now falls back to the Mac's own certificates by itself; if it still fails, open the Python folder in Applications and double-click <code>Install Certificates.command</code>, then try again.</td></tr>
         <tr><td>"Sign-in failed: Invalid credentials"</td><td>Check the email or username and password. You can also make a token on the website and use <code>--token</code>.</td></tr>
         <tr><td>"hCRI.io said 401"</td><td>The token is wrong or was deleted. Click Sign out, then Sign in again (or run <code>--login</code>).</td></tr>
         <tr><td>The upload says the account limit is reached</td><td>Delete some runtime curves on hCRI.io, then click Upload again.</td></tr>
