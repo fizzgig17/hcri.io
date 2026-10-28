@@ -425,7 +425,7 @@ function drawChart(cv, ts, vs, windowS, ymax) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
   var grid = css('--border'), dim = css('--dim'), line = css('--accent');
-  var L = 54, R = 14, T = 16, B = 28, pw = w - L - R, ph = h - T - B;
+  var L = 54, R = 14, T = 24, B = 28, pw = w - L - R, ph = h - T - B;
   if (pw < 40 || ph < 30) return 0;
   var tmax = ts.length ? ts[ts.length - 1] : 0, t0, t1;
   if (windowS > 0) { t1 = Math.max(tmax, windowS); t0 = t1 - windowS; } else { t0 = 0; t1 = Math.max(tmax, 10); }
@@ -447,7 +447,7 @@ function drawChart(cv, ts, vs, windowS, ymax) {
     g.beginPath(); g.moveTo(L - lv.tick, y); g.lineTo(L, y); g.stroke();
     if (k % every === 0) g.fillText(String(+v.toPrecision(6)), L - 8, y);
   }
-  g.textAlign = 'right'; g.fillText('lm', L - 6, 6);
+  g.textAlign = 'right'; g.fillText('lm', L - 6, 7);
   var stp = niceStep(t1 - t0), tt = Math.ceil(t0 / stp) * stp;
   g.textAlign = 'center'; g.textBaseline = 'top';
   for (; tt <= t1 + 1e-9; tt += stp) { var x = Math.round(X(tt)) + .5; g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.fillText(tickLabel(tt), x, T + ph + 5); }
