@@ -207,6 +207,9 @@
   #viewDlg{max-width:min(980px,96vw);width:96vw}
   #viewDlg canvas{height:380px}
   .note{font-size:12px;color:var(--dim)}
+  fieldset.limits{border:1px solid var(--border);border-radius:10px;margin:10px 0;padding:8px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+  fieldset.limits legend{font-size:12px;color:var(--dim);padding:0 6px}
+  fieldset.limits label{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
 </style>
 <div class="app">
   <h1>TKLamp Live Logger <span class="chip" style="font-size:11px;vertical-align:middle">in your browser</span></h1>
@@ -241,10 +244,16 @@
       <label>Chart width <select id="win"><option value="30">30 seconds</option><option value="120" selected>2 minutes</option><option value="600">10 minutes</option><option value="0">Whole run</option></select></label>
     </div>
     <div class="row">
-      <label>Stop after <input type="number" id="dur" min="0" step="1" placeholder="min"> minutes (blank = when I stop it)</label>
       <label><input type="checkbox" id="trim" checked> Trim the dark start</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
+    <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
+      <label>Start at <input type="number" id="limStart" min="0" step="any" placeholder="off"> lm</label>
+      <label>Stop below <input type="number" id="limStop" min="0" step="any" placeholder="off"> lm</label>
+      <label>Stop after <input type="number" id="dur" min="0" step="any" placeholder="off"> min</label>
+      <label>No readings for <input type="number" id="limIdle" min="0" step="any" placeholder="off"> min</label>
+      <div class="note" style="flex-basis:100%">Start at: Start run waits until the light reaches this level. Stop below: ends the run when the output stays below it for 3 s (only after it has been above it). No readings: ends the run when the tester has been silent that long (default 5 minutes). A run that stops by itself is saved at once under its suggested name; rename or upload it from History.</div>
+    </fieldset>
     <div id="logWrap"><div class="note"><b>Time &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Elapsed &nbsp;&nbsp;&nbsp;&nbsp;Lumens</b></div><div class="log" id="log"></div></div>
     <p class="note" style="margin-top:10px">Keep this tab open while recording (it asks the computer not to sleep). Your runs are kept in this browser; upload them to keep a copy on hCRI.io.</p>
   </div>
@@ -485,17 +494,42 @@ var S = {
   scale: pref('scale', DEFAULT_SCALE), source: null, connected: false, recording: false,
   rt: [], rv: [], t0: 0, started: null, stamp: '', lt: [], lv: [], lt0: performance.now() / 1000,
   recent: [], lastRx: 0, secVals: [], lastRow: 0, ymax: 0, calib: null,
-  runs: [], sel: null, saved: 0, wake: null
+  runs: [], sel: null, saved: 0, wake: null,
+  armed: false, seenAbove: false, belowSince: null, pendingStop: null, lastRxWall: new Date()
 };
 var cv = $('cv'), hcv = $('hcv');
 function msg(t) { $('status').textContent = t || ''; }
 
+// ---- run limits (same rules as the Python script and hCRI Companion) ----------------------------------------------------
+var STOP_HOLD_S = 3;
+function limitVal(id) { var t = $(id).value.trim().replace(',', '.'); if (!t) return null; var n = Number(t); return isFinite(n) && n >= 0 ? n : null; }
+function limits() { return { startAt: limitVal('limStart'), stopBelow: limitVal('limStop'), durationMin: limitVal('dur'), idleMin: limitVal('limIdle') || 0 }; }
+function avgNow() { return S.recent.length ? S.recent.reduce(function (a, b) { return a + b; }, 0) / S.recent.length : 0; }
+function stopLevelReason(avg, t) {
+  var b = limits().stopBelow; if (!b) return null;
+  if (avg >= b) { S.seenAbove = true; S.belowSince = null; return null; }
+  if (!S.seenAbove) return null;
+  if (S.belowSince === null) S.belowSince = t;
+  return t - S.belowSince >= STOP_HOLD_S ? 'the output fell below ' + b + ' lm' : null;
+}
+function timerReason(recSeconds, silentSeconds) {
+  var l = limits();
+  if (l.durationMin && recSeconds >= l.durationMin * 60) return 'the ' + l.durationMin + ' minute time limit was reached';
+  if (l.idleMin && silentSeconds >= l.idleMin * 60) return 'no readings for ' + l.idleMin + ' minute' + (l.idleMin === 1 ? '' : 's');
+  return null;
+}
+
 function onReading(tSec, raw) {
   var lm = raw / S.scale;
   S.recent.push(lm); if (S.recent.length > 5) S.recent.shift();
-  S.lastRx = tSec; S.secVals.push(lm);
+  S.lastRx = tSec; S.lastRxWall = new Date(); S.secVals.push(lm);
   if (S.calib) S.calib.push(raw);
-  if (S.recording) { S.rt.push(tSec - S.t0); S.rv.push(lm); }
+  if (S.armed && !S.recording) { var a = limits().startAt; if (a === null || avgNow() >= a) beginRun(tSec); }
+  if (S.recording) {
+    S.rt.push(tSec - S.t0); S.rv.push(lm);
+    var why = stopLevelReason(avgNow(), tSec - S.t0);
+    if (why && !S.pendingStop) S.pendingStop = { why: why, ended: null };
+  }
   else { S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
 }
 function now() { return performance.now() / 1000; }
@@ -566,8 +600,15 @@ document.addEventListener('visibilitychange', function () { if (S.recording && d
 window.addEventListener('beforeunload', function (e) { if (S.recording) { e.preventDefault(); e.returnValue = ''; } });
 
 function startRun() {
+  if (S.armed) { S.armed = false; msg('Stopped waiting for the start level.'); updateButtons(); return; }
   var n = now();
   if (!S.recent.length || n - S.lastRx > 5) { msg('No readings yet: check the tester is on and its cable is in. Not started.'); return; }
+  var a = limits().startAt;
+  if (a !== null && !(avgNow() >= a)) { S.armed = true; msg('Waiting for the light to reach ' + a + ' lm; it then starts recording by itself.'); updateButtons(); return; }
+  beginRun(n);
+}
+function beginRun(n) {
+  S.armed = false; S.seenAbove = false; S.belowSince = null; S.pendingStop = null;
   S.recording = true; S.rt = []; S.rv = []; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
   addRow('-- Recording started ' + fmtTS(S.started) + ' --');
   msg('Recording from ' + fmtTS(S.started) + '.');
@@ -586,16 +627,25 @@ function pad3(n) { return ('000' + n).slice(-4); }
 function dropPartial(stamp) {
   return idbAll('partial').then(function (all) { return Promise.all(all.filter(function (r) { return r.stamp === stamp; }).map(function (r) { return idbDel('partial', r.key); })); }).catch(function () {});
 }
-function stopRun(why) {
+function stopRun(why, auto, endedAt) {
   if (!S.recording) return;
-  var ended = new Date(), ts = S.rt, vs = S.rv, started = S.started, stamp = S.stamp;
+  var ended = endedAt || new Date(), ts = S.rt, vs = S.rv, started = S.started, stamp = S.stamp;
   S.recording = false; releaseWake();
   S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0;
-  addRow('-- Stopped ' + fmtTS(ended) + ' --');
+  addRow('-- Stopped ' + fmtTS(ended) + (why ? ': ' + why : '') + ' --');
   updateButtons();
   var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked);
-  if (!run) { msg('The recording was too short to keep (it needs at least 2 seconds of readings).'); dropPartial(stamp); return; }
+  if (!run) { msg((auto ? why + ' ' : '') + 'The recording was too short to keep (it needs at least 2 seconds of readings).'); dropPartial(stamp); return; }
   run._stamp = stamp;
+  if (auto) {
+    // Nobody may be at the computer: keep the run now under its suggested name; rename or upload it from History.
+    dropPartial(stamp); delete run._stamp;
+    idbPut('runs', run).then(function () {
+      S.runs.unshift(run); S.runs.sort(byStart); S.sel = run.id; showTab('hist'); renderRuns();
+      msg(why + " Saved in this browser as '" + run.label + "'. Rename or upload it here.");
+    }).catch(function (e) { S.runs.unshift(run); S.sel = run.id; renderRuns(); msg(why + ' Could not save in this browser (' + (e && e.message || e) + '). Use Download to keep the run.'); });
+    return;
+  }
   saveDialog(run, why);
 }
 
@@ -800,14 +850,13 @@ function addRow(text) {
 function windowS() { return parseInt($('win').value, 10) || 0; }
 function updateButtons() {
   var rec = S.recording, con = S.connected;
-  $('mainBtn').textContent = rec ? 'Stop run' : 'Start run';
-  $('mainBtn').classList.toggle('rec', rec);
-  $('mainBtn').disabled = !(con || rec);
+  $('mainBtn').textContent = rec ? 'Stop run' : (S.armed ? 'Cancel' : 'Start run');
+  $('mainBtn').classList.toggle('rec', rec || S.armed);
+  $('mainBtn').disabled = !(con || rec || S.armed);
   $('clearBtn').disabled = rec; $('calBtn').disabled = !con || rec;
   $('connectBtn').textContent = con ? 'Disconnect' : 'Connect tester';
   $('connectBtn').disabled = rec;
   $('simBtn').disabled = con || rec; $('otherBtn').disabled = con || rec;
-  $('dur').disabled = rec;
   $('scaleNote').textContent = 'Scale: ' + S.scale + ' counts per lumen';
 }
 function showTab(t) {
@@ -820,10 +869,10 @@ $('connectBtn').onclick = function () { if (S.connected) disconnect(); else conn
 $('otherBtn').onclick = function () { connectSerial(true, true); };
 $('simBtn').onclick = startSim;
 $('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun(); };
+['limStart', 'limStop', 'dur', 'limIdle'].forEach(function (id) { $(id).addEventListener('change', function () { setPref(id, $(id).value); }); });
 $('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); };
 $('win').onchange = function () { setPref('win', $('win').value); S.ymax = S.ymax; redraw(); };
 $('trim').onchange = function () { setPref('trim', $('trim').checked); };
-$('dur').onchange = function () { setPref('dur', $('dur').value); };
 $('showLog').onchange = function () { setPref('showLog', $('showLog').checked); $('logWrap').hidden = !$('showLog').checked; };
 
 function redraw() {
@@ -834,7 +883,7 @@ function redraw() {
 function tick() {
   var n = now(), fresh = S.recent.length && n - S.lastRx <= 5;
   $('big').textContent = fresh ? (S.recent.reduce(function (a, b) { return a + b; }, 0) / S.recent.length).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '--';
-  $('recstat').textContent = S.recording ? 'REC ' + clock(n - S.t0) + '   ' + S.rt.length + ' readings' : '';
+  $('recstat').textContent = S.recording ? 'REC ' + clock(n - S.t0) + '   ' + S.rt.length + ' readings' : (S.armed ? 'Waiting for ' + limits().startAt + ' lm to start...' : '');
   if (S.connected && n - S.lastRow >= 1) {
     S.lastRow = n;
     if ($('showLog').checked) {
@@ -846,15 +895,19 @@ function tick() {
   }
   if (S.recording) {
     flushPartial(false);
-    var dur = parseFloat($('dur').value);
-    if (dur > 0 && n - S.t0 >= dur * 60) stopRun(dur + ' minutes reached.');
+    if (!S.pendingStop) {
+      var why = timerReason(S.rt.length ? S.rt[S.rt.length - 1] : 0, n - S.lastRx);
+      if (why) S.pendingStop = { why: why, ended: /^no readings/.test(why) ? S.lastRxWall : null };
+    }
+    if (S.pendingStop) { var ps = S.pendingStop; S.pendingStop = null; stopRun('Stopped automatically: ' + ps.why + '.', true, ps.ended); }
   }
   redraw();
 }
 
 window.addEventListener('resize', function () { redraw(); drawRun(hcv, selRun()); });
 (function init() {
-  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('dur').value = pref('dur', '');
+  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true);
+  $('limStart').value = pref('limStart', ''); $('limStop').value = pref('limStop', ''); $('dur').value = pref('dur', ''); $('limIdle').value = pref('limIdle', '5');
   $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked;
   if (!navigator.serial) { $('unsupported').hidden = false; $('connectBtn').disabled = true; $('otherBtn').hidden = true; }
   updateButtons(); showAccount();

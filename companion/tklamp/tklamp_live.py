@@ -19,8 +19,12 @@ In the terminal: the live number shows at once, with a line of time and lumens e
 hCRI.io upload:  python tklamp_live.py --login                              (once: sign in, a token is created and remembered in ~/.hcri_tklamp.json)
                  or  --token YOUR_TOKEN --save-token  with a token made on the website
                  or set the HCRI_TOKEN environment variable. The token is the same API token hCRI Companion uses.
+Run limits:      --start-at 100            wait until the light reaches 100 lm, then start recording
+                 --stop-below 50           stop when the output stays below 50 lm (only after it has been above it)
+                 --duration 30             stop after 30 minutes
+                 --idle-timeout 5          stop when no reading has arrived for 5 minutes (default 5; 0 = off)
+                 --save-settings           remember these for next time (the window remembers them by itself)
 Other uses:      --calibrate 2150          put a lamp of known lumens in the sphere: sets and saves the scale
-                 --duration 30             stop by itself after 30 minutes
                  --upload run.json         upload a run saved earlier
                  --simulate                no tester needed: makes a fading test light (for trying the script)
 
@@ -254,6 +258,75 @@ def fmt_clock(s):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# Run limits: start at a level, stop below a level, stop after a time, stop when readings stop (same rules as the apps)
+# ----------------------------------------------------------------------------------------------------------------------
+
+STOP_BELOW_HOLD_S = 3          # the output must stay below the stop level this long
+DEFAULT_IDLE_MIN = 5
+
+
+def num_or_none(v):
+    """A limit box's text (or a saved value) as a number of at least 0; blank or invalid means off (None)."""
+    try:
+        if v is None or str(v).strip() == "":
+            return None
+        n = float(str(v).strip().replace(",", "."))
+        return n if n >= 0 and n == n else None
+    except ValueError:
+        return None
+
+
+def limits_from_cfg(cfg):
+    lim = cfg.get("limits") or {}
+    idle = lim.get("idle_min", DEFAULT_IDLE_MIN)
+    idle = num_or_none(idle)
+    return {"start_at": num_or_none(lim.get("start_at")), "stop_below": num_or_none(lim.get("stop_below")),
+            "duration": num_or_none(lim.get("duration")), "idle_min": DEFAULT_IDLE_MIN if "idle_min" not in lim else (idle or 0)}
+
+
+class RunGuard:
+    """Decides when a run starts and stops by itself. The stop level only counts once the output has been above it, then it
+    must stay below for STOP_BELOW_HOLD_S seconds. Time limit and no-readings timeout are checked with on_timer."""
+
+    def __init__(self, limits):
+        self.limits = limits
+        self.reset()
+
+    def reset(self):
+        self.seen_above = False
+        self.below_since = None
+
+    def should_start(self, avg):
+        a = self.limits.get("start_at")
+        return a is None or avg >= a
+
+    def on_reading(self, avg, t):
+        b = self.limits.get("stop_below")
+        if not b or b <= 0:
+            return None
+        if avg >= b:
+            self.seen_above = True
+            self.below_since = None
+            return None
+        if not self.seen_above:
+            return None
+        if self.below_since is None:
+            self.below_since = t
+        if t - self.below_since >= STOP_BELOW_HOLD_S:
+            return f"the output fell below {b:g} lm"
+        return None
+
+    def on_timer(self, rec_seconds, silent_seconds):
+        d = self.limits.get("duration")
+        if d and d > 0 and rec_seconds >= d * 60:
+            return f"the {d:g} minute time limit was reached"
+        i = self.limits.get("idle_min")
+        if i and i > 0 and silent_seconds >= i * 60:
+            return f"no readings for {i:g} minute{'' if i == 1 else 's'}"
+        return None
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 # Live loop
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -276,20 +349,57 @@ def enter_pressed():
     return False
 
 
-def live(ser, scale, duration_min, spool_path, readout=True):
-    """Shows live lumens. Enter starts, Enter stops. Returns (points, started_wall, ended_wall) or None."""
+def live(ser, scale, limits, spool_path, readout=True):
+    """Shows live lumens. Enter starts (or waits for the start level), Enter stops. Returns
+    (points, started_wall, ended_wall, spool, reason) or None."""
     reader = FrameReader()
+    guard = RunGuard(limits)
     recent = []
     recording = False
+    armed = False
     pts = []
     t_start_mono = None
     started_wall = None
     last_rx = time.monotonic()
+    last_rx_wall = datetime.datetime.now()
     last_draw = 0.0
     last_flush = 0.0
     last_row = 0.0
     spool = None
-    print("\nLive reading. Press Enter to START recording; Enter again to STOP. (Ctrl+C also stops.)\n")
+    st = {"spool": None}
+
+    def avg_now():
+        return sum(recent) / len(recent) if recent else 0.0
+
+    def begin(now):
+        nonlocal recording, armed, t_start_mono, started_wall, spool
+        recording, armed = True, False
+        guard.reset()
+        t_start_mono = now
+        started_wall = datetime.datetime.now()
+        spool = open(spool_path, "w", encoding="utf-8")
+        spool.write("seconds,lumens\n")
+        spool_written[0] = 0
+        print(f"\nRecording from {started_wall.strftime(TS)}. Press Enter to stop.\n")
+        if readout:
+            print("  clock       elapsed       lumens")
+
+    def finish_rec(reason=None, ended=None):
+        return pts, started_wall, ended or datetime.datetime.now(), spool, reason
+
+    notes = []
+    if limits.get("start_at") is not None:
+        notes.append(f"start at {limits['start_at']:g} lm")
+    if limits.get("stop_below") is not None:
+        notes.append(f"stop below {limits['stop_below']:g} lm")
+    if limits.get("duration"):
+        notes.append(f"stop after {limits['duration']:g} min")
+    if limits.get("idle_min"):
+        notes.append(f"stop after {limits['idle_min']:g} min with no readings")
+    print("\nLive reading. Press Enter to START recording; Enter again to STOP. (Ctrl+C also stops.)")
+    if notes:
+        print("Limits: " + ", ".join(notes) + ".")
+    print()
     try:
         while True:
             data = ser.read(256)
@@ -300,42 +410,50 @@ def live(ser, scale, duration_min, spool_path, readout=True):
                 if len(recent) > 5:
                     recent.pop(0)
                 last_rx = now
+                last_rx_wall = datetime.datetime.now()
+                if armed and guard.should_start(avg_now()):
+                    begin(now)
                 if recording:
                     pts.append((now - t_start_mono, lm))
+                    why = guard.on_reading(avg_now(), now - t_start_mono)
+                    if why:
+                        print(f"\nStopped: {why}.")
+                        return finish_rec(why)
             if enter_pressed():
-                if not recording:
-                    if not recent or now - last_rx > 5:
-                        print("\nNo readings yet: check the tester is on and its cable is in. Not started.")
-                    else:
-                        recording = True
-                        t_start_mono = now
-                        started_wall = datetime.datetime.now()
-                        spool = open(spool_path, "w", encoding="utf-8")
-                        spool.write("seconds,lumens\n")
-                        print(f"\nRecording from {started_wall.strftime(TS)}. Press Enter to stop.\n")
-                        if readout:
-                            print("  clock       elapsed       lumens")
+                if recording:
+                    return finish_rec()
+                if armed:
+                    armed = False
+                    print("\nStopped waiting for the start level.")
+                elif not recent or now - last_rx > 5:
+                    print("\nNo readings yet: check the tester is on and its cable is in. Not started.")
+                elif not guard.should_start(avg_now()):
+                    armed = True
+                    print(f"\nWaiting for the light to reach {limits['start_at']:g} lm to start recording. Enter cancels.")
                 else:
-                    return pts, started_wall, datetime.datetime.now(), spool
+                    begin(now)
             if recording and spool and pts and now - last_flush > 2:    # a crash keeps what was recorded so far
                 spool.write("".join(f"{t:.3f},{v:.2f}\n" for t, v in pts[spool_written[0]:]))
                 spool_written[0] = len(pts)
                 spool.flush()
                 last_flush = now
-            if recording and duration_min and now - t_start_mono >= duration_min * 60:
-                print(f"\n{duration_min:g} minutes reached.")
-                return pts, started_wall, datetime.datetime.now(), spool
+            if recording:
+                why = guard.on_timer(pts[-1][0] if pts else 0.0, now - last_rx)
+                if why:
+                    print(f"\nStopped: {why}.")
+                    return finish_rec(why, ended=last_rx_wall if "no readings" in why else None)
             if recording and readout and recent and now - last_row >= 1.0:     # one line of time and value each second
                 last_row = now
                 sys.stdout.write("\r" + f"  {datetime.datetime.now():%H:%M:%S}  {fmt_clock(now - t_start_mono):>10}  "
-                                 f"{sum(recent) / len(recent):9.1f} lm".ljust(70) + "\n")
+                                 f"{avg_now():9.1f} lm".ljust(70) + "\n")
             if now - last_draw > 0.25:
                 last_draw = now
                 if recent and now - last_rx <= 5:
-                    avg = sum(recent) / len(recent)
-                    line = f"  {avg:9.1f} lm"
+                    line = f"  {avg_now():9.1f} lm"
                 else:
                     line = "  no readings (tester on? cable in?)"
+                if armed:
+                    line += f"    waiting for {limits['start_at']:g} lm"
                 if recording:
                     line += f"    REC {fmt_clock(now - t_start_mono)}   {len(pts)} readings"
                 sys.stdout.write("\r" + line.ljust(70))
@@ -343,7 +461,7 @@ def live(ser, scale, duration_min, spool_path, readout=True):
     except KeyboardInterrupt:
         print("\nStopped.")
         if recording:
-            return pts, started_wall, datetime.datetime.now(), spool
+            return finish_rec()
         return None
 
 
@@ -760,6 +878,13 @@ class TkApp:
         self.recent, self.last_rx, self.sec_vals, self.last_row, self.last_flush = [], 0.0, [], 0.0, 0.0
         self.ymax, self.calib = 0.0, None
         self.runs, self.port_map = [], {}
+        self.armed, self.pending_stop, self.last_rx_wall = False, None, datetime.datetime.now()
+        lim = limits_from_cfg(cfg)
+        for key, name in (("start_at", "start_at"), ("stop_below", "stop_below"), ("duration", "duration"), ("idle_min", "idle_timeout")):
+            v = getattr(args, name, None)
+            if v is not None:
+                lim[key] = v
+        self.guard = RunGuard(lim)
         self.build_ui()
         self.refresh_ports()
         self.load_history()
@@ -842,12 +967,20 @@ class TkApp:
         wb.bind("<<ComboboxSelected>>", lambda e: self.redraw())
         ttk.Label(bar, text="Chart width").pack(side="right", padx=6)
 
+        lf = ttk.LabelFrame(f, text="Run limits (blank = off; remembered between runs)", padding=(8, 4))
+        lf.pack(fill="x", pady=(6, 2))
+        self.lim_vars = {}
+        for key, label in (("start_at", "Start at (lm)"), ("stop_below", "Stop below (lm)"), ("duration", "Stop after (min)"),
+                           ("idle_min", "No readings for (min)")):
+            ttk.Label(lf, text=label).pack(side="left")
+            v = tk.StringVar(value=self.lim_text(self.guard.limits.get(key)))
+            e = ttk.Entry(lf, textvariable=v, width=7)
+            e.pack(side="left", padx=(4, 12))
+            e.bind("<FocusOut>", lambda ev: self.commit_limits())
+            e.bind("<Return>", lambda ev: self.commit_limits())
+            self.lim_vars[key] = v
         opts = ttk.Frame(f)
         opts.pack(fill="x", pady=2)
-        ttk.Label(opts, text="Stop after (minutes, blank = when I stop it)").pack(side="left")
-        self.dur_var = tk.StringVar(value=("%g" % self.args.duration) if self.args.duration else "")
-        self.dur_entry = ttk.Entry(opts, textvariable=self.dur_var, width=7)
-        self.dur_entry.pack(side="left", padx=6)
         self.trim_var = tk.BooleanVar(value=not self.args.no_trim)
         ttk.Checkbutton(opts, text="Trim the dark start", variable=self.trim_var).pack(side="left", padx=14)
         self.show_var = tk.BooleanVar(value=(not self.args.no_readout) and self.cfg.get("readout", True))
@@ -914,17 +1047,34 @@ class TkApp:
             self.jobs.put((cb, res))
         threading.Thread(target=work, daemon=True).start()
 
+    @staticmethod
+    def lim_text(v):
+        return "" if not v else f"{v:g}"
+
+    def commit_limits(self):
+        """Reads the four limit boxes, remembers them (in ~/.hcri_tklamp.json) and applies them to the current run too."""
+        lim = {k: num_or_none(v.get()) for k, v in self.lim_vars.items()}
+        lim["idle_min"] = lim["idle_min"] or 0
+        for k, v in self.lim_vars.items():
+            v.set(self.lim_text(lim[k]))
+        self.guard.limits = lim
+        self.cfg["limits"] = lim
+        try:
+            save_config(self.cfg)
+        except OSError:
+            pass
+
     def window_s(self):
         return dict(self.WINDOWS)[self.win_var.get()] if self.win_var.get() in dict(self.WINDOWS) else 120
 
     def update_buttons(self):
         rec, con = self.recording, self.connected
-        self.main_btn.configure(text="Stop run" if rec else "Start run", state="normal" if (con or rec) else "disabled")
+        self.main_btn.configure(text="Stop run" if rec else ("Cancel" if self.armed else "Start run"),
+                                state="normal" if (con or rec or self.armed) else "disabled")
         self.clear_btn.configure(state="disabled" if rec else "normal")
         self.cal_btn.configure(state="normal" if (con and not rec) else "disabled")
         self.port_box.configure(state="disabled" if (con or rec) else "readonly")
         self.conn_btn.configure(text="Disconnect" if con else "Connect", state="disabled" if rec else "normal")
-        self.dur_entry.configure(state="disabled" if rec else "normal")
         self.scale_lbl.configure(text=f"Scale: {self.scale:g} counts per lumen")
 
     def update_account(self):
@@ -1041,11 +1191,18 @@ class TkApp:
         if len(self.recent) > 5:
             self.recent.pop(0)
         self.last_rx = t
+        self.last_rx_wall = datetime.datetime.now()
         self.sec_vals.append(lm)
+        avg = sum(self.recent) / len(self.recent)
         if self.calib is not None:
             self.calib.append(raw)
+        if self.armed and not self.recording and self.guard.should_start(avg):
+            self.begin_run(t)
         if self.recording:
             self.pts.append((t - self.t0, lm))
+            why = self.guard.on_reading(avg, t - self.t0)
+            if why and not self.pending_stop:
+                self.pending_stop = (why, None)
         else:
             self.live_t.append(t - self.live_t0)
             self.live_v.append(lm)
@@ -1077,6 +1234,8 @@ class TkApp:
         self.big.set(f"{sum(self.recent) / len(self.recent):,.1f}" if fresh else "--")
         if self.recording:
             self.rec_var.set(f"REC {fmt_clock(now - self.t0)}   {len(self.pts)} readings")
+        elif self.armed:
+            self.rec_var.set(f"Waiting for {self.guard.limits['start_at']:g} lm to start...")
         else:
             self.rec_var.set("")
         if self.connected and now - self.last_row >= 1.0:
@@ -1093,13 +1252,14 @@ class TkApp:
             self.spool_n = len(self.pts)
             self.spool.flush()
             self.last_flush = now
-        if self.recording:
-            try:
-                dur = float(self.dur_var.get())
-            except ValueError:
-                dur = 0.0
-            if dur > 0 and now - self.t0 >= dur * 60:
-                self.stop_run("%g minutes reached." % dur)
+        if self.recording and not self.pending_stop:
+            why = self.guard.on_timer(self.pts[-1][0] if self.pts else 0.0, now - self.last_rx)
+            if why:
+                self.pending_stop = (why, self.last_rx_wall if "no readings" in why else None)
+        if self.pending_stop and self.recording:
+            why, ended = self.pending_stop
+            self.pending_stop = None
+            self.stop_run(f"Stopped automatically: {why}.", auto=True, ended=ended)
         self.redraw()
 
     def on_error(self, text):
@@ -1126,13 +1286,30 @@ class TkApp:
 
     # ---- recording -----------------------------------------------------------------------------------------------
     def start_stop(self):
+        self.commit_limits()
         if self.recording:
             self.stop_run()
+            return
+        if self.armed:
+            self.armed = False
+            self.msg("Stopped waiting for the start level.")
+            self.update_buttons()
             return
         now = time.monotonic()
         if not self.recent or now - self.last_rx > 5:
             messagebox.showinfo("No readings yet", "Check the tester is on and its cable is in. Not started.")
             return
+        if not self.guard.should_start(sum(self.recent) / len(self.recent)):
+            self.armed = True
+            self.msg(f"Waiting for the light to reach {self.guard.limits['start_at']:g} lm; it then starts recording by itself.")
+            self.update_buttons()
+            return
+        self.begin_run(now)
+
+    def begin_run(self, now):
+        self.armed = False
+        self.guard.reset()
+        self.pending_stop = None
         self.recording = True
         self.pts, self.t0, self.started, self.ymax = [], now, datetime.datetime.now(), 0.0
         self.stamp = self.started.strftime("%Y-%m-%d-%H.%M.%S")
@@ -1146,10 +1323,10 @@ class TkApp:
         self.msg(f"Recording from {self.started.strftime(TS)}.")
         self.update_buttons()
 
-    def stop_run(self, why=""):
+    def stop_run(self, why="", auto=False, ended=None):
         if not self.recording:
             return
-        ended = datetime.datetime.now()
+        ended = ended or datetime.datetime.now()
         self.recording = False
         if self.spool:
             self.spool.close()
@@ -1158,12 +1335,29 @@ class TkApp:
         pts, started = self.pts, self.started
         self.pts = []
         self.live_t, self.live_v, self.live_t0, self.ymax = [], [], time.monotonic(), 0.0
-        self.add_row(f"-- Stopped {ended.strftime(TS)} --")
+        self.add_row(f"-- Stopped {ended.strftime(TS)}" + (f": {why}" if why else "") + " --")
         self.update_buttons()
         run = build_run(pts, started, ended, self.scale, bool(self.trim_var.get()))
         if not run:
-            messagebox.showinfo("Too short", "The recording was too short to keep (it needs at least 2 seconds of readings).")
-            self.msg("Nothing saved.")
+            if auto:
+                self.msg(f"{why} The recording was too short to keep.")
+            else:
+                messagebox.showinfo("Too short", "The recording was too short to keep (it needs at least 2 seconds of readings).")
+                self.msg("Nothing saved.")
+            return
+        if auto:
+            # Nobody may be at the computer: keep the run now under its suggested name; rename or upload it from History.
+            try:
+                os.remove(partial)
+            except OSError:
+                pass
+            base = os.path.join(self.outdir, f"TKLamp_{self.stamp}")
+            run["_base"] = base
+            write_run(base, run)
+            self.runs.insert(0, run)
+            self.fill_tree(select=run)
+            self.nb.select(self.hist_tab)
+            self.msg(f"{why} Saved as '{run['label']}'. Rename or upload it here.")
             return
         self.save_dialog(run, partial, why)
 
@@ -1635,6 +1829,7 @@ class TkApp:
             pass
 
     def on_close(self):
+        self.commit_limits()
         if self.recording:
             messagebox.showinfo("Recording", "A run is being recorded. Press Stop run to save it, then close the window.")
             return
@@ -1664,6 +1859,10 @@ def main():
     ap.add_argument("--scale", type=float, help=f"Counts per lumen (default {DEFAULT_SCALE}, or the saved one)")
     ap.add_argument("--calibrate", type=float, metavar="LUMENS", help="Set the scale from a lamp of this known output")
     ap.add_argument("--duration", type=float, metavar="MIN", help="Stop by itself after this many minutes")
+    ap.add_argument("--start-at", type=float, metavar="LM", help="Wait until the light reaches this many lumens, then start recording")
+    ap.add_argument("--stop-below", type=float, metavar="LM", help="Stop when the output stays below this many lumens (after it has been above it)")
+    ap.add_argument("--idle-timeout", type=float, metavar="MIN", help=f"Stop when no reading has arrived for this many minutes (default {DEFAULT_IDLE_MIN}; 0 = off)")
+    ap.add_argument("--save-settings", action="store_true", help="Remember --start-at, --stop-below, --duration and --idle-timeout for next time")
     ap.add_argument("--no-trim", action="store_true", help="Keep the dark start of the run (default: trimmed)")
     ap.add_argument("--output-dir", default=None, help="Where to save runs (default: the current folder in the terminal, "
                     "'TKLamp runs' in your home folder in the window)")
@@ -1695,6 +1894,14 @@ def main():
         if not (args.upload or args.simulate or args.calibrate or args.port):
             return
     scale = args.scale or cfg.get("scale") or DEFAULT_SCALE
+    limits = limits_from_cfg(cfg)
+    for key, val in (("start_at", args.start_at), ("stop_below", args.stop_below), ("duration", args.duration), ("idle_min", args.idle_timeout)):
+        if val is not None:
+            limits[key] = val
+    if args.save_settings:
+        cfg["limits"] = limits
+        save_config(cfg)
+        print("Run limits remembered.")
 
     if args.upload:
         with open(args.upload, "r", encoding="utf-8") as f:
@@ -1716,13 +1923,13 @@ def main():
         stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H.%M.%S")
         spool_path = os.path.join(args.output_dir, f"TKLamp_{stamp}.partial.csv")
         spool_written[0] = 0
-        res = live(ser, scale, args.duration, spool_path, not args.no_readout)
+        res = live(ser, scale, limits, spool_path, not args.no_readout)
     finally:
         ser.close()
     if not res:
         print("Nothing recorded.")
         return
-    pts, started, ended, spool = res
+    pts, started, ended, spool, reason = res
     if spool:
         spool.close()
     run = build_run(pts, started, ended, scale, not args.no_trim)
