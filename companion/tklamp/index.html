@@ -166,7 +166,7 @@
 .news a{color:var(--accent);font-weight:600}
 @media (max-width:1140px){.news{margin-inline:16px}}
 </style>
-<div class="news" role="note"><strong>New</strong>Log a <b>TKLamp TK2303D</b> tester from your Mac, Windows or Linux computer: a window with a live chart, history, rename, upload and share to hCRI.io. <a href="#install">Install</a> · <a href="#window">The window</a> · <a href="../bridge/#tklamp">Using your phone instead</a></div>
+<div class="news" role="note"><strong>New</strong>Log a <b>TKLamp TK2303D</b> tester from your Mac, Windows or Linux computer: a window with a live chart, history, rename, upload and share to hCRI.io. <a href="live/">Run it in Chrome or Edge, no install</a> · <a href="#install">Install the Python version</a> · <a href="../bridge/#tklamp">Using your phone instead</a></div>
 
 <div class="page">
   <nav class="toc" aria-label="Table of contents">
@@ -203,6 +203,8 @@
       </ul>
       <div class="card tip"><h4>Why use it instead of Transfer Data?</h4>
         <p>The tester's own Transfer Data sends the stored readings after the test, with no date or time, so the real start and end of the run are unknown. Because this script records while the test is running, the start time, end time and length are exact. You choose the name, and it can upload and make a share link for you.</p></div>
+      <div class="card tip"><h4>No install? Use it in your browser</h4>
+        <p><a href="live/">Open the browser version</a> in Chrome or Edge on a Mac, Windows or Linux computer. It uses Chrome's built-in USB serial access, so there is nothing to install (the Windows CH340 driver is still needed if the tester does not show up). It has the same live chart, calibrate, history, rename, upload and share, and uses your hCRI.io website sign-in. It does not run the Python script: it is a JavaScript version of the same logic. Runs are kept in that browser, so download or upload them to keep them. Safari, Firefox and phones cannot do this.</p></div>
       <div class="card"><h4>Prefer your phone?</h4>
         <p>hCRI Companion does the same with the ESP32 bridge, no computer needed. See <a href="../bridge/#tklamp">Using a TKLamp tester</a> and the <a href="../manual/#tklamp">manual</a>.</p></div>
     </section>

@@ -1,0 +1,904 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TKLamp Live Logger (browser) — hCRI Companion</title>
+<meta name="description" content="Log a TKLamp TK2303D tester from Chrome or Edge with no install: live chart, exact start and end times, history, and upload and share to hCRI.io.">
+<link rel="canonical" href="https://www.hcri.io/companion/tklamp/live/">
+<script>
+  (function(){
+    try {
+      var t = localStorage.getItem('hcri_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root{
+    --bg:#060a0f; --surface:#0a1628; --surface2:#0b1929; --border:#2d3645;
+    --text:#e8f4ff; --dim:#7aaccc; --accent:#00d4ff; --accent-dim:rgba(0,212,255,.14);
+    --good:#3dff9a; --warn:#ffcc33; --bad:#ff4466;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2f7; --surface:#ffffff; --surface2:#dce6f0; --border:rgba(40,90,160,0.25);
+    --text:#0d1f30; --dim:#2a5070; --accent:#005baa; --accent-dim:rgba(0,91,170,.14);
+    --good:#0a6e2e; --warn:#8a5a00; --bad:#aa1133;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box}
+  html,body{background:var(--bg);transition:background-color .15s,color .15s}
+  body{
+    margin:0; color:var(--text); line-height:1.6;
+    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    padding-inline:16px;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  img,svg{max-width:100%}
+  code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:.92em;color:var(--text)}
+
+  header.top{
+    display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between;
+    padding-block:18px; border-bottom:1px solid var(--border); max-width:1080px;margin:0 auto;
+  }
+  .brand{font-size:19px;font-weight:900;letter-spacing:.2px;display:flex;align-items:baseline;gap:8px}
+  .brand .dot{color:var(--accent)}
+  .brand .tag{
+    font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.4px;
+    border:1px solid var(--border);border-radius:999px;padding:2px 8px;
+  }
+  nav.links{display:flex;gap:18px;font-size:13px;flex-wrap:wrap;align-items:center}
+  nav.links a{color:var(--dim)}
+  nav.links a:hover{color:var(--text)}
+  .btn-sm{
+    display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+    border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);
+    border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .btn-sm:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
+  .btn-sm svg{width:14px;height:14px}
+
+  .page{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:48px;padding-block:36px 72px}
+  @media (max-width:860px){ .page{grid-template-columns:1fr} }
+
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:12.5px;max-height:calc(100vh - 40px);overflow:auto}
+  @media (max-width:860px){ nav.toc{position:static;max-height:none;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface)} }
+  nav.toc .toc-title{color:var(--dim);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:sec}
+  nav.toc li{counter-increment:sec;margin-bottom:7px}
+  nav.toc li a{color:var(--dim);display:block}
+  nav.toc li a:hover{color:var(--text)}
+  nav.toc li a::before{content:counter(sec) '. ';color:var(--accent);font-weight:700}
+
+  main{min-width:0}
+  .doc-title{font-size:clamp(26px,4vw,36px);margin:0 0 6px;letter-spacing:-.01em}
+  .doc-meta{color:var(--dim);font-size:12.5px;margin-bottom:38px}
+  .doc-meta a{color:var(--dim)}
+
+  section{padding-block:30px;border-top:1px solid var(--border)}
+  section:first-of-type{border-top:none;padding-top:0}
+  h2{font-size:21px;margin:0 0 14px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px}
+  h2 .num{color:var(--accent);font-size:15px;font-weight:700}
+  h3{font-size:15px;margin:22px 0 8px}
+  p{margin:0 0 12px;font-size:13.5px}
+  p.dim{color:var(--dim)}
+  ul,ol{margin:0 0 12px;padding-left:22px;font-size:13.5px}
+  li{margin-bottom:6px}
+  .lede{color:var(--dim);font-size:14.5px;max-width:68ch}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;margin:14px 0;
+  }
+  .card h4{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;font-size:13px;color:var(--dim)}
+  .card.tip h4{color:var(--good)}
+  .card.warn h4{color:var(--warn)}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+  td code{font-size:12px}
+
+  .steps{list-style:none;margin:0;padding:0;counter-reset:step}
+  .steps li{
+    counter-increment:step;position:relative;padding-left:40px;margin-bottom:16px;font-size:13.5px;
+  }
+  .steps li::before{
+    content:counter(step);position:absolute;left:0;top:-1px;
+    width:26px;height:26px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--accent) 40%,transparent);
+    color:var(--accent);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;
+  }
+  .steps li strong{display:block;margin-bottom:2px}
+  .steps li span{color:var(--dim)}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .chip{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600}
+
+  footer{border-top:1px solid var(--border);padding-block:24px;max-width:1080px;margin:0 auto;font-size:12.5px;color:var(--dim)}
+  footer a{color:var(--dim)}
+  footer a:hover{color:var(--accent)}
+
+  @media print{
+    nav.toc, header .links, .btn-sm, .no-print{display:none!important}
+    :root{ --bg:#fff; --surface:#fff; --surface2:#f3f3f3; --border:#ccc; --text:#111; --dim:#555; --accent:#1a4fb4; color-scheme: light; }
+    body{padding:0}
+    .page{display:block;max-width:none;padding:0}
+    header.top{max-width:none}
+    section{break-inside:avoid-page;border-top:1px solid #ccc}
+    h2{break-after:avoid}
+    a{color:#1a4fb4;text-decoration:underline}
+    .card{break-inside:avoid-page}
+  }
+
+  /* Floating back-to-top arrow -- same treatment as the main Companion
+     page (see companion/index.html), hidden on print via .no-print above. */
+  #back-to-top{
+    position:fixed; right:18px; bottom:calc(18px + env(safe-area-inset-bottom,0px));
+    width:40px; height:40px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; visibility:hidden; transform:translateY(8px);
+    transition:opacity .2s,transform .2s,visibility .2s,background-color .15s,border-color .15s;
+    box-shadow:0 2px 10px rgba(0,0,0,.25); z-index:50;
+  }
+  #back-to-top.visible{opacity:1; visibility:visible; transform:translateY(0)}
+  #back-to-top:hover{background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
+  #back-to-top svg{width:18px;height:18px}
+</style>
+<link rel="stylesheet" href="/assets/site-pages.css">
+<script defer src="/assets/site-pages.js"></script>
+</head><body>
+
+<header class="top">
+  <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
+    <span class="tag">TKLamp logger · browser</span>
+  </div>
+  <nav class="links">
+    <a href="../../">← Companion home</a>
+    <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a>
+    <a href="../../manual/">Manual</a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme" style="background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text);padding:0">🌙</button>
+  </nav>
+</header>
+<div class="bar"></div>
+
+
+<style>
+  .app{max-width:1080px;margin:0 auto;padding-block:26px 64px}
+  .app h1{font-size:clamp(24px,3.6vw,32px);margin:0 0 4px;letter-spacing:-.01em}
+  .app .sub{color:var(--dim);font-size:12.5px;margin-bottom:18px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .toolbar .grow{flex:1 1 auto}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:0 13px;border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .btn:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn.plain{background:transparent;border-color:var(--border);color:var(--text)}
+  .btn.rec{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:var(--bad);color:var(--bad)}
+  .btn.big{min-height:40px;padding:0 22px;font-size:14px}
+  .link{background:none;border:0;color:var(--dim);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:0}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);font:inherit;font-size:13px;font-weight:700;padding:8px 14px;cursor:pointer}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .pane[hidden]{display:none}
+  .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .big-num{font-size:clamp(44px,9vw,76px);font-weight:900;letter-spacing:-.02em;line-height:1.1}
+  .big-num small{font-size:.32em;font-weight:600;color:var(--dim);margin-left:6px}
+  .recstat{color:var(--bad);font-weight:800;font-size:16px}
+  canvas.chart{width:100%;height:280px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
+  .row label{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+  input[type=text],input[type=password],input[type=number],select{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
+  input[type=number]{width:84px}
+  .log{font-size:12px;height:150px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;white-space:pre;margin-top:6px}
+  .log b{color:var(--dim)}
+  .status{font-size:12.5px;color:var(--dim);min-height:20px;margin-top:8px}
+  table.runs{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+  table.runs th,table.runs td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
+  table.runs tbody tr{cursor:pointer}
+  table.runs tbody tr.sel{background:var(--accent-dim)}
+  .detail{white-space:pre-line;font-size:12.5px;color:var(--dim);margin:10px 0}
+  dialog{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:min(520px,92vw);font:inherit}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  dialog h3{margin:0 0 10px}
+  dialog .f{display:grid;grid-template-columns:130px 1fr;gap:8px 10px;align-items:center;margin:10px 0}
+  dialog .f input{width:100%}
+  dialog .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+  .err{color:var(--bad);font-size:12.5px;min-height:18px}
+  .chk{display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0}
+  #viewDlg{max-width:min(980px,96vw);width:96vw}
+  #viewDlg canvas{height:380px}
+  .note{font-size:12px;color:var(--dim)}
+</style>
+<div class="app">
+  <h1>TKLamp Live Logger <span class="chip" style="font-size:11px;vertical-align:middle">in your browser</span></h1>
+  <div class="sub">Records a TKLamp TK2303D tester over USB in Chrome or Edge, with exact start and end times, then uploads and shares the run on hCRI.io.
+    <a href="../">Instructions, and the Python version</a></div>
+
+  <div id="unsupported" class="card warn" hidden><h4>This browser can't open USB serial devices</h4>
+    <p>Reading the tester needs Web Serial, which is in Chrome and Edge on a Mac, Windows or Linux computer (not Safari, Firefox or phones). You can still try everything with <em>Try without a tester</em>, and use <a href="../">the Python version</a>.</p></div>
+  <div id="recover" class="card" hidden><h4>An unfinished run was found</h4>
+    <p id="recoverText"></p><div class="row"><button class="btn" id="recoverBtn">Recover it</button><button class="btn plain" id="recoverDrop">Discard it</button></div></div>
+
+  <div class="toolbar">
+    <button class="btn" id="connectBtn">Connect tester</button>
+    <button class="link" id="otherBtn" title="Pick a different USB serial device">choose another device</button>
+    <button class="btn plain" id="simBtn">Try without a tester</button>
+    <span class="grow"></span>
+    <span id="acct" class="note"></span>
+    <button class="btn plain" id="acctBtn">Sign in</button>
+  </div>
+
+  <div class="tabs"><button data-tab="live" class="on">Live</button><button data-tab="hist" id="histTab">History</button></div>
+
+  <div class="pane" id="pane-live">
+    <div class="head"><div class="big-num"><span id="big">--</span><small>lm</small></div><div class="recstat" id="recstat"></div></div>
+    <canvas class="chart" id="cv"></canvas>
+    <div class="row">
+      <button class="btn big" id="mainBtn" disabled>Start run</button>
+      <button class="btn plain" id="clearBtn">Clear</button>
+      <button class="btn plain" id="calBtn" disabled>Calibrate...</button>
+      <span class="note" id="scaleNote"></span>
+      <span class="grow" style="flex:1"></span>
+      <label>Chart width <select id="win"><option value="30">30 seconds</option><option value="120" selected>2 minutes</option><option value="600">10 minutes</option><option value="0">Whole run</option></select></label>
+    </div>
+    <div class="row">
+      <label>Stop after <input type="number" id="dur" min="0" step="1" placeholder="min"> minutes (blank = when I stop it)</label>
+      <label><input type="checkbox" id="trim" checked> Trim the dark start</label>
+      <label><input type="checkbox" id="showLog" checked> Show readings</label>
+    </div>
+    <div id="logWrap"><div class="note"><b>Time &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Elapsed &nbsp;&nbsp;&nbsp;&nbsp;Lumens</b></div><div class="log" id="log"></div></div>
+    <p class="note" style="margin-top:10px">Keep this tab open while recording (it asks the computer not to sleep). Your runs are kept in this browser; upload them to keep a copy on hCRI.io.</p>
+  </div>
+
+  <div class="pane" id="pane-hist" hidden>
+    <div class="row">
+      <button class="btn plain" data-act="view">View</button>
+      <button class="btn plain" data-act="rename">Rename...</button>
+      <button class="btn" data-act="upload">Upload</button>
+      <button class="btn plain" data-act="share">Share link</button>
+      <button class="btn plain" data-act="unshare">Stop sharing</button>
+      <button class="btn plain" data-act="open">Open on hCRI.io</button>
+      <button class="btn plain" data-act="csv">Download CSV</button>
+      <button class="btn plain" data-act="json">Download JSON</button>
+      <button class="btn plain" data-act="delete">Delete</button>
+    </div>
+    <table class="runs"><thead><tr><th>Name</th><th>Started</th><th>Length</th><th>Lumens (start &gt; end)</th><th>Status</th></tr></thead><tbody id="runsBody"></tbody></table>
+    <div class="detail" id="detail">Runs you record appear here.</div>
+    <canvas class="chart" id="hcv"></canvas>
+  </div>
+  <div class="status" id="status" role="status"></div>
+</div>
+
+<dialog id="saveDlg"><h3>Save this run</h3><div class="note" id="saveInfo" style="white-space:pre-line"></div>
+  <div class="f"><label for="saveName">Name</label><input type="text" id="saveName" maxlength="160"></div>
+  <label class="chk"><input type="checkbox" id="saveUp"> Upload to Runtime on hCRI.io</label>
+  <label class="chk"><input type="checkbox" id="saveShare"> Make a share link</label>
+  <div class="btns"><button class="btn plain" id="saveDiscard">Discard</button><button class="btn" id="saveOk">Save</button></div></dialog>
+
+<dialog id="calDlg"><h3>Calibrate the scale</h3>
+  <p class="note">Put a lamp of known output in the sphere and leave it steady. Enter its lumens, then Measure. It averages 8 seconds of readings and works out the counts per lumen.</p>
+  <div class="f"><label for="calLm">Known lumens</label><input type="number" id="calLm" value="2150" min="1" step="any"></div>
+  <div class="note" id="calRes" style="min-height:36px"></div>
+  <div class="btns"><button class="btn plain" id="calClose">Close</button><button class="btn" id="calMeasure">Measure</button><button class="btn" id="calSave" disabled>Save scale</button></div></dialog>
+
+<dialog id="signDlg"><h3>Sign in to hCRI.io</h3>
+  <p class="note">The same account as the website. You stay signed in on this browser (and on hCRI.io) until you sign out.</p>
+  <div class="f"><label for="signWho">Email or username</label><input type="text" id="signWho" autocomplete="username"></div>
+  <div class="f"><label for="signPw">Password</label><input type="password" id="signPw" autocomplete="current-password"></div>
+  <div class="err" id="signErr"></div>
+  <div class="btns"><button class="btn plain" id="signCancel">Cancel</button><button class="btn" id="signGo">Sign in</button></div></dialog>
+
+<dialog id="viewDlg"><h3 id="viewTitle"></h3><div class="detail" id="viewDetail"></div><canvas class="chart" id="vcv"></canvas>
+  <div class="btns"><button class="btn plain" id="viewClose">Close</button></div></dialog>
+
+<script>
+(function () {
+'use strict';
+var API = '/index.php/api';
+var DEFAULT_SCALE = 313.2, MAX_POINTS = 100000;
+var HEAD = [0xA5, 0x0A, 0xAF, 0xA5, 0x09, 0xAE, 0x5A, 0x5A, 0x09, 0x04, 0x00], FRAME_LEN = 15;
+function $(id) { return document.getElementById(id); }
+function pref(k, d) { try { var v = localStorage.getItem('tkl_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+function setPref(k, v) { try { localStorage.setItem('tkl_' + k, JSON.stringify(v)); } catch (e) {} }
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function fmtTS(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function stampOf(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '-' + pad(d.getHours()) + '.' + pad(d.getMinutes()) + '.' + pad(d.getSeconds()); }
+function parseTS(s) { var m = /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)$/.exec(s || ''); return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null; }
+function clock(s) { s = Math.floor(s); return Math.floor(s / 3600) + ':' + pad(Math.floor((s % 3600) / 60)) + ':' + pad(s % 60); }
+function tickLabel(s) { s = Math.floor(s); return s < 3600 ? Math.floor(s / 60) + ':' + pad(s % 60) : Math.floor(s / 3600) + ':' + pad(Math.floor((s % 3600) / 60)) + ':' + pad(s % 60); }
+function fixed(v, n) { return Number(v).toFixed(n); }
+
+// ---- the tester's stream (same frame format the Python script reads) ------------------------------------------------
+function FrameReader() { this.buf = []; }
+FrameReader.prototype.find = function () {
+  var b = this.buf, n = HEAD.length;
+  for (var i = 0; i + n <= b.length; i++) {
+    var ok = true;
+    for (var j = 0; j < n; j++) if (b[i + j] !== HEAD[j]) { ok = false; break; }
+    if (ok) return i;
+  }
+  return -1;
+};
+FrameReader.prototype.feed = function (data) {
+  for (var k = 0; k < data.length; k++) this.buf.push(data[k]);
+  var out = [];
+  for (;;) {
+    var i = this.find();
+    if (i < 0) { var keep = HEAD.length - 1; if (this.buf.length > keep) this.buf.splice(0, this.buf.length - keep); break; }
+    if (i > 0) this.buf.splice(0, i);
+    if (this.buf.length < FRAME_LEN) break;
+    var v2 = this.buf[11], v1 = this.buf[12], v0 = this.buf[13], cs = this.buf[14];
+    if (((v2 + v1 + v0 - 0x3F) & 0xFF) === cs) { out.push((v2 << 16) | (v1 << 8) | v0); this.buf.splice(0, FRAME_LEN); }
+    else this.buf.splice(0, 1);
+  }
+  return out;
+};
+
+// ---- run processing (same rules as the Python script and hCRI Companion) ---------------------------------------------
+function resample(ts, vs) {
+  if (ts.length < 2) return null;
+  var dur = ts[ts.length - 1];
+  var step = dur <= MAX_POINTS - 1 ? 1 : Math.ceil(dur / (MAX_POINTS - 1));
+  var bins = Math.floor(dur / step) + 1;
+  if (bins < 2) return null;
+  var sums = new Float64Array(bins), cnts = new Uint32Array(bins), i;
+  for (i = 0; i < ts.length; i++) { var b = Math.min(bins - 1, Math.floor(ts[i] / step)); sums[b] += vs[i]; cnts[b]++; }
+  var vals = [], last = 0;
+  for (i = 0; i < bins; i++) { if (cnts[i]) last = sums[i] / cnts[i]; vals.push(Math.round(last * 10) / 10); }
+  return { step: step, vals: vals };
+}
+function trimLeading(vals, step) {
+  if (vals.length < 2) return { vals: vals, trimmed: 0 };
+  var peak = Math.max.apply(null, vals.length > 50000 ? vals.filter(function (_, i) { return i % 4 === 0; }) : vals);
+  for (var i = 0; i < vals.length; i++) if (vals[i] > peak) peak = vals[i];
+  if (peak <= 0) return { vals: vals, trimmed: 0 };
+  var first = 0;
+  for (var j = 0; j < vals.length; j++) if (vals[j] >= peak * 0.02) { first = j; break; }
+  var start = Math.max(0, first - Math.ceil(1 / step));
+  if (start <= 0 || vals.length - start < 2) return { vals: vals, trimmed: 0 };
+  return { vals: vals.slice(start), trimmed: start };
+}
+function buildRun(ts, vs, started, ended, scale, trim) {
+  var out = resample(ts, vs);
+  if (!out) return null;
+  var step = out.step, vals = out.vals, trimmed = 0;
+  if (trim) { var t = trimLeading(vals, step); vals = t.vals; trimmed = t.trimmed; if (trimmed) started = new Date(started.getTime() + trimmed * step * 1000); }
+  var dur = (vals.length - 1) * step;
+  var label = 'TKLamp run ' + fmtTS(started).slice(0, 16);
+  return { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
+    meta: { started: fmtTS(started), ended: fmtTS(ended), durationSeconds: dur, readings: ts.length, countsPerLumen: scale,
+      trimmedLeadingSeconds: trimmed * step, source: 'tklamp web logger', label: label } };
+}
+function csvOf(run) {
+  var lines = ['minutes,' + run.label.replace(/,/g, ' ')];
+  for (var i = 0; i < run.values.length; i++) lines.push((Math.round(i * run.intervalSeconds / 60 * 10000) / 10000) + ',' + run.values[i]);
+  return lines.join('\n') + '\n';
+}
+
+// ---- chart ------------------------------------------------------------------------------------------------------------
+function niceCeil(v) {
+  if (v <= 0) return 1;
+  var e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e, c = [1, 2, 2.5, 5, 10];
+  for (var i = 0; i < c.length; i++) if (f <= c[i] + 1e-9) return c[i] * e;
+  return 10 * e;
+}
+function niceStep(span) {
+  var raw = span / 6, s = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400];
+  for (var i = 0; i < s.length; i++) if (s[i] >= raw) return s[i];
+  return 86400;
+}
+function lowerBound(a, x) { var lo = 0, hi = a.length; while (lo < hi) { var m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; }
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function drawChart(cv, ts, vs, windowS, ymax) {
+  var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return 0;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  var g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  var grid = css('--border'), dim = css('--dim'), line = css('--accent');
+  var L = 54, R = 14, T = 16, B = 28, pw = w - L - R, ph = h - T - B;
+  if (pw < 40 || ph < 30) return 0;
+  var tmax = ts.length ? ts[ts.length - 1] : 0, t0, t1;
+  if (windowS > 0) { t1 = Math.max(tmax, windowS); t0 = t1 - windowS; } else { t0 = 0; t1 = Math.max(tmax, 10); }
+  var i0 = ts.length ? Math.max(0, lowerBound(ts, t0) - 1) : 0;
+  var step = Math.max(1, Math.floor((ts.length - i0) / (pw * 2)));
+  var peak = 0, st = [], sv = [];
+  for (var i = i0; i < ts.length; i += step) { st.push(ts[i]); sv.push(vs[i]); if (vs[i] > peak) peak = vs[i]; }
+  var topV = Math.max(ymax || 0, niceCeil(peak * 1.05));
+  function X(t) { return L + (t - t0) / (t1 - t0) * pw; }
+  function Y(v) { return T + ph - (v / topV) * ph; }
+  g.font = '10px sans-serif'; g.lineWidth = 1; g.strokeStyle = grid; g.fillStyle = dim;
+  g.strokeRect(L + .5, T + .5, pw, ph);
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (var k = 0; k <= 4; k++) { var v = topV * k / 4, y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.fillText(String(+v.toPrecision(6)), L - 6, y); }
+  g.textAlign = 'right'; g.fillText('lm', L - 6, 6);
+  var stp = niceStep(t1 - t0), tt = Math.ceil(t0 / stp) * stp;
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (; tt <= t1 + 1e-9; tt += stp) { var x = Math.round(X(tt)) + .5; g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.fillText(tickLabel(tt), x, T + ph + 5); }
+  g.save(); g.beginPath(); g.rect(L, T, pw, ph); g.clip();
+  g.strokeStyle = line; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+  var any = false;
+  for (var n = 0; n < st.length; n++) { if (st[n] > t1) break; var px = X(st[n]), py = Y(sv[n]); if (!any) { g.moveTo(px, py); any = true; } else g.lineTo(px, py); }
+  if (any) { if (st.length === 1) { g.fillStyle = line; g.fillRect(X(st[0]) - 2, Y(sv[0]) - 2, 4, 4); } else g.stroke(); }
+  g.restore();
+  return topV;
+}
+
+// ---- storage: runs live in this browser (IndexedDB) -------------------------------------------------------------------
+var dbp = null;
+function db() {
+  if (dbp) return dbp;
+  dbp = new Promise(function (res, rej) {
+    var rq = indexedDB.open('tklamp_logger', 1);
+    rq.onupgradeneeded = function () { var d = rq.result; d.createObjectStore('runs', { keyPath: 'id' }); d.createObjectStore('partial', { keyPath: 'key' }); };
+    rq.onsuccess = function () { res(rq.result); };
+    rq.onerror = function () { rej(rq.error); };
+  });
+  return dbp;
+}
+function tx(store, mode, fn) {
+  return db().then(function (d) { return new Promise(function (res, rej) {
+    var t = d.transaction(store, mode), s = t.objectStore(store), out = fn(s);
+    t.oncomplete = function () { res(out && out.result !== undefined ? out.result : undefined); };
+    t.onerror = function () { rej(t.error); };
+    t.onabort = function () { rej(t.error); };
+  }); });
+}
+function idbAll(store) { return tx(store, 'readonly', function (s) { return s.getAll(); }); }
+function idbPut(store, v) { return tx(store, 'readwrite', function (s) { s.put(v); }); }
+function idbDel(store, k) { return tx(store, 'readwrite', function (s) { s.delete(k); }); }
+
+// ---- hCRI.io -----------------------------------------------------------------------------------------------------------
+function sessionToken() { try { return localStorage.getItem('spd_token') || ''; } catch (e) { return ''; } }
+function call(method, path, body) {
+  var tok = sessionToken(), h = {};
+  if (tok) h.Authorization = 'Bearer ' + tok;
+  if (body !== undefined) h['Content-Type'] = 'application/json';
+  return fetch(API + path, { method: method, headers: h, body: body !== undefined ? JSON.stringify(body) : undefined }).then(function (r) {
+    return r.text().then(function (t) {
+      var j = {}; try { j = t ? JSON.parse(t) : {}; } catch (e) { throw new Error('Unexpected reply from hCRI.io (' + r.status + ')'); }
+      if (!r.ok) {
+        if (r.status === 401 && tok) { try { localStorage.removeItem('spd_token'); } catch (e) {} showAccount(); throw new Error('Your hCRI.io session expired. Sign in again.'); }
+        throw new Error(j.error || ('hCRI.io said ' + r.status));
+      }
+      return j;
+    });
+  });
+}
+function remoteId(label) {
+  return call('GET', '/v1/runtime').then(function (r) {
+    var it = (r.items || []).filter(function (i) { return i.label === label; })[0];
+    if (!it) throw new Error('could not find the uploaded light on hCRI.io');
+    return it.id;
+  });
+}
+function makeShare(id) { return call('POST', '/v1/runtime?share=' + encodeURIComponent(id), {}).then(function (r) { return location.origin + '/?runtime=' + r.shareToken; }); }
+function uploadRun(run) {
+  return call('POST', '/v1/runtime', { items: [{ label: run.label, group: 'TKLamp', unit: 'lm', intervalSeconds: run.intervalSeconds, values: run.values }] }).then(function (r) {
+    if (r.skipped && r.skipped.length) throw new Error('hCRI.io skipped it: ' + r.skipped.map(function (s) { return s.reason || '?'; }).join('; '));
+    return remoteId(run.label);
+  });
+}
+
+// ---- state ------------------------------------------------------------------------------------------------------------
+var S = {
+  scale: pref('scale', DEFAULT_SCALE), source: null, connected: false, recording: false,
+  rt: [], rv: [], t0: 0, started: null, stamp: '', lt: [], lv: [], lt0: performance.now() / 1000,
+  recent: [], lastRx: 0, secVals: [], lastRow: 0, ymax: 0, calib: null,
+  runs: [], sel: null, saved: 0, wake: null
+};
+var cv = $('cv'), hcv = $('hcv');
+function msg(t) { $('status').textContent = t || ''; }
+
+function onReading(tSec, raw) {
+  var lm = raw / S.scale;
+  S.recent.push(lm); if (S.recent.length > 5) S.recent.shift();
+  S.lastRx = tSec; S.secVals.push(lm);
+  if (S.calib) S.calib.push(raw);
+  if (S.recording) { S.rt.push(tSec - S.t0); S.rv.push(lm); }
+  else { S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
+}
+function now() { return performance.now() / 1000; }
+
+// ---- sources ------------------------------------------------------------------------------------------------------------
+function resetLive() { S.recent = []; S.lastRx = 0; S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; }
+
+function connectSerial(forcePicker, anyDevice) {
+  if (!navigator.serial) { msg('This browser cannot open USB serial devices. Use Chrome or Edge.'); return Promise.resolve(); }
+  var pick;
+  if (!forcePicker) pick = navigator.serial.getPorts().then(function (ps) { return ps.filter(function (p) { var i = p.getInfo(); return i.usbVendorId === 0x1a86; })[0]; });
+  else pick = Promise.resolve(null);
+  return pick.then(function (port) {
+    return port || navigator.serial.requestPort(anyDevice ? {} : { filters: [{ usbVendorId: 0x1a86 }] });
+  }).then(function (port) {
+    return port.open({ baudRate: 9600 }).then(function () {
+      try { port.setSignals({ dataTerminalReady: true }); } catch (e) {}
+      var fr = new FrameReader(), reader = port.readable.getReader(), stopping = false;
+      S.source = { kind: 'serial', close: function () { stopping = true; return reader.cancel().catch(function () {}).then(function () { return port.close().catch(function () {}); }); } };
+      S.connected = true; resetLive();
+      msg('Reading the tester.');
+      (function loop() {
+        reader.read().then(function (r) {
+          if (r.done) { if (!stopping) lost('The tester stopped sending.'); return; }
+          if (r.value) { var t = now(); fr.feed(r.value).forEach(function (raw) { onReading(t, raw); }); }
+          loop();
+        }).catch(function (e) { if (!stopping) lost(e && e.message || 'The connection was lost.'); });
+      })();
+      updateButtons();
+    });
+  }).catch(function (e) {
+    if (e && e.name === 'NotFoundError') { msg('No device chosen. If your tester is not listed, use "choose another device".'); return; }
+    msg('Could not open the tester: ' + (e && e.message || e));
+  });
+}
+function startSim() {
+  var sent = 0, t0 = now();
+  var iv = setInterval(function () {
+    var due = Math.floor((now() - t0) * 4.5) - sent;
+    for (var i = 0; i < Math.min(due, 20); i++) {
+      var t = sent / 4.5, lm = 2150 * (0.55 + 0.45 * Math.exp(-t / 120)) + (sent % 7 - 3) * 0.4;
+      onReading(now(), Math.round(lm * S.scale / 60) * 60); sent++;
+    }
+  }, 100);
+  S.source = { kind: 'sim', close: function () { clearInterval(iv); return Promise.resolve(); } };
+  S.connected = true; resetLive();
+  msg('Simulation: a made-up fading light.');
+  updateButtons();
+}
+function disconnect() {
+  if (S.recording) return Promise.resolve();
+  var s = S.source; S.source = null; S.connected = false; S.recent = [];
+  updateButtons();
+  return s ? s.close() : Promise.resolve();
+}
+function lost(text) {
+  var s = S.source; S.source = null; S.connected = false; S.recent = [];
+  if (s) s.close();
+  updateButtons();
+  msg('Lost the tester: ' + text + (S.recording ? ' The run so far is kept; press Stop run to save it.' : ''));
+}
+if (navigator.serial) navigator.serial.addEventListener('disconnect', function () { if (S.source && S.source.kind === 'serial') lost('the USB cable was unplugged.'); });
+
+// ---- recording ----------------------------------------------------------------------------------------------------------
+function acquireWake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { S.wake = w; }, function () {}); } catch (e) {} }
+function releaseWake() { try { if (S.wake) S.wake.release(); } catch (e) {} S.wake = null; }
+document.addEventListener('visibilitychange', function () { if (S.recording && document.visibilityState === 'visible' && !S.wake) acquireWake(); });
+window.addEventListener('beforeunload', function (e) { if (S.recording) { e.preventDefault(); e.returnValue = ''; } });
+
+function startRun() {
+  var n = now();
+  if (!S.recent.length || n - S.lastRx > 5) { msg('No readings yet: check the tester is on and its cable is in. Not started.'); return; }
+  S.recording = true; S.rt = []; S.rv = []; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
+  addRow('-- Recording started ' + fmtTS(S.started) + ' --');
+  msg('Recording from ' + fmtTS(S.started) + '.');
+  acquireWake(); updateButtons();
+}
+function flushPartial(force) {
+  if (!S.recording) return;
+  var n = S.rt.length - S.saved;
+  if (n <= 0 || (!force && now() - S.lastFlush < 5)) return;
+  S.lastFlush = now();
+  var rec = { key: S.stamp + '#' + pad3(S.chunk++), stamp: S.stamp, started: fmtTS(S.started), scale: S.scale, t: S.rt.slice(S.saved), v: S.rv.slice(S.saved), at: fmtTS(new Date()) };
+  S.saved = S.rt.length;
+  idbPut('partial', rec).catch(function () {});
+}
+function pad3(n) { return ('000' + n).slice(-4); }
+function dropPartial(stamp) {
+  return idbAll('partial').then(function (all) { return Promise.all(all.filter(function (r) { return r.stamp === stamp; }).map(function (r) { return idbDel('partial', r.key); })); }).catch(function () {});
+}
+function stopRun(why) {
+  if (!S.recording) return;
+  var ended = new Date(), ts = S.rt, vs = S.rv, started = S.started, stamp = S.stamp;
+  S.recording = false; releaseWake();
+  S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0;
+  addRow('-- Stopped ' + fmtTS(ended) + ' --');
+  updateButtons();
+  var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked);
+  if (!run) { msg('The recording was too short to keep (it needs at least 2 seconds of readings).'); dropPartial(stamp); return; }
+  run._stamp = stamp;
+  saveDialog(run, why);
+}
+
+// ---- save dialog --------------------------------------------------------------------------------------------------------
+function saveDialog(run, why) {
+  var m = run.meta;
+  $('saveInfo').textContent = (why ? why + '\n' : '') + 'Length ' + clock(m.durationSeconds) + ', ' + m.readings + ' readings, ' + fixed(run.values[0], 0) + ' to ' +
+    fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nDark start trimmed: ' + m.trimmedLeadingSeconds + ' s' : '');
+  $('saveName').value = run.label;
+  $('saveUp').checked = !!sessionToken(); $('saveShare').checked = false;
+  var d = $('saveDlg');
+  function done(save) {
+    var name = $('saveName').value.trim();
+    if (save && !name) { $('saveName').focus(); return; }
+    d.close();
+    dropPartial(run._stamp);
+    if (!save) { msg('Run discarded.'); return; }
+    run.label = run.meta.label = name.slice(0, 160);
+    var up = $('saveUp').checked, sh = $('saveShare').checked;
+    delete run._stamp;
+    idbPut('runs', run).then(function () {
+      S.runs.unshift(run); S.runs.sort(byStart); S.sel = run.id; showTab('hist'); renderRuns();
+      msg('Saved in this browser.');
+      if (up || sh) doUpload(run, sh);
+    }).catch(function (e) { msg('Could not save in this browser: ' + (e && e.message || e) + '. Use Download to keep the run.'); S.runs.unshift(run); S.sel = run.id; renderRuns(); });
+  }
+  $('saveOk').onclick = function () { done(true); };
+  $('saveDiscard').onclick = function () { done(false); };
+  d.oncancel = function (e) { e.preventDefault(); };
+  d.showModal(); $('saveName').select();
+}
+$('saveName').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('saveOk').click(); });
+
+// ---- calibration -------------------------------------------------------------------------------------------------------
+var calNew = null;
+$('calBtn').onclick = function () { calNew = null; $('calRes').textContent = ''; $('calSave').disabled = true; $('calMeasure').disabled = false; $('calDlg').showModal(); };
+$('calClose').onclick = function () { S.calib = null; $('calDlg').close(); };
+$('calMeasure').onclick = function () {
+  var lm = parseFloat($('calLm').value);
+  if (!(lm > 0)) { $('calRes').textContent = "Enter the lamp's lumens as a number."; return; }
+  S.calib = []; $('calMeasure').disabled = true; $('calSave').disabled = true; $('calRes').textContent = 'Measuring for 8 seconds...';
+  setTimeout(function () {
+    var raws = S.calib || []; S.calib = null; $('calMeasure').disabled = false;
+    if (raws.length < 5) { $('calRes').textContent = 'No readings from the tester.'; return; }
+    var avg = raws.reduce(function (a, b) { return a + b; }, 0) / raws.length;
+    calNew = Math.round(avg / lm * 10) / 10;
+    $('calRes').textContent = 'Average raw count ' + Math.round(avg) + '. The scale was ' + S.scale + '; it would now be ' + calNew + ' counts per lumen.';
+    $('calSave').disabled = false;
+  }, 8000);
+};
+$('calSave').onclick = function () { S.scale = calNew; setPref('scale', S.scale); msg('Scale saved: ' + S.scale + ' counts per lumen.'); $('calDlg').close(); updateButtons(); };
+
+// ---- account -----------------------------------------------------------------------------------------------------------
+function showAccount() {
+  if (sessionToken()) {
+    $('acctBtn').textContent = 'Sign out';
+    call('GET', '/auth/me').then(function (u) { $('acct').textContent = 'hCRI.io: ' + (u.name || u.email); }).catch(function () { $('acct').textContent = ''; });
+    $('acct').textContent = 'hCRI.io: signed in';
+  } else { $('acct').textContent = 'hCRI.io: not signed in'; $('acctBtn').textContent = 'Sign in'; }
+}
+var afterSign = null;
+function signIn(then) { afterSign = then || null; $('signErr').textContent = ''; $('signPw').value = ''; $('signDlg').showModal(); $('signWho').focus(); }
+$('acctBtn').onclick = function () {
+  if (sessionToken()) { if (confirm('Sign out of hCRI.io on this browser? (This also signs you out of the hCRI.io website here.)')) { try { localStorage.removeItem('spd_token'); } catch (e) {} showAccount(); } }
+  else signIn();
+};
+$('signCancel').onclick = function () { $('signDlg').close(); };
+function doSignIn() {
+  var who = $('signWho').value.trim(), pw = $('signPw').value;
+  if (!who || !pw) { $('signErr').textContent = 'Email/username and password are both needed.'; return; }
+  $('signGo').disabled = true; $('signErr').textContent = '';
+  fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: who, password: pw }) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || !j.token) throw new Error(j.error || 'Sign-in failed (' + r.status + ')'); return j; }); })
+    .then(function (j) { try { localStorage.setItem('spd_token', j.token); } catch (e) { throw new Error('This browser would not keep the sign-in.'); } $('signPw').value = ''; $('signDlg').close(); showAccount(); msg('Signed in.'); var f = afterSign; afterSign = null; if (f) f(); })
+    .catch(function (e) { $('signErr').textContent = e.message; })
+    .then(function () { $('signGo').disabled = false; });
+}
+$('signGo').onclick = doSignIn;
+$('signPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSignIn(); });
+
+// ---- history -----------------------------------------------------------------------------------------------------------
+function byStart(a, b) { return (b.meta.started || '').localeCompare(a.meta.started || ''); }
+function statusOf(r) { var m = r.meta.remote || {}; return m.shareUrl ? 'Uploaded, shared' : (m.id ? 'Uploaded' : 'In this browser'); }
+function selRun() { return S.runs.filter(function (r) { return r.id === S.sel; })[0] || null; }
+function needSel() { var r = selRun(); if (!r) msg('Select a run in the list first.'); return r; }
+function renderRuns() {
+  var tb = $('runsBody'); tb.textContent = '';
+  S.runs.forEach(function (r) {
+    var tr = document.createElement('tr'); if (r.id === S.sel) tr.className = 'sel';
+    var v = r.values;
+    [r.label, r.meta.started || '', clock((v.length - 1) * r.intervalSeconds), fixed(v[0], 0) + ' > ' + fixed(v[v.length - 1], 0) + ' lm', statusOf(r)].forEach(function (t) { var td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+    tr.onclick = function () { S.sel = r.id; renderRuns(); };
+    tr.ondblclick = function () { viewRun(); };
+    tb.appendChild(tr);
+  });
+  $('histTab').textContent = 'History' + (S.runs.length ? ' (' + S.runs.length + ')' : '');
+  var r = selRun();
+  $('detail').textContent = r ? describe(r) : (S.runs.length ? 'Select a run to see it.' : 'Runs you record appear here (they are kept in this browser).');
+  drawRun(hcv, r);
+}
+function describe(r) {
+  var m = r.meta, v = r.values, rem = m.remote || {};
+  return r.label + '\nStarted ' + (m.started || '?') + '   Ended ' + (m.ended || '?') + '   Length ' + clock((v.length - 1) * r.intervalSeconds) + '   ' + v.length + ' points at ' + r.intervalSeconds + ' s\n' +
+    fixed(v[0], 0) + ' lm at the start, ' + fixed(v[v.length - 1], 0) + ' lm at the end (' + (v[0] ? Math.round(100 * v[v.length - 1] / v[0]) : 0) + '% left)   Scale ' + (m.countsPerLumen || '?') + ' counts per lumen\n' +
+    statusOf(r) + (rem.shareUrl ? '   ' + rem.shareUrl : '');
+}
+function drawRun(canvas, r) {
+  if (!r) { var g = canvas.getContext('2d'); g.clearRect(0, 0, canvas.width, canvas.height); return; }
+  var ts = r.values.map(function (_, i) { return i * r.intervalSeconds; });
+  drawChart(canvas, ts, r.values, 0, 0);
+}
+function saveRun(r) { return idbPut('runs', r).catch(function (e) { msg('Could not update the saved copy: ' + (e && e.message || e)); }); }
+function viewRun() { var r = needSel(); if (!r) return; $('viewTitle').textContent = r.label; $('viewDetail').textContent = describe(r); $('viewDlg').showModal(); drawRun($('vcv'), r); }
+$('viewClose').onclick = function () { $('viewDlg').close(); };
+function download(name, mime, text) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+function fileBase(r) { return 'TKLamp_' + r.id; }
+
+function doUpload(r, share) {
+  if (!sessionToken()) { if (confirm('You need to sign in to hCRI.io first. Sign in now?')) signIn(function () { doUpload(r, share); }); return; }
+  msg('Uploading...');
+  uploadRun(r).then(function (id) {
+    r.meta.remote = { id: id, uploadedAt: fmtTS(new Date()) };
+    return share ? makeShare(id).then(function (u) { r.meta.remote.shareUrl = u; return u; }) : null;
+  }).then(function (u) {
+    saveRun(r); renderRuns();
+    if (u) { copy(u); msg('Uploaded to Runtime on hCRI.io. Share link copied: ' + u); } else msg('Uploaded to Runtime on hCRI.io (Explore, then Runtime).');
+  }).catch(function (e) { msg('Upload failed: ' + e.message + ' The run is still saved in this browser.'); });
+}
+function copy(text) { try { navigator.clipboard.writeText(text).catch(function () {}); } catch (e) {} }
+
+document.querySelectorAll('[data-act]').forEach(function (b) {
+  b.onclick = function () {
+    var act = b.getAttribute('data-act'), r = needSel(); if (!r) return;
+    var rem = r.meta.remote || {};
+    if (act === 'view') viewRun();
+    else if (act === 'csv') download(fileBase(r) + '.csv', 'text/csv', csvOf(r));
+    else if (act === 'json') download(fileBase(r) + '.json', 'application/json', JSON.stringify({ label: r.label, intervalSeconds: r.intervalSeconds, unit: r.unit, values: r.values, meta: r.meta }));
+    else if (act === 'upload') doUpload(r, false);
+    else if (act === 'open') window.open(rem.shareUrl || location.origin + '/', '_blank', 'noopener');
+    else if (act === 'rename') {
+      var nn = prompt('Run name', r.label); if (!nn || !nn.trim() || nn.trim() === r.label) return;
+      nn = nn.trim().slice(0, 160); var old = r.label;
+      if (rem.id && sessionToken() && confirm('This run is also on hCRI.io. Rename it there too?\n(It is re-uploaded under the new name and the old copy deleted. An old share link stops working.)')) {
+        r.label = r.meta.label = nn; msg('Renaming on hCRI.io...');
+        uploadRun(r).then(function (nid) { return call('POST', '/v1/runtime?delete=' + encodeURIComponent(rem.id), {}).then(function () { r.meta.remote = { id: nid, uploadedAt: fmtTS(new Date()) }; msg('Renamed here and on hCRI.io.'); }); })
+          .catch(function (e) { msg('Rename on hCRI.io failed: ' + e.message + ' The name here was changed; the one on hCRI.io was not.'); })
+          .then(function () { saveRun(r); renderRuns(); });
+      } else { r.label = r.meta.label = nn; if (rem.id) r.meta.remote = Object.assign({}, rem, { stale: true }); saveRun(r); renderRuns(); msg("Renamed '" + old + "' to '" + nn + "'."); }
+    }
+    else if (act === 'share') {
+      if (rem.shareUrl) { copy(rem.shareUrl); msg('Share link (copied): ' + rem.shareUrl); return; }
+      if (!rem.id) { if (confirm('A share link needs the run on hCRI.io. Upload it and make a link?')) doUpload(r, true); return; }
+      if (!sessionToken()) { signIn(function () { b.click(); }); return; }
+      makeShare(rem.id).then(function (u) { rem.shareUrl = u; r.meta.remote = rem; copy(u); saveRun(r); renderRuns(); msg('Share link (copied): ' + u + '  Anyone with it can see this run.'); }).catch(function (e) { msg('Could not make a link: ' + e.message); });
+    }
+    else if (act === 'unshare') {
+      if (!rem.shareUrl) { msg('This run has no share link.'); return; }
+      if (!sessionToken()) { signIn(function () { b.click(); }); return; }
+      call('POST', '/v1/runtime?unshare=' + encodeURIComponent(rem.id), {}).then(function () { delete rem.shareUrl; r.meta.remote = rem; saveRun(r); renderRuns(); msg('Sharing stopped. The old link no longer works.'); }).catch(function (e) { msg('Could not stop sharing: ' + e.message); });
+    }
+    else if (act === 'delete') {
+      var both = false;
+      if (rem.id && sessionToken()) { both = confirm("Delete '" + r.label + "' from this browser.\n\nAlso delete it from hCRI.io?  OK = both, Cancel = then I'll ask about this browser only."); }
+      if (!both && !confirm("Delete '" + r.label + "' from this browser only?")) return;
+      function local() { idbDel('runs', r.id).then(function () { S.runs = S.runs.filter(function (x) { return x.id !== r.id; }); S.sel = S.runs[0] ? S.runs[0].id : null; renderRuns(); msg('Deleted.'); }); }
+      if (both) call('POST', '/v1/runtime?delete=' + encodeURIComponent(rem.id), {}).then(local).catch(function (e) { msg('Could not delete on hCRI.io: ' + e.message + ' Nothing was deleted.'); });
+      else local();
+    }
+  };
+});
+
+// ---- recovery of an unfinished run -------------------------------------------------------------------------------------
+var recoverStamp = null;
+function checkRecover() {
+  idbAll('partial').then(function (all) {
+    if (!all.length) return;
+    all.sort(function (a, b) { return a.key < b.key ? -1 : 1; });
+    var stamp = all[all.length - 1].stamp, parts = all.filter(function (r) { return r.stamp === stamp; });
+    var n = parts.reduce(function (a, p) { return a + p.t.length; }, 0);
+    recoverStamp = stamp;
+    $('recoverText').textContent = 'A run started ' + parts[0].started + ' was not saved (' + n + ' readings, last at ' + parts[parts.length - 1].at + '). The page may have been closed or crashed while recording.';
+    $('recover').hidden = false;
+    $('recoverBtn').onclick = function () {
+      var ts = [], vs = [];
+      parts.forEach(function (p) { ts = ts.concat(p.t); vs = vs.concat(p.v); });
+      var started = parseTS(parts[0].started) || new Date(), ended = parseTS(parts[parts.length - 1].at) || new Date();
+      var run = buildRun(ts, vs, started, ended, parts[0].scale || S.scale, $('trim').checked);
+      $('recover').hidden = true;
+      if (!run) { msg('That run was too short to recover.'); dropPartial(stamp); return; }
+      run._stamp = stamp; saveDialog(run, 'Recovered run.');
+    };
+    $('recoverDrop').onclick = function () { dropPartial(stamp); $('recover').hidden = true; };
+  }).catch(function () {});
+}
+
+// ---- UI plumbing --------------------------------------------------------------------------------------------------------
+function addRow(text) {
+  var l = $('log'); l.appendChild(document.createTextNode(text + '\n'));
+  while (l.childNodes.length > 1500) l.removeChild(l.firstChild);
+  l.scrollTop = l.scrollHeight;
+}
+function windowS() { return parseInt($('win').value, 10) || 0; }
+function updateButtons() {
+  var rec = S.recording, con = S.connected;
+  $('mainBtn').textContent = rec ? 'Stop run' : 'Start run';
+  $('mainBtn').classList.toggle('rec', rec);
+  $('mainBtn').disabled = !(con || rec);
+  $('clearBtn').disabled = rec; $('calBtn').disabled = !con || rec;
+  $('connectBtn').textContent = con ? 'Disconnect' : 'Connect tester';
+  $('connectBtn').disabled = rec;
+  $('simBtn').disabled = con || rec; $('otherBtn').disabled = con || rec;
+  $('dur').disabled = rec;
+  $('scaleNote').textContent = 'Scale: ' + S.scale + ' counts per lumen';
+}
+function showTab(t) {
+  document.querySelectorAll('.tabs button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
+  $('pane-live').hidden = t !== 'live'; $('pane-hist').hidden = t !== 'hist';
+  if (t === 'hist') renderRuns();
+}
+document.querySelectorAll('.tabs button').forEach(function (b) { b.onclick = function () { showTab(b.getAttribute('data-tab')); }; });
+$('connectBtn').onclick = function () { if (S.connected) disconnect(); else connectSerial(false, false); };
+$('otherBtn').onclick = function () { connectSerial(true, true); };
+$('simBtn').onclick = startSim;
+$('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun(); };
+$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); };
+$('win').onchange = function () { setPref('win', $('win').value); S.ymax = S.ymax; redraw(); };
+$('trim').onchange = function () { setPref('trim', $('trim').checked); };
+$('dur').onchange = function () { setPref('dur', $('dur').value); };
+$('showLog').onchange = function () { setPref('showLog', $('showLog').checked); $('logWrap').hidden = !$('showLog').checked; };
+
+function redraw() {
+  var ts = S.recording ? S.rt : S.lt, vs = S.recording ? S.rv : S.lv;
+  var top = drawChart(cv, ts, vs, windowS(), S.ymax);
+  if (top > S.ymax) S.ymax = top;   // the vertical scale starts at zero and only grows, so the line does not jump about
+}
+function tick() {
+  var n = now(), fresh = S.recent.length && n - S.lastRx <= 5;
+  $('big').textContent = fresh ? (S.recent.reduce(function (a, b) { return a + b; }, 0) / S.recent.length).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '--';
+  $('recstat').textContent = S.recording ? 'REC ' + clock(n - S.t0) + '   ' + S.rt.length + ' readings' : '';
+  if (S.connected && n - S.lastRow >= 1) {
+    S.lastRow = n;
+    if ($('showLog').checked) {
+      var v = S.secVals, d = new Date();
+      var lm = v.length ? (v.reduce(function (a, b) { return a + b; }, 0) / v.length).toFixed(1) : null;
+      addRow(pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + '  ' + (S.recording ? clock(n - S.t0) : '-').padStart(10) + '  ' + (lm ? lm.padStart(9) + ' lm' : '  no reading') + (S.recording ? '   REC' : ''));
+    }
+    S.secVals = [];
+  }
+  if (S.recording) {
+    flushPartial(false);
+    var dur = parseFloat($('dur').value);
+    if (dur > 0 && n - S.t0 >= dur * 60) stopRun(dur + ' minutes reached.');
+  }
+  redraw();
+}
+
+window.addEventListener('resize', function () { redraw(); drawRun(hcv, selRun()); });
+(function init() {
+  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('dur').value = pref('dur', '');
+  $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked;
+  if (!navigator.serial) { $('unsupported').hidden = false; $('connectBtn').disabled = true; $('otherBtn').hidden = true; }
+  updateButtons(); showAccount();
+  idbAll('runs').then(function (all) { S.runs = all.sort(byStart); S.sel = S.runs[0] ? S.runs[0].id : null; renderRuns(); }).catch(function () { msg('This browser would not open its storage, so runs will not be kept here. Use Download after each run.'); });
+  checkRecover();
+  setInterval(tick, 100);
+})();
+window.__tkl = S;   // for testing
+})();
+
+</script>
+<footer>
+  TKLamp Live Logger (browser) · <a href="../">Instructions</a> · <a href="../../">Companion home</a> · <a href="../../manual/">Manual</a> · <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a><br>© 2026 fizzgig · Bridge firmware is GPLv3. The ColorMunki driver code is derived from ArgyllCMS (AGPL-3.0) · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Source ↗</a>
+</footer>
+
+<button id="back-to-top" class="no-print" type="button" title="Back to top" aria-label="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+<script>
+  (function(){
+    var btn = document.getElementById('back-to-top');
+    function sync(){
+      if (window.scrollY > 400) btn.classList.add('visible');
+      else btn.classList.remove('visible');
+    }
+    sync();
+    window.addEventListener('scroll', sync, { passive: true });
+    btn.addEventListener('click', function(){
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  })();
+</script>
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
+</body></html>
