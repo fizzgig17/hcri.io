@@ -229,7 +229,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.28.1, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.28.2, iOS 1.28)</h3>
+      <ul>
+        <li><strong>Live for the Torch Bearer</strong> (needs the latest bridge firmware): continuous spectrum, stopped with <code>Stop</code>. See <a href="#torchbearer">Using a Torch Bearer</a>.</li>
+      </ul>
+      <h3>Android 2026.10.28.1, iOS 1.28</h3>
       <ul>
         <li><strong>TKLamp run limits.</strong> Start a run at a lumen level, stop below a level, stop after a set time, and stop automatically after no readings for 5 minutes (change or turn off each; they are remembered). See <a href="#tklamp">Using a TKLamp tester</a>.</li>
         <li><strong>Runtime charts have a lumen grid:</strong> faint dots every 50 lm, dotted every 100 and solid every 500, with ticks on the axis.</li>
@@ -506,6 +510,7 @@
       <p>Where to buy the board, how to connect it and how to install the firmware are covered step by step in the
         <a href="../bridge/">ESP32 bridge setup guide</a>. Once the bridge is flashed and powered, it is listed in the meter picker as <code>hCRI Bridge</code> (older firmware: <code>Torch Bearer</code>) and connects like any other meter;
         once connected, the header shows <code>Torch Bearer</code> or <code>ColorMunki</code> depending on what is plugged in.</p>
+      <p><strong>Live (Torch Bearer only).</strong> Tap <code>Live</code> to keep scanning: the spectrum refreshes continuously until you tap <code>Stop</code> (or press a button on the bridge). It needs the latest bridge firmware; if no readings arrive within about 25 seconds the app says so. The ColorMunki takes one measurement at a time and has no Live mode. Live for the Torch Bearer is new and has not been tested on a Torch Bearer by the developer, so please report anything odd.</p>
       <h3>ColorMunki</h3>
       <p>Turn the dial to calibration and tap Calibrate, then turn to ambient and measure. The app asks for a fresh
         calibration after the time set in Settings (default 1 hour), because the dark reference drifts. Lux is approximate.</p>
