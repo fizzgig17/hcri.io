@@ -746,7 +746,13 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
       <div className="report-view-root" style={{ display: 'flex', flexDirection: 'column', height: isMobile ? 'auto' : '100%', background: U.bg, fontFamily: 'monospace', overflow: isMobile ? 'visible' : 'auto', color: U.text }}>
         <div style={{ padding: isMobile ? '14px 14px 4px' : '20px 22px 4px' }}>
           <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 900, color: U.text, wordBreak: 'break-word' }}>{report.label || 'Untitled'}</div>
-          <div style={{ fontSize: 12, color: U.dim, marginTop: 4 }}>Spectral analysis · TM‑30 / CRI · guest preview, not saved</div>
+          <div style={{ fontSize: 12, color: U.dim, marginTop: 4 }}>Spectral analysis · TM‑30 / CRI{report.id ? '' : ' · guest preview, not saved'}</div>
+          <button
+            onClick={() => setTm30Open(true)}
+            style={{ marginTop: 10, background: `${U.accent}15`, border: `1px solid ${U.accent}40`, color: U.accent, borderRadius: 6, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}
+          >
+            TM-30 report
+          </button>
         </div>
         <div style={{ padding: isMobile ? '6px 12px' : '10px 22px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(115px,1fr))', gap: 10 }}>
@@ -816,6 +822,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
             }))}
           />
         )}
+        {tm30Open && <AnnexEModal report={report} onClose={() => setTm30Open(false)} />}
       </div>
     );
   }
