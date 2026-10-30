@@ -29,7 +29,7 @@ import { useIsMobile } from '../hooks/useIsMobile.js';
 import ThreeViewer from './ThreeViewer.jsx';
 import SPDChart from './SPDChart.jsx';
 import CVGWheel from './CVGWheel.jsx';
-import { BinBarChart, CESBars, RawDataPanel } from './ReportCharts.jsx';
+import { BinBarChart, CESBars } from './ReportCharts.jsx';
 import MetaEditor from './MetaEditor.jsx';
 import ReportActionsMenu from './ReportActionsMenu.jsx';
 import AnnexEModal from './AnnexEModal.jsx';
@@ -334,10 +334,6 @@ export default function ReportView({ report, allReports = [], isGuest = false, o
 
           <div style={{ padding: isMobile ? '14px' : '16px 22px' }}>
             <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
-          </div>
-
-          <div style={{ padding: isMobile ? '0 14px 24px' : '0 22px 32px' }}>
-            <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={C} isMobile={isMobile} />
           </div>
         </div>
       )}

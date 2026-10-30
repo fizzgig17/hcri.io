@@ -34,7 +34,6 @@
 //   ce -> SPDChart.jsx (default)                  {wls, vals, cct, theme}
 //   le -> ReportCharts.jsx: BinBarChart            {title, tip, rfBins, mode, data, theme, noHelp}
 //   ue -> ReportCharts.jsx: CESBars                {rfBins, rfSamples, sampleHues, theme, noHelp}
-//   de -> ReportCharts.jsx: RawDataPanel           {headers, wls, vals, label, C}
 //   fe -> CVGWheel.jsx (default)                   {report, rfBins, Rg, Rf, cct, duv, size, theme, noHelp}
 //   Q1 -> Chromaticity.jsx: ChromaticityMini        {report, noHelp}
 //   H  -> Chromaticity.jsx: ChromaticityPanel (default) {report} -- the "cie" tab's 3D/4-panel plot
@@ -60,7 +59,7 @@ import Votes from './Votes.jsx';
 import ShareCardModal from './ShareCardModal.jsx';
 
 import SPDChart from './SPDChart.jsx';
-import { BinBarChart, CESBars, RawDataPanel } from './ReportCharts.jsx';
+import { BinBarChart, CESBars } from './ReportCharts.jsx';
 import FlickerSection from './FlickerSection.jsx';
 import CVGWheel from './CVGWheel.jsx';
 import ChromaticityPanel, { ChromaticityMini } from './Chromaticity.jsx';
@@ -1100,12 +1099,6 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <div style={{ height: 40 }} />
                 </div>
 
-                {report.rawHeaders && Object.keys(report.rawHeaders).length > 0 && (
-                  <div style={{ padding: '0 14px 40px' }}>
-                    <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
-                  </div>
-                )}
-
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} pad="0 14px 40px" />
               </div>
             ) : (
@@ -1157,7 +1150,6 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
 
                 <div style={{ padding: '16px 22px 32px' }}>
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
-                  <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                 </div>
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
