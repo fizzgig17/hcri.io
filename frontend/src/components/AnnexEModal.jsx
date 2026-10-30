@@ -489,7 +489,7 @@ export default function AnnexEModal({ report, onClose }) {
         </div>
         <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', padding: 10, boxSizing: 'border-box' }}>
           <div style={{ overflowX: 'auto', background: canvasBg, borderRadius: 6 }}>
-            <canvas ref={canvasRef} style={{ display: 'block' }} />
+            <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
           </div>
         </div>
       </div>
@@ -511,7 +511,7 @@ export default function AnnexEModal({ report, onClose }) {
             </div>
           </div>
           <div style={{ overflowX: 'scroll', overflowY: 'visible', WebkitOverflowScrolling: 'touch', background: canvasBg, borderRadius: 6, boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
-            <canvas ref={canvasRef} style={{ display: 'block' }} />
+            <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
           </div>
         </div>
       </div>
