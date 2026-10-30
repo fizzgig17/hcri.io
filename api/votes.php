@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -37,10 +38,13 @@ function vote_counts(PDO $db, array $ids): array {
 
 // ── GET /api/votes?ids=1,2,3&voter=token → { "1": {up,down,myVote}, ... } ──────
 if ($m === 'GET') {
-    $ids = array_values(array_filter(
-        array_map('intval', explode(',', (string)($_GET['ids'] ?? ''))),
-        fn($x) => $x > 0
-    ));
+    // ids may be public ids (or old numeric ones); the answer is keyed by whatever the caller sent.
+    $keyOf = [];   // internal id => key as sent
+    foreach (array_slice(array_filter(array_map('trim', explode(',', (string)($_GET['ids'] ?? '')))), 0, 200) as $k) {
+        $iid = hcri_rid($db, $k);
+        if ($iid > 0) $keyOf[$iid] = $k;
+    }
+    $ids = array_keys($keyOf);
     $vk   = voter_key_from($_GET['voter'] ?? '');
     $c    = vote_counts($db, $ids);
     $mine = [];
@@ -52,7 +56,7 @@ if ($m === 'GET') {
     }
     $resp = [];
     foreach ($ids as $id) {
-        $resp[(string)$id] = [
+        $resp[(string)$keyOf[$id]] = [
             'up'     => $c[$id]['up']   ?? 0,
             'down'   => $c[$id]['down'] ?? 0,
             'myVote' => $mine[$id]      ?? 0,
@@ -64,7 +68,8 @@ if ($m === 'GET') {
 // ── POST /api/votes  { reportId, value: 1|-1|0, voter } ───────────────────────
 if ($m === 'POST') {
     $b   = body();
-    $rid = (int)($b['reportId'] ?? 0);
+    $ridKey = (string)($b['reportId'] ?? '');
+    $rid = hcri_rid($db, $ridKey);
     $val = (int)($b['value'] ?? 0);
     $vk  = voter_key_from($b['voter'] ?? '');
     if (!$rid)                          json_error('reportId required', 400);
@@ -83,7 +88,7 @@ if ($m === 'POST') {
     }
     $c = vote_counts($db, [$rid]);
     json_out([
-        'reportId' => $rid,
+        'reportId' => $ridKey,
         'up'       => $c[$rid]['up']   ?? 0,
         'down'     => $c[$rid]['down'] ?? 0,
         'myVote'   => $val,

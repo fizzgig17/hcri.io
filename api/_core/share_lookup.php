@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/spd.php';
+require_once __DIR__ . '/public_id.php';
 
 /**
  * Fetch a public/shared report by its share token and return a normalized
@@ -83,7 +84,7 @@ function hcri_share_normalize(PDO $db, array $r): ?array
     }
 
     return [
-        'id'           => (int)$r['id'],
+        'id'           => hcri_pid($db, (int)$r['id']),
         'label'        => $r['label'] ?: 'SPD Report',
 
 

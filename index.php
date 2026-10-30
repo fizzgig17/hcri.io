@@ -162,8 +162,10 @@ if ($uri === '/sitemap.xml') {
     try {
         require_once __DIR__ . '/api/_core/db.php';
         $rows = get_db()->query('SELECT id, created_at FROM reports WHERE is_public = 1 ORDER BY id DESC LIMIT 45000')->fetchAll();
+        require_once __DIR__ . '/api/_core/public_id.php';
+        $rows = hcri_pid_reports(get_db(), $rows);
         foreach ($rows as $r) {
-            echo '  <url><loc>' . htmlspecialchars($smBase . '?report=' . (int)$r['id'], ENT_XML1) . '</loc><lastmod>' . date('Y-m-d', strtotime((string)$r['created_at'])) . '</lastmod></url>' . "\n";
+            echo '  <url><loc>' . htmlspecialchars($smBase . '?report=' . rawurlencode((string)$r['id']), ENT_XML1) . '</loc><lastmod>' . date('Y-m-d', strtotime((string)$r['created_at'])) . '</lastmod></url>' . "\n";
         }
     } catch (\Throwable $e) {
         // Database unavailable: still serve the static entries above.
@@ -195,11 +197,11 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
-    if (preg_match('#^/api/reports/(\d+)/led_suggest/?$#', $uri)) {
+    if (preg_match('#^/api/reports/([A-Za-z0-9]+)/led_suggest/?$#', $uri)) {
         require __DIR__ . '/api/reports_led_suggest.php'; exit;
     }
 
-    if (preg_match('#^/api/reports/(\d+)/flicker/?$#', $uri)) {
+    if (preg_match('#^/api/reports/([A-Za-z0-9]+)/flicker/?$#', $uri)) {
         require __DIR__ . '/api/reports_flicker.php'; exit;
     }
 
@@ -207,13 +209,13 @@ if (str_starts_with($uri, '/api/')) {
         require __DIR__ . '/api/flicker.php'; exit;
     }
 
-    if (preg_match('#^/api/reports/(\d+)/pdf$#', $uri)) {
+    if (preg_match('#^/api/reports/([A-Za-z0-9]+)/pdf$#', $uri)) {
 
         require __DIR__ . '/api/reports_pdf.php'; exit;
 
     }
 
-    if (preg_match('#^/api/reports/(\d+)(/recalc)?$#', $uri)) {
+    if (preg_match('#^/api/reports/([A-Za-z0-9]+)(/recalc)?$#', $uri)) {
 
         require __DIR__ . '/api/reports_item.php'; exit;
 
@@ -337,7 +339,7 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
-    if (preg_match('#^/api/v1/reports/(\d+)/led$#', $uri, $m)) {
+    if (preg_match('#^/api/v1/reports/([A-Za-z0-9]+)/led$#', $uri, $m)) {
 
         $_GET['id'] = $m[1];
 
@@ -345,7 +347,7 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
-    if (preg_match('#^/api/v1/reports/(\d+)/share$#', $uri, $m)) {
+    if (preg_match('#^/api/v1/reports/([A-Za-z0-9]+)/share$#', $uri, $m)) {
 
         $_GET['id'] = $m[1];
 
@@ -395,7 +397,7 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
-    if (preg_match('#^/api/explore/(\d+)$#', $uri)) {
+    if (preg_match('#^/api/explore/([A-Za-z0-9]+)$#', $uri)) {
 
         require __DIR__ . '/api/explore_item.php'; exit;
 
@@ -977,7 +979,27 @@ if ($shareTok !== '') {
 
 }
 
-$reportId = isset($_GET['report']) ? (int)$_GET['report'] : 0;
+$reportKey = isset($_GET['report']) ? (string)$_GET['report'] : '';
+$reportId  = 0;
+if ($reportKey !== '') {
+    try {
+        require_once __DIR__ . '/api/_core/db.php';
+        require_once __DIR__ . '/api/_core/public_id.php';
+        $reportId = hcri_rid(get_db(), $reportKey);
+        if ($reportId > 0 && hcri_is_legacy_id($reportKey)) {
+            // Old numeric link: permanent redirect to the report's new id (public reports, or ones whose share token is in the link).
+            $lq = get_db()->prepare('SELECT is_public, share_token FROM reports WHERE id = ?');
+            $lq->execute([$reportId]);
+            $lr = $lq->fetch();
+            $lt = (string)($_GET['t'] ?? '');
+            if ($lr && ((int)$lr['is_public'] === 1 || ($lt !== '' && !empty($lr['share_token']) && hash_equals((string)$lr['share_token'], $lt)))) {
+                $q = $_GET; $q['report'] = hcri_pid(get_db(), $reportId);
+                header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '?' . http_build_query($q), true, 301);
+                exit;
+            }
+        }
+    } catch (\Throwable $e) { $reportId = 0; }
+}
 
 if ($reportId > 0 && $shareTok === '') {
 
@@ -997,11 +1019,11 @@ if ($reportId > 0 && $shareTok === '') {
 
             if ($sum !== '') $ogDesc = $sum;
 
-            $ogUrl  = $ogBase . '?report=' . $reportId;
+            $ogUrl  = $ogBase . '?report=' . rawurlencode($reportKey);
 
             $ogType = 'article';
 
-            if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/r' . $reportId . '.png';
+            if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/r' . rawurlencode($reportKey) . '.png';
 
         }
 
@@ -1017,7 +1039,7 @@ if ($cmpRaw !== '' && $shareTok === '' && $reportId === 0) {
 
     foreach (array_filter(array_map('trim', explode(',', $cmpRaw))) as $cmpEn) {
 
-        if (preg_match('/^\d+(?:\.[a-zA-Z0-9_-]+)?$/', $cmpEn)) $cmpValid[] = $cmpEn;
+        if (preg_match('/^[A-Za-z0-9]+(?:\.[a-zA-Z0-9_-]+)?$/', $cmpEn)) $cmpValid[] = $cmpEn;
 
     }
 

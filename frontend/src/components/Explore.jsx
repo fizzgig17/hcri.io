@@ -1606,8 +1606,8 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     try {
       const p = new URLSearchParams(window.location.search).get('compare');
       if (!p) return;
-      const ids = p.split(',').map((x) => { const q = x.split('.'); return { id: parseInt(q[0], 10), t: q[1] || '' }; })
-        .filter((x) => x.id > 0).slice(0, 12);
+      const ids = p.split(',').map((x) => { const q = x.split('.'); return { id: q[0], t: q[1] || '' }; })
+        .filter((x) => x.id).slice(0, 12);
       if (!ids.length) return;
       setComparing(true);
       setCmpView('cards');
@@ -1819,7 +1819,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   useEffect(() => {
     try {
       const rid = new URLSearchParams(window.location.search).get('rid');
-      if (rid) openReport({ id: Number(rid) });
+      if (rid) openReport({ id: rid });
     } catch {}
   }, []);
 

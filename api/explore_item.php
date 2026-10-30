@@ -6,11 +6,13 @@ require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('GET required', 405);
-preg_match('#/api/explore/(\d+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
-$id = isset($m[1]) ? (int)$m[1] : 0;
+preg_match('#/api/explore/([A-Za-z0-9]+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
+$keyIn = $m[1] ?? '';
+$id = $keyIn !== '' ? hcri_rid(get_db(), $keyIn) : 0;
 if (!$id) json_error('Invalid ID', 400);
 $db = get_db();
 $myId = 0;
@@ -20,6 +22,13 @@ $isSuper = false; if ($myId > 0) { try { $ssq = $db->prepare('SELECT is_super_ad
 $s->execute($isSuper ? [$id] : [$id, $myId, $shareTok]);
 $r  = $s->fetch();
 if (!$r) json_error('Not found', 404);
+// An old numeric id: permanent redirect to the report's new id (only reached when the report is visible to this viewer).
+if (hcri_is_legacy_id($keyIn)) {
+    $dest = preg_replace('#/[0-9]+$#', '/' . hcri_pid($db, (int)$r['id']), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+    if ($shareTok !== '') $dest .= '?t=' . rawurlencode($shareTok);
+    header('Location: ' . $dest, true, 301);
+    exit;
+}
 $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
 spd_recompute($r, $meta);
 // Backfill metrics not persisted by older uploads, so the explore report matches the shared report exactly.
@@ -66,7 +75,7 @@ $ownerName = null;
 try { $uq = $db->prepare('SELECT name, name_masked FROM users WHERE id=?'); $uq->execute([(int)$r['user_id']]);
   if ($urow = $uq->fetch()) { $ownerName = ((int)($urow['name_masked'] ?? 0) === 1) ? 'hidden' : $urow['name']; } } catch (\Throwable $e) {}
 $out = [
-    'id'                => (int)$r['id'],
+    'id'                => hcri_pid($db, (int)$r['id']),
     'label'             => $r['label'],
     'sourceType'        => $r['source_type'] ?? null,
     'notes'             => $r['notes'],
@@ -117,11 +126,13 @@ json_out($out);
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('GET required', 405);
-preg_match('#/api/explore/(\d+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
-$id = isset($m[1]) ? (int)$m[1] : 0;
+preg_match('#/api/explore/([A-Za-z0-9]+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
+$keyIn = $m[1] ?? '';
+$id = $keyIn !== '' ? hcri_rid(get_db(), $keyIn) : 0;
 if (!$id) json_error('Invalid ID', 400);
 $db = get_db();
 $myId = 0;
@@ -131,6 +142,13 @@ $isSuper = false; if ($myId > 0) { try { $ssq = $db->prepare('SELECT is_super_ad
 $s->execute($isSuper ? [$id] : [$id, $myId, $shareTok]);
 $r  = $s->fetch();
 if (!$r) json_error('Not found', 404);
+// An old numeric id: permanent redirect to the report's new id (only reached when the report is visible to this viewer).
+if (hcri_is_legacy_id($keyIn)) {
+    $dest = preg_replace('#/[0-9]+$#', '/' . hcri_pid($db, (int)$r['id']), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+    if ($shareTok !== '') $dest .= '?t=' . rawurlencode($shareTok);
+    header('Location: ' . $dest, true, 301);
+    exit;
+}
 $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
 spd_recompute($r, $meta);
 // Backfill metrics not persisted by older uploads, so the explore report matches the shared report exactly.
@@ -174,7 +192,7 @@ if (empty($riOut) && !empty($meta['instrumentMeta']['raw_headers'])) {
     if ($tmp) $riOut = $tmp;
 }
 $out = [
-    'id'                => (int)$r['id'],
+    'id'                => hcri_pid($db, (int)$r['id']),
     'label'             => $r['label'],
     'sourceType'        => $r['source_type'] ?? null,
     'notes'             => $r['notes'],
@@ -220,4 +238,4 @@ if (!empty($r['spd_data'])) {
     $out['reduced'] = !$fullRes;
 }
 $out['categories'] = report_categories_map($db, (int)$r['id']);
-json_out($out);
+json_out($out);

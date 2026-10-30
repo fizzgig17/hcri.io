@@ -12,15 +12,16 @@ set_exception_handler(function($e) {
 
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
-require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 
 $user = require_auth();
 $db   = get_db();
 
-preg_match('#/api/reports/(\d+)/pdf#', $_SERVER['REQUEST_URI'], $idm);
-$id = isset($idm[1]) ? (int)$idm[1] : 0;
+preg_match('#/api/reports/([A-Za-z0-9]+)/pdf#', $_SERVER['REQUEST_URI'], $idm);
+$id = isset($idm[1]) ? hcri_rid($db, $idm[1]) : 0;
 if (!$id) json_error('Invalid report ID', 400);
 
 $s = $db->prepare('SELECT * FROM reports WHERE id = ? AND user_id = ?');

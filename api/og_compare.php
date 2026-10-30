@@ -50,8 +50,8 @@ if (!$entries) ogc_fallback();
 $db   = get_db();
 $reps = [];
 foreach ($entries as $en) {
-    if (!preg_match('/^(\d+)(?:\.([a-zA-Z0-9_-]+))?$/', $en, $mm)) continue;
-    $id  = (int)$mm[1];
+    if (!preg_match('/^([A-Za-z0-9]+)(?:\.([a-zA-Z0-9_-]+))?$/', $en, $mm)) continue;
+    $id  = hcri_rid($db, $mm[1]);
     $tok = $mm[2] ?? '';
     try {
         // A token grants access to a private report; a bare id must be public.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/pdf_extract.php';
 
@@ -224,7 +225,7 @@ json_error('Method not allowed: ' . $_SERVER['REQUEST_METHOD'], 405);
 function fmt(array $r, bool $spd): array {
     $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
     $out  = [
-        'id'         => (int)$r['id'],
+        'id'         => hcri_pid(get_db(), (int)$r['id']),
         'label'      => $r['label'],
         'sourceType' => $r['source_type'],
         'cct'        => $r['cct']   !== null ? (int)$r['cct']     : null,

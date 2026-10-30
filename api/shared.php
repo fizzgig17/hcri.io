@@ -8,6 +8,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/spd.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 
 
@@ -92,7 +93,7 @@ $rfBins = $meta['rfBins'] ?? null;
 
 $out = [
 
-    'id'           => (int)$r['id'],
+    'id'           => hcri_pid($db, (int)$r['id']),
 
     'label'        => $r['label'],
 

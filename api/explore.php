@@ -24,7 +24,8 @@ require_once __DIR__ . '/_core/auth.php';
 
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/completeness.php';
-require_once __DIR__ . '/_core/flicker.php';
+require_once __DIR__ . '/_core/flicker.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 
 
@@ -1231,11 +1232,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
-                if ($dot === false) { $rid = (int)$part; $tk = ''; }
+                if ($dot === false) { $rid = hcri_rid($db, $part); $tk = ''; }
 
 
 
-                else { $rid = (int)substr($part, 0, $dot); $tk = substr($part, $dot + 1); }
+                else { $rid = hcri_rid($db, substr($part, 0, $dot)); $tk = substr($part, $dot + 1); }
 
 
 
@@ -1899,7 +1900,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
-        'ranges' => $ranges, 'reports' => $reports,
+        'ranges' => $ranges, 'reports' => hcri_pid_reports($db, $reports),
 
 
 
