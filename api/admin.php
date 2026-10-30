@@ -420,6 +420,7 @@ if ($m === 'POST' && $section === '/users' && $userId === null) {
     if ($check->fetch()) json_error('Email already registered');
     $db->prepare('INSERT INTO users (name,email,password,is_admin) VALUES (?,?,?,?)')
        ->execute([$name, $email, password_hash($pass, PASSWORD_BCRYPT), 0]);
+    try { $db->prepare('UPDATE users SET email_verified_at = NOW() WHERE id = ?')->execute([(int)$db->lastInsertId()]); } catch (\Throwable $e) {}   // admin-created: already vouched for
     $id = (int)$db->lastInsertId();
     json_out(['id' => $id, 'name' => $name, 'email' => $email, 'isAdmin' => false, 'reportCount' => 0, 'createdAt' => date('Y-m-d H:i:s')], 201);
 }

@@ -6,11 +6,8 @@ require_once __DIR__ . '/../vendor/fpdf/fpdf.php';
 
 cors_headers();
 
-// Allow both authenticated and guest use
-$hdr = get_auth_header();
-if ($hdr && str_starts_with($hdr, 'Bearer ')) {
-    jwt_verify(substr($hdr, 7)); // verify but don't require
-}
+// PDF downloads need an account.
+require_auth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST required', 405);
 

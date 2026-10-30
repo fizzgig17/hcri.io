@@ -6,13 +6,16 @@ error_reporting(E_ALL);
 set_exception_handler(function($e) {
     if (!headers_sent()) header('Content-Type: application/json');
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]);
+    if (function_exists('hcri_log_exception')) hcri_log_exception($e); else error_log((string)$e);
+    echo json_encode(['error' => 'Server error']);
     exit;
 });
 
-require_once __DIR__ . '/_core/response.php';
+require_once __DIR__ . '/_core/response.php';
+require_once __DIR__ . '/_core/auth.php';
 
-cors_headers();
+cors_headers();
+require_auth();   // PDF downloads need an account
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST required', 405);
 

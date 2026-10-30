@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/settings.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 header('Cache-Control: public, max-age=30');
@@ -26,7 +27,7 @@ try {
             foreach ($st->fetchAll() as $r) {
                 $m = json_decode($r['meta'] ?: '{}', true) ?: [];
                 $byId[(int)$r['id']] = [
-                    'id'    => (int)$r['id'],
+                    'id'    => hcri_pid($db, (int)$r['id']),
                     'label' => $r['label'],
                     'cct'   => $r['cct'] !== null ? (int)$r['cct']   : null,
                     'duv'   => $r['duv'] !== null ? (float)$r['duv'] : null,

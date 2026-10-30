@@ -15,8 +15,9 @@ cors_headers();
 header('Cache-Control: no-store');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('GET required', 405);
 
-preg_match('#/api/reports/(\d+)/led_suggest/?$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
-$rid = isset($m[1]) ? (int)$m[1] : 0;
+require_once __DIR__ . '/_core/public_id.php';
+preg_match('#/api/reports/([A-Za-z0-9]+)/led_suggest/?$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
+$rid = isset($m[1]) ? hcri_rid(get_db(), $m[1]) : 0;
 if (!$rid) json_error('Invalid ID', 400);
 
 $user = require_auth();

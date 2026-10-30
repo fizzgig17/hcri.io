@@ -312,7 +312,6 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {e.private && <span title="Private — only you can see this" style={{ fontSize: 14, lineHeight: 1, opacity: 0.75 }}>🔒</span>}
-          <span title="Report ID" style={{ fontSize: 10, color: n.dim, opacity: 0.5, fontFamily: 'monospace', lineHeight: 1 }}>#{e.id}</span>
           {e.hasFlicker && (
             <svg title="Has a flicker reading" width="16" height="12" viewBox="0 0 16 12" fill="none" stroke={n.accent} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
               <title>Has a flicker reading</title>
@@ -1607,8 +1606,8 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     try {
       const p = new URLSearchParams(window.location.search).get('compare');
       if (!p) return;
-      const ids = p.split(',').map((x) => { const q = x.split('.'); return { id: parseInt(q[0], 10), t: q[1] || '' }; })
-        .filter((x) => x.id > 0).slice(0, 12);
+      const ids = p.split(',').map((x) => { const q = x.split('.'); return { id: q[0], t: q[1] || '' }; })
+        .filter((x) => x.id).slice(0, n ? 12 : 4);
       if (!ids.length) return;
       setComparing(true);
       setCmpView('cards');
@@ -1820,7 +1819,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   useEffect(() => {
     try {
       const rid = new URLSearchParams(window.location.search).get('rid');
-      if (rid) openReport({ id: Number(rid) });
+      if (rid) openReport({ id: rid });
     } catch {}
   }, []);
 
@@ -1833,10 +1832,13 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     } catch {}
   };
 
-  const toggleCmpSel = (e) => setCmpSel((p) => {
-    const already = p.some((x) => x.id === e.id);
-    return already ? p.filter((x) => x.id !== e.id) : (p.length >= 12 ? p : [...p, e]);
-  });
+  const toggleCmpSel = (e) => {
+    if (!n && cmpSel.length >= 4 && !cmpSel.some((x) => x.id === e.id)) { alert('Sign in (free) to compare more than 4 reports at once.'); return; }
+    setCmpSel((p) => {
+      const already = p.some((x) => x.id === e.id);
+      return already ? p.filter((x) => x.id !== e.id) : (p.length >= 12 ? p : [...p, e]);
+    });
+  };
 
   // Common props for the two <FilterPanel> / <ResultsPanel> call sites.
   const filterPanelProps = {

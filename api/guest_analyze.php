@@ -154,6 +154,6 @@ try {
 
 } catch (\Throwable $e) {
 
-    json_error($e->getMessage(), str_contains($e->getMessage(), 'Need') ? 422 : 500);
+    str_contains($e->getMessage(), 'Need') ? json_error($e->getMessage(), 422) : hcri_fail($e);
 
 }

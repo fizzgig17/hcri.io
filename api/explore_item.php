@@ -6,11 +6,13 @@ require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('GET required', 405);
-preg_match('#/api/explore/(\d+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
-$id = isset($m[1]) ? (int)$m[1] : 0;
+preg_match('#/api/explore/([A-Za-z0-9]+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
+$keyIn = $m[1] ?? '';
+$id = $keyIn !== '' ? hcri_rid(get_db(), $keyIn) : 0;
 if (!$id) json_error('Invalid ID', 400);
 $db = get_db();
 $myId = 0;
@@ -20,6 +22,13 @@ $isSuper = false; if ($myId > 0) { try { $ssq = $db->prepare('SELECT is_super_ad
 $s->execute($isSuper ? [$id] : [$id, $myId, $shareTok]);
 $r  = $s->fetch();
 if (!$r) json_error('Not found', 404);
+// An old numeric id: permanent redirect to the report's new id (only reached when the report is visible to this viewer).
+if (hcri_is_legacy_id($keyIn)) {
+    $dest = preg_replace('#/[0-9]+$#', '/' . hcri_pid($db, (int)$r['id']), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+    if ($shareTok !== '') $dest .= '?t=' . rawurlencode($shareTok);
+    header('Location: ' . $dest, true, 301);
+    exit;
+}
 $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
 spd_recompute($r, $meta);
 // Backfill metrics not persisted by older uploads, so the explore report matches the shared report exactly.
@@ -66,7 +75,7 @@ $ownerName = null;
 try { $uq = $db->prepare('SELECT name, name_masked FROM users WHERE id=?'); $uq->execute([(int)$r['user_id']]);
   if ($urow = $uq->fetch()) { $ownerName = ((int)($urow['name_masked'] ?? 0) === 1) ? 'hidden' : $urow['name']; } } catch (\Throwable $e) {}
 $out = [
-    'id'                => (int)$r['id'],
+    'id'                => hcri_pid($db, (int)$r['id']),
     'label'             => $r['label'],
     'sourceType'        => $r['source_type'] ?? null,
     'notes'             => $r['notes'],
@@ -94,20 +103,48 @@ $out = [
     'createdAt'         => $r['created_at'],
 ];
 if (!empty($r['spd_data'])) {
-    $pairs2      = json_decode($r['spd_data'], true);
+    $pairs2 = json_decode($r['spd_data'], true);
+    // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
+    // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
+    $fullRes = $isSuper
+        || ($myId > 0 && $myId === (int)$r['user_id'])
+        || ($shareTok !== '' && !empty($r['share_token']) && hash_equals((string)$r['share_token'], $shareTok));
+    if (!$fullRes && is_array($pairs2)) {
+        $kept = []; $nextWl = null;
+        foreach ($pairs2 as $pt) {
+            $w = (float)$pt[0];
+            if ($nextWl === null || $w >= $nextWl - 1e-6) { $kept[] = $pt; $nextWl = (floor($w / 5 + 1e-6) + 1) * 5; }
+        }
+        $pairs2 = $kept;
+    }
     $out['wls']  = array_column($pairs2, 0);
     $out['vals'] = array_column($pairs2, 1);
+    $out['reduced'] = !$fullRes;
+}
+if ($myId <= 0) {
+    // Guests get a lighter copy: no free-text notes or raw instrument headers, rounded numbers.
+    $out['notes'] = null; $out['rawHeaders'] = null; $out['instrumentVersion'] = null;
+    $rnd = function ($v) use (&$rnd) { return is_array($v) ? array_map($rnd, $v) : (is_float($v) || is_int($v) ? round((float)$v, 1) : $v); };
+    if ($out['cct'] !== null) $out['cct'] = (int)(round($out['cct'] / 10) * 10);
+    if ($out['duv'] !== null) $out['duv'] = round($out['duv'], 4);
+    if ($out['x'] !== null) $out['x'] = round($out['x'], 4);
+    if ($out['y'] !== null) $out['y'] = round($out['y'], 4);
+    foreach (['rfBins', 'rcsBins', 'rhsBins'] as $bk) if (!empty($out[$bk])) $out[$bk] = $rnd($out[$bk]);
+    if ($out['ra'] !== null) $out['ra'] = round($out['ra'], 1);
+    if ($out['r9'] !== null) $out['r9'] = round($out['r9'], 1);
 }
 $out['categories'] = report_categories_map($db, (int)$r['id']);
 json_out($out);
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('GET required', 405);
-preg_match('#/api/explore/(\d+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
-$id = isset($m[1]) ? (int)$m[1] : 0;
+preg_match('#/api/explore/([A-Za-z0-9]+)$#', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m);
+$keyIn = $m[1] ?? '';
+$id = $keyIn !== '' ? hcri_rid(get_db(), $keyIn) : 0;
 if (!$id) json_error('Invalid ID', 400);
 $db = get_db();
 $myId = 0;
@@ -117,6 +154,13 @@ $isSuper = false; if ($myId > 0) { try { $ssq = $db->prepare('SELECT is_super_ad
 $s->execute($isSuper ? [$id] : [$id, $myId, $shareTok]);
 $r  = $s->fetch();
 if (!$r) json_error('Not found', 404);
+// An old numeric id: permanent redirect to the report's new id (only reached when the report is visible to this viewer).
+if (hcri_is_legacy_id($keyIn)) {
+    $dest = preg_replace('#/[0-9]+$#', '/' . hcri_pid($db, (int)$r['id']), parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+    if ($shareTok !== '') $dest .= '?t=' . rawurlencode($shareTok);
+    header('Location: ' . $dest, true, 301);
+    exit;
+}
 $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
 spd_recompute($r, $meta);
 // Backfill metrics not persisted by older uploads, so the explore report matches the shared report exactly.
@@ -160,7 +204,7 @@ if (empty($riOut) && !empty($meta['instrumentMeta']['raw_headers'])) {
     if ($tmp) $riOut = $tmp;
 }
 $out = [
-    'id'                => (int)$r['id'],
+    'id'                => hcri_pid($db, (int)$r['id']),
     'label'             => $r['label'],
     'sourceType'        => $r['source_type'] ?? null,
     'notes'             => $r['notes'],
@@ -187,9 +231,23 @@ $out = [
     'createdAt'         => $r['created_at'],
 ];
 if (!empty($r['spd_data'])) {
-    $pairs2      = json_decode($r['spd_data'], true);
+    $pairs2 = json_decode($r['spd_data'], true);
+    // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
+    // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
+    $fullRes = $isSuper
+        || ($myId > 0 && $myId === (int)$r['user_id'])
+        || ($shareTok !== '' && !empty($r['share_token']) && hash_equals((string)$r['share_token'], $shareTok));
+    if (!$fullRes && is_array($pairs2)) {
+        $kept = []; $nextWl = null;
+        foreach ($pairs2 as $pt) {
+            $w = (float)$pt[0];
+            if ($nextWl === null || $w >= $nextWl - 1e-6) { $kept[] = $pt; $nextWl = (floor($w / 5 + 1e-6) + 1) * 5; }
+        }
+        $pairs2 = $kept;
+    }
     $out['wls']  = array_column($pairs2, 0);
     $out['vals'] = array_column($pairs2, 1);
+    $out['reduced'] = !$fullRes;
 }
 $out['categories'] = report_categories_map($db, (int)$r['id']);
-json_out($out);
+json_out($out);

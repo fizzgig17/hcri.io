@@ -6,7 +6,8 @@ declare(strict_types=1);
 // temp dir is cleared the counters simply reset.
 
 function rl_client_ip(): string {
-    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    require_once __DIR__ . '/rate_limit.php';   // knows about Cloudflare's forwarded address
+    return hcri_client_ip();
 }
 
 function rl_path(string $bucket, string $key): string {

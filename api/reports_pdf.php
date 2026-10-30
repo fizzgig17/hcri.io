@@ -6,21 +6,23 @@ error_reporting(E_ALL);
 set_exception_handler(function($e) {
     if (!headers_sent()) header('Content-Type: application/json');
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]);
+    if (function_exists('hcri_log_exception')) hcri_log_exception($e); else error_log((string)$e);
+    echo json_encode(['error' => 'Server error']);
     exit;
 });
 
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
-require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 
 $user = require_auth();
 $db   = get_db();
 
-preg_match('#/api/reports/(\d+)/pdf#', $_SERVER['REQUEST_URI'], $idm);
-$id = isset($idm[1]) ? (int)$idm[1] : 0;
+preg_match('#/api/reports/([A-Za-z0-9]+)/pdf#', $_SERVER['REQUEST_URI'], $idm);
+$id = isset($idm[1]) ? hcri_rid($db, $idm[1]) : 0;
 if (!$id) json_error('Invalid report ID', 400);
 
 $s = $db->prepare('SELECT * FROM reports WHERE id = ? AND user_id = ?');

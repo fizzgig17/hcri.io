@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/pdf_extract.php';
 
@@ -215,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $response = process_uploaded_report($db, $user, $file['tmp_name'], $file['name'], $label, $maxBytes);
         json_out($response, 201);
     } catch (\Throwable $e) {
-        json_error($e->getMessage(), str_contains($e->getMessage(), 'Need') ? 422 : 500);
+        str_contains($e->getMessage(), 'Need') ? json_error($e->getMessage(), 422) : hcri_fail($e);
     }
 }
 
@@ -224,7 +225,7 @@ json_error('Method not allowed: ' . $_SERVER['REQUEST_METHOD'], 405);
 function fmt(array $r, bool $spd): array {
     $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
     $out  = [
-        'id'         => (int)$r['id'],
+        'id'         => hcri_pid(get_db(), (int)$r['id']),
         'label'      => $r['label'],
         'sourceType' => $r['source_type'],
         'cct'        => $r['cct']   !== null ? (int)$r['cct']     : null,

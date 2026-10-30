@@ -15,6 +15,7 @@ require_once __DIR__ . '/_core/api_token.php';
 require_once __DIR__ . '/_core/led_lists.php';
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/report_leds.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 header('Cache-Control: no-store');
@@ -25,7 +26,7 @@ $db   = get_db();
 $user = user_from_api_token($db, api_token_from_request());
 if (!$user) json_error('Invalid or missing API token. Send "Authorization: Bearer <token>".', 401);
 
-$reportId = (int)($_GET['id'] ?? 0);
+$reportId = hcri_rid($db, (string)($_GET['id'] ?? ''));
 if ($reportId <= 0) json_error('Invalid report id', 400);
 
 $own = $db->prepare('SELECT user_id FROM reports WHERE id = ?');

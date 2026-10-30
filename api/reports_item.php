@@ -14,7 +14,8 @@ set_exception_handler(function($e) {
 
     http_response_code(500);
 
-    echo json_encode(['error' => $e->getMessage(), 'file' => basename($e->getFile()), 'line' => $e->getLine()]);
+    if (function_exists('hcri_log_exception')) hcri_log_exception($e); else error_log((string)$e);
+    echo json_encode(['error' => 'Server error']);
 
     exit;
 
@@ -33,6 +34,7 @@ require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/db.php';
 
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/report_leds.php';
@@ -49,9 +51,9 @@ $m    = $_SERVER['REQUEST_METHOD'];
 
 $_uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-preg_match('#/api/reports/(\d+)(/(\w+))?#', $_uri, $_pm);
+preg_match('#/api/reports/([A-Za-z0-9]+)(/(\w+))?#', $_uri, $_pm);
 
-$id   = isset($_pm[1]) ? (int)$_pm[1] : 0;
+$id   = isset($_pm[1]) ? hcri_rid(get_db(), $_pm[1]) : 0;
 
 $path = $_pm[2] ?? '';   // e.g. '/recalc'
 
@@ -305,7 +307,7 @@ function fmt(array $r, bool $spd): array {
 
     $out  = [
 
-        'id'         => (int)$r['id'],
+        'id'         => hcri_pid($db, (int)$r['id']),
 
         'label'      => $r['label'],
 

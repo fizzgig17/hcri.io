@@ -53,6 +53,14 @@ SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^(.*)\+(.*)$ $1%20$2 [N]
 
+    # Never serve internal files over the web (403). Runs before the "static files" rule below, which would
+    # otherwise hand them out. The app reaches these from PHP, not over HTTP.
+    RewriteRule ^(database\.sql|checksums\.md5|api-test\.html|error_log|router\.php)$ - [F,L,NC]
+    RewriteRule ^(sql|vendor|uploads|\.git|\.github)(/|$) - [F,L,NC]
+    RewriteRule ^api/_core(/|$) - [F,L,NC]
+    RewriteRule (^|/)(secrets[^/]*\.php|[^/]*\.(sql|log|md5|bak|orig|swp))$ - [F,L,NC]
+    RewriteRule (^|/)\.(git|env|htaccess|htpasswd)  - [F,L,NC]
+
     # Static files — serve directly, never rewrite
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]

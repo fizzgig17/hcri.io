@@ -5,7 +5,8 @@ error_reporting(E_ALL);
 set_exception_handler(function($e) {
     if (!headers_sent()) header('Content-Type: application/json');
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage(), 'file' => basename($e->getFile()), 'line' => $e->getLine()]);
+    if (function_exists('hcri_log_exception')) hcri_log_exception($e); else error_log((string)$e);
+    echo json_encode(['error' => 'Server error']);
     exit;
 });
 set_error_handler(function($no, $str, $file, $line) {
@@ -14,6 +15,7 @@ set_error_handler(function($no, $str, $file, $line) {
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
+require_once __DIR__ . '/_core/public_id.php';
 require_once __DIR__ . '/_core/spd.php';
 require_once __DIR__ . '/_core/pdf_extract.php';
 
@@ -138,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } catch (\Throwable $e) {
         @unlink($dest);
-        json_error($e->getMessage(), str_contains($e->getMessage(), 'Need') ? 422 : 500);
+        str_contains($e->getMessage(), 'Need') ? json_error($e->getMessage(), 422) : hcri_fail($e);
     }
 }
 
@@ -147,7 +149,7 @@ json_error('Method not allowed: ' . $_SERVER['REQUEST_METHOD'], 405);
 function fmt(array $r, bool $spd): array {
     $meta = json_decode($r['meta'] ?: '{}', true) ?? [];
     $out  = [
-        'id'         => (int)$r['id'],
+        'id'         => hcri_pid(get_db(), (int)$r['id']),
         'label'      => $r['label'],
         'sourceType' => $r['source_type'],
         'cct'        => $r['cct']   !== null ? (int)$r['cct']     : null,

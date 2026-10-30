@@ -46,7 +46,7 @@ foreach ([$F_WORK_B, $F_WORK_R, $F_MONO_B, $F_MONO_R] as $f) {
     if (!is_file($f)) og_fallback();
 }
 
-$rep = preg_match('/^r(\d+)$/', $token, $mm) ? load_public_report(get_db(), (int)$mm[1]) : load_shared_report(get_db(), $token);
+$rep = preg_match('/^r([A-Za-z0-9]{1,16})$/', $token, $mm) ? load_public_report(get_db(), hcri_rid(get_db(), $mm[1])) : load_shared_report(get_db(), $token);
 if (!$rep) og_fallback();
 
 // ── Canvas + palette (dark, matching the app) ────────────────────────────────

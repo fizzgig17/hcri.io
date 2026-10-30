@@ -23,6 +23,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/api_token.php';
+require_once __DIR__ . '/_core/public_id.php';
 require_once __DIR__ . '/_core/inbound_config.php'; // INBOUND_SITE_URL -- the one site-origin constant that already exists, also used for the inbound-email confirmation's report links
 
 cors_headers();
@@ -38,7 +39,7 @@ if (!$user) {
     json_error('Invalid or missing API token. Send "Authorization: Bearer <token>".', 401);
 }
 
-$id = (int)($_GET['id'] ?? 0);
+$id = hcri_rid($db, (string)($_GET['id'] ?? ''));
 if ($id <= 0) json_error('Missing report id', 400);
 
 $stmt = $db->prepare('SELECT id, user_id, is_public, share_token FROM reports WHERE id = ?');
@@ -53,7 +54,7 @@ if (!$report || (int)$report['user_id'] !== (int)$user['id']) {
 
 if ((bool)$report['is_public']) {
     json_out([
-        'link'      => INBOUND_SITE_URL . '/?report=' . $report['id'],
+        'link'      => INBOUND_SITE_URL . '/?report=' . hcri_pid($db, (int)$report['id']),
         'isPublic'  => true,
     ]);
 }

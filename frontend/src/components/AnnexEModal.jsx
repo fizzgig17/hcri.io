@@ -88,12 +88,12 @@ export default function AnnexEModal({ report, onClose }) {
       c.fillStyle = dark ? '#e8f0fa' : '#ffffff'; c.font = 'bold 16px sans-serif';
       c.textAlign = 'left'; c.textBaseline = 'middle';
       c.fillText('IES TM-30-18', 22, 20);
-      c.fillStyle = dark ? 'rgba(14,20,32,0.65)' : 'rgba(255,255,255,0.65)'; c.font = '11px sans-serif';
+      c.fillStyle = dark ? 'rgba(232,240,250,0.7)' : 'rgba(255,255,255,0.65)'; c.font = '11px sans-serif';
       c.fillText('Color Rendition Report', 22, 35);
       c.textAlign = 'right';
-      c.fillStyle = dark ? 'rgba(14,20,32,0.9)' : 'rgba(255,255,255,0.9)'; c.font = 'bold 13px sans-serif';
+      c.fillStyle = dark ? 'rgba(232,240,250,0.95)' : 'rgba(255,255,255,0.9)'; c.font = 'bold 13px sans-serif';
       c.fillText('hcri.io', 803, 20);
-      c.fillStyle = dark ? 'rgba(14,20,32,0.5)' : 'rgba(255,255,255,0.5)'; c.font = '10px sans-serif';
+      c.fillStyle = dark ? 'rgba(232,240,250,0.6)' : 'rgba(255,255,255,0.5)'; c.font = '10px sans-serif';
       c.fillText(fmtTZ((r.createdAt || '').replace(' ', 'T'), { year: 'numeric', month: 'short', day: 'numeric' }, true), 803, 35);
 
       c.fillStyle = dark ? '#161f30' : '#f0f4f8'; c.fillRect(0, 52, 825, 34);
@@ -449,6 +449,7 @@ export default function AnnexEModal({ report, onClose }) {
   }
 
   async function downloadPdf() {
+    if (!getToken()) { alert('Please sign in or create a free account to download PDFs.'); return; }
     setPdfBusy(true);
     try {
       const png = canvasRef.current.toDataURL('image/png');
@@ -488,7 +489,7 @@ export default function AnnexEModal({ report, onClose }) {
         </div>
         <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', padding: 10, boxSizing: 'border-box' }}>
           <div style={{ overflowX: 'auto', background: canvasBg, borderRadius: 6 }}>
-            <canvas ref={canvasRef} style={{ display: 'block' }} />
+            <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
           </div>
         </div>
       </div>
@@ -498,7 +499,7 @@ export default function AnnexEModal({ report, onClose }) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647, background: 'rgba(0,0,0,0.92)', overflowY: 'scroll', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
       <div style={{ padding: 16, minHeight: '100%', boxSizing: 'border-box' }}>
-        <div style={{ maxWidth: 865, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ maxWidth: 825, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 8, padding: '10px 16px', gap: 6 }}>
             <div style={{ fontFamily: 'monospace', fontWeight: 700, color: T.white, fontSize: 15 }}>
               TM-30-18<span style={{ fontSize: 11, color: T.dim, fontWeight: 400, marginLeft: 6 }}>{data.label}</span>
@@ -510,7 +511,7 @@ export default function AnnexEModal({ report, onClose }) {
             </div>
           </div>
           <div style={{ overflowX: 'scroll', overflowY: 'visible', WebkitOverflowScrolling: 'touch', background: canvasBg, borderRadius: 6, boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
-            <canvas ref={canvasRef} style={{ display: 'block' }} />
+            <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
           </div>
         </div>
       </div>

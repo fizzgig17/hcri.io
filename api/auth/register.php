@@ -5,6 +5,7 @@ require_once __DIR__ . '/../_core/db.php';
 require_once __DIR__ . '/../_core/auth.php';
 require_once __DIR__ . '/../_core/ratelimit.php';
 require_once __DIR__ . '/../_core/gdpr.php';
+require_once __DIR__ . '/../_core/email_verify.php';
 
 cors_headers();
 
@@ -34,11 +35,14 @@ if ($action === 'register') {
     if (strlen($password) < 8)            json_error('Password must be ≥8 characters');
 
     // At most 10 sign-ups per hour from one address.
-    rl_block_if_over('register', rl_client_ip(), 10, 3600);
+    rl_block_if_over('register', rl_client_ip(), 3, 3600);
+    rl_block_if_over('register_day', rl_client_ip(), 10, 86400);
     rl_hit('register', rl_client_ip(), 3600);
+    rl_hit('register_day', rl_client_ip(), 86400);
     $consent = !empty($b['consent']);
     if (!$consent) json_error('You must accept the Privacy Policy and Terms to create an account', 400);
     consent_ensure($db);
+    hcri_verify_ensure($db);   // before the insert, so the new account is not counted as an existing one
 
     $s = $db->prepare('SELECT id FROM users WHERE email=?');
     $s->execute([strtolower($email)]);
@@ -53,6 +57,12 @@ if ($action === 'register') {
         $s->execute([strtolower($email), $name, $hash]);
     }
     $id = (int)$db->lastInsertId();
+    // Not signed in yet: the account is usable once the emailed link has been opened.
+    if (hcri_verify_send($db, $id, strtolower($email), $name)) {
+        json_out(['verifyRequired' => true, 'email' => strtolower($email)], 201);
+    }
+    // The confirmation email could not be sent (mail not working): do not lock the person out, sign them in as before.
+    try { $db->prepare('UPDATE users SET email_verified_at = NOW() WHERE id = ?')->execute([$id]); } catch (\Throwable $e) {}
     $token = jwt_sign(['id' => $id, 'email' => strtolower($email), 'name' => $name]);
     json_out(['token' => $token, 'user' => ['id' => $id, 'email' => strtolower($email), 'name' => $name]], 201);
 }

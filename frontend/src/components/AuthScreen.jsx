@@ -136,6 +136,8 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
   const [resetSent, setResetSent]   = useState(false);
   const [resetSending, setResetSending] = useState(false);
   const [err, setErr]               = useState('');
+  const [errInfo, setErrInfo]       = useState(false);
+  const [resendNote, setResendNote] = useState('');
   const [loading, setLoading]       = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
   const [liEmail, setLiEmail]       = useState('');
@@ -180,7 +182,7 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
 
   async function submitAuth(e) {
     e.preventDefault();
-    setErr('');
+    setErr(''); setErrInfo(false); setResendNote('');
     setLoading(true);
     try {
       if (tab === 'register' && !agree) {
@@ -196,9 +198,17 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
       }
     } catch (ex) {
       setErr(ex.message);
+      if (ex && ex.info) { setErrInfo(true); setLiEmail(rgEmail); setTab('login'); }
     } finally {
       setLoading(false);
     }
+  }
+
+  async function resendConfirmation() {
+    try {
+      await fetch('./index.php/api/auth/resend_verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: liEmail }) });
+      setResendNote('If that address has an unconfirmed account, a new link is on its way.');
+    } catch { setResendNote('Could not send right now. Please try again in a moment.'); }
   }
 
   async function handleGuestFile(file) {
@@ -389,7 +399,7 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
                       <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
                         <span style={{ width:12, height:12, borderRadius:'50%', background:cc, boxShadow:`0 0 8px ${cc}99`, flexShrink:0, border:'1px solid rgba(255,255,255,0.3)' }} />
                         <div style={{ fontSize:14, fontWeight:800, color:T.text, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                          {rep.label || 'Report #' + rep.id}
+                          {rep.label || 'Untitled report'}
                         </div>
                       </div>
                       <div style={{ fontSize:12, color:T.dim, marginTop:6 }}>
@@ -544,7 +554,13 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
                   {loading ? '…' : tab === 'login' ? 'Sign In' : 'Create Account'}
                 </button>
               </form>
-              {err && <div style={{ fontSize:14, color:T.bad, textAlign:'center', fontWeight:600 }}>{err}</div>}
+              {err && <div style={{ fontSize:14, color: errInfo ? T.good : T.bad, textAlign:'center', fontWeight:600 }}>{err}</div>}
+              {err && /confirm your email/i.test(err) && (
+                <div style={{ textAlign:'center' }}>
+                  <button type="button" onClick={resendConfirmation} style={{ background:'none', border:'none', color:T.accent, cursor:'pointer', fontSize:13, textDecoration:'underline' }}>Resend confirmation email</button>
+                  {resendNote && <div style={{ fontSize:12, color:T.dim, marginTop:4 }}>{resendNote}</div>}
+                </div>
+              )}
             </div>
           </div>
         </div>

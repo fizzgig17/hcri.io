@@ -48,6 +48,10 @@ export function useAuth() {
   // ever called. Stores the returned token and sets `user` on success.
   const register = useCallback(async (name, email, password) => {
     const r = await api.post('/auth/register', { name, email, password, consent: true });
+    if (r.verifyRequired) {
+      // New accounts are confirmed by email before first sign-in.
+      throw Object.assign(new Error('Almost there! We sent a confirmation link to ' + (r.email || email) + '. Open it, then sign in here. (Check your spam folder if you don\'t see it.)'), { info: true });
+    }
     if (!r.user) throw new Error(r.error || 'Registration failed');
     const u = { ...r.user, isAdmin: !!r.user.is_admin };
     setToken(r.token);
