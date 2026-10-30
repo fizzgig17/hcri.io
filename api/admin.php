@@ -7,6 +7,7 @@ require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/report_leds.php';
 require_once __DIR__ . '/_core/categories_csv.php';
+require_once __DIR__ . '/_core/public_id.php';
 require_once __DIR__ . '/_core/settings.php';
 require_once __DIR__ . '/_core/spd.php';
 cors_headers();
@@ -209,13 +210,13 @@ if ($m === 'GET' && $path === '/featured') {
         }
         foreach ($ids as $id) { if (isset($byId[$id])) $reports[] = $byId[$id]; }
     }
-    json_out(['ids'=>$ids,'reports'=>$reports]);
+    json_out(['ids'=>array_map(fn($i) => hcri_pid($db, (int)$i), $ids),'reports'=>array_map(function($r) use ($db) { $r['id'] = hcri_pid($db, (int)$r['id']); return $r; }, $reports)]);
 }
 if ($m === 'POST' && $path === '/featured') {
     $b = body();
     $ids = $b['ids'] ?? [];
     if (!is_array($ids)) json_error('ids must be an array', 400);
-    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($v)=>$v>0)));
+    $ids = array_values(array_unique(array_filter(array_map(fn($x) => hcri_rid($db, $x), $ids), fn($v)=>$v>0)));
     $ids = array_slice($ids, 0, 3);
     setting_set($db, 'featured_reports', $ids);
     json_out(['ids'=>$ids]);

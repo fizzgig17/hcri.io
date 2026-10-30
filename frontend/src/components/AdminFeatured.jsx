@@ -41,7 +41,7 @@ export default function AdminFeatured({ theme: o }) {
   const save = () => {
     setSaving(true);
     setMsg('');
-    const cleanIds = ids.map((x) => parseInt(x, 10)).filter((x) => x > 0);
+    const cleanIds = ids.map((x) => String(x).trim()).filter(Boolean);
     fetch(`${basePath()}index.php/api/admin/featured`, {
       method: 'POST',
       headers: { ...auth(), 'Content-Type': 'application/json' },
@@ -137,12 +137,12 @@ export default function AdminFeatured({ theme: o }) {
             </div>
             <div style={{ fontSize: 12, color: o.dim, lineHeight: 1.5 }}>
               Up to 3 public reports shown on the logged-out homepage. Enter report IDs (an ID
-              appears in a report's URL, e.g. ?report=42). Reports must be public to appear.
+              appears in a report's URL, e.g. ?report=k3x9mq2abc). Reports must be public to appear.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[0, 1, 2].map((idx) => {
-                const rid = parseInt(ids[idx], 10);
-                const rep = reports.find((r) => r.id === rid);
+                const rid = String(ids[idx] || '').trim();
+                const rep = reports.find((r) => String(r.id) === rid);
                 const repLabel = rep
                   ? (rep.label || '#' + rid) + (rep.isPublic ? '' : ' — PRIVATE, won\'t show')
                   : '';

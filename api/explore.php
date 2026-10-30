@@ -521,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
 
-    $id   = (int)($body['id'] ?? 0);
+    $id   = hcri_rid(get_db(), $body['id'] ?? 0);
 
 
 
