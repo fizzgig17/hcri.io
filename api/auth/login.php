@@ -8,6 +8,7 @@ require_once __DIR__ . '/../_core/db.php';
 
 require_once __DIR__ . '/../_core/auth.php';
 require_once __DIR__ . '/../_core/ratelimit.php';
+require_once __DIR__ . '/../_core/email_verify.php';
 
 
 
@@ -126,6 +127,9 @@ if ($action === 'login') {
         rl_hit('login_ip', rl_client_ip(), 900);
         rl_hit('login_acct', $rlAcct, 900);
         json_error('Invalid email or password', 401);
+    }
+    if (!hcri_user_is_verified($db, $u)) {
+        json_out(['error' => 'Please confirm your email address first. We sent you a link when you signed up.', 'code' => 'unverified'], 403);
     }
     rl_clear('login_acct', $rlAcct);
 

@@ -753,6 +753,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
+    // Guests (not signed in) page through at most the first 120 results, 48 at a time.
+    $guestMaxPages = null;
+    if ($myId <= 0) {
+        $perPage = min($perPage, 48);
+        $guestMaxPages = max(1, (int)ceil(120 / $perPage));
+        $page = min($page, $guestMaxPages);
+    }
     $offset   = ($page - 1) * $perPage;
 
 
@@ -1248,6 +1255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
+            if ($myId <= 0) $tokById = array_slice($tokById, 0, 4, true);   // guests: 4 reports at most
             if (!$tokById) json_out(build_explore_summary([]));
 
 
@@ -1900,7 +1908,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
-        'ranges' => $ranges, 'reports' => hcri_pid_reports($db, $reports),
+        'ranges' => $ranges, 'reports' => hcri_pid_reports($db, hcri_guest_round($myId, $reports)),
 
 
 
@@ -1912,7 +1920,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 
 
-        'pages'   => max(1, (int)ceil($total / $perPage)),
+        'pages'   => min($guestMaxPages ?? PHP_INT_MAX, max(1, (int)ceil($total / $perPage))),
+        'guestLimited' => $guestMaxPages !== null,
 
 
 

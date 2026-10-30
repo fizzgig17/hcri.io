@@ -121,6 +121,18 @@ if (!empty($r['spd_data'])) {
     $out['vals'] = array_column($pairs2, 1);
     $out['reduced'] = !$fullRes;
 }
+if ($myId <= 0) {
+    // Guests get a lighter copy: no free-text notes or raw instrument headers, rounded numbers.
+    $out['notes'] = null; $out['rawHeaders'] = null; $out['instrumentVersion'] = null;
+    $rnd = function ($v) use (&$rnd) { return is_array($v) ? array_map($rnd, $v) : (is_float($v) || is_int($v) ? round((float)$v, 1) : $v); };
+    if ($out['cct'] !== null) $out['cct'] = (int)(round($out['cct'] / 10) * 10);
+    if ($out['duv'] !== null) $out['duv'] = round($out['duv'], 4);
+    if ($out['x'] !== null) $out['x'] = round($out['x'], 4);
+    if ($out['y'] !== null) $out['y'] = round($out['y'], 4);
+    foreach (['rfBins', 'rcsBins', 'rhsBins'] as $bk) if (!empty($out[$bk])) $out[$bk] = $rnd($out[$bk]);
+    if ($out['ra'] !== null) $out['ra'] = round($out['ra'], 1);
+    if ($out['r9'] !== null) $out['r9'] = round($out['r9'], 1);
+}
 $out['categories'] = report_categories_map($db, (int)$r['id']);
 json_out($out);
 require_once __DIR__ . '/_core/categories.php';

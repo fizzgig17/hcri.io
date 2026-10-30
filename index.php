@@ -193,7 +193,7 @@ if (str_starts_with($uri, '/api/')) {
     require_once __DIR__ . '/api/_core/rate_limit.php';
     if (($rg = hcri_rate_group($uri)) !== null) hcri_rate_limit($rg, $uri);
 
-    if (preg_match('#^/api/auth/(login|register|me|reset_request|reset_confirm)$#', $uri, $m)) {
+    if (preg_match('#^/api/auth/(login|register|me|reset_request|reset_confirm|resend_verification)$#', $uri, $m)) {
 
         require __DIR__ . '/api/auth/' . $m[1] . '.php'; exit;
 
@@ -981,6 +981,26 @@ if ($shareTok !== '') {
 
 }
 
+// ── Email confirmation link (?verify=TOKEN) ───────────────────────────────────
+if (isset($_GET['verify'])) {
+    $vOk = false;
+    try {
+        require_once __DIR__ . '/api/_core/db.php';
+        require_once __DIR__ . '/api/_core/email_verify.php';
+        $vOk = hcri_verify_consume(get_db(), (string)$_GET['verify']);
+    } catch (\Throwable $e) {}
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
+    $vMsg = $vOk ? 'Your email address is confirmed. You can sign in now.'
+                 : 'This confirmation link is invalid or has expired. Sign in and choose "resend", and we will send a new one.';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+       . '<meta name="robots" content="noindex"><title>Confirm email — hCRI.io</title>'
+       . '<style>body{font-family:system-ui,sans-serif;background:#0b1218;color:#e6edf3;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:16px}'
+       . '.c{max-width:420px;text-align:center}h1{font-size:22px}a{display:inline-block;margin-top:18px;background:#4fd1c5;color:#06222a;padding:12px 22px;border-radius:8px;font-weight:700;text-decoration:none}</style></head>'
+       . '<body><div class="c"><h1>' . ($vOk ? 'Email confirmed' : 'Link not valid') . '</h1><p>' . htmlspecialchars($vMsg, ENT_QUOTES) . '</p><a href="/">Go to hCRI.io</a></div></body></html>';
+    exit;
+}
 $reportKey = isset($_GET['report']) ? (string)$_GET['report'] : '';
 $reportId  = 0;
 if ($reportKey !== '') {

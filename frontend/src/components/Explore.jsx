@@ -1607,7 +1607,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       const p = new URLSearchParams(window.location.search).get('compare');
       if (!p) return;
       const ids = p.split(',').map((x) => { const q = x.split('.'); return { id: q[0], t: q[1] || '' }; })
-        .filter((x) => x.id).slice(0, 12);
+        .filter((x) => x.id).slice(0, n ? 12 : 4);
       if (!ids.length) return;
       setComparing(true);
       setCmpView('cards');
@@ -1832,10 +1832,13 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     } catch {}
   };
 
-  const toggleCmpSel = (e) => setCmpSel((p) => {
-    const already = p.some((x) => x.id === e.id);
-    return already ? p.filter((x) => x.id !== e.id) : (p.length >= 12 ? p : [...p, e]);
-  });
+  const toggleCmpSel = (e) => {
+    if (!n && cmpSel.length >= 4 && !cmpSel.some((x) => x.id === e.id)) { alert('Sign in (free) to compare more than 4 reports at once.'); return; }
+    setCmpSel((p) => {
+      const already = p.some((x) => x.id === e.id);
+      return already ? p.filter((x) => x.id !== e.id) : (p.length >= 12 ? p : [...p, e]);
+    });
+  };
 
   // Common props for the two <FilterPanel> / <ResultsPanel> call sites.
   const filterPanelProps = {

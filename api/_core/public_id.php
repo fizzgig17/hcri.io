@@ -110,3 +110,15 @@ function hcri_pid_reports(PDO $db, array $reports): array
     unset($r);
     return $reports;
 }
+
+/** Guests (not signed in) see CCT to the nearest 10 K and Duv to 4 decimals in lists; signed-in users see exact values. */
+function hcri_guest_round(int $myId, array $reports): array
+{
+    if ($myId > 0) return $reports;
+    foreach ($reports as &$r) {
+        if (isset($r['cct']) && is_numeric($r['cct'])) $r['cct'] = (int)(round($r['cct'] / 10) * 10);
+        if (isset($r['duv']) && is_numeric($r['duv'])) $r['duv'] = round((float)$r['duv'], 4);
+    }
+    unset($r);
+    return $reports;
+}

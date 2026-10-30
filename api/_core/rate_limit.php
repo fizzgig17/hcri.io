@@ -24,7 +24,7 @@ function hcri_rate_group(string $uri): ?string
 {
     if (preg_match('#^/api/explore/stats/?$#', $uri) || preg_match('#^/api/explore/?$#', $uri)) return 'list';
     if (preg_match('#^/api/(explore/[A-Za-z0-9]+|shared/[A-Za-z0-9_-]+|og/.+)$#', $uri)) return 'item';
-    if (preg_match('#^/api/(guest_pdf|reports/[A-Za-z0-9]+/pdf)$#', $uri)) return 'pdf';
+    if (preg_match('#^/api/(guest_pdf|annexe_pdf|reports/[A-Za-z0-9]+/pdf)$#', $uri)) return 'pdf';
     return null;
 }
 

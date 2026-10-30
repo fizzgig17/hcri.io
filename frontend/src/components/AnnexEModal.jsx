@@ -449,6 +449,7 @@ export default function AnnexEModal({ report, onClose }) {
   }
 
   async function downloadPdf() {
+    if (!getToken()) { alert('Please sign in or create a free account to download PDFs.'); return; }
     setPdfBusy(true);
     try {
       const png = canvasRef.current.toDataURL('image/png');

@@ -11,9 +11,11 @@ set_exception_handler(function($e) {
     exit;
 });
 
-require_once __DIR__ . '/_core/response.php';
+require_once __DIR__ . '/_core/response.php';
+require_once __DIR__ . '/_core/auth.php';
 
-cors_headers();
+cors_headers();
+require_auth();   // PDF downloads need an account
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST required', 405);
 

@@ -30,6 +30,7 @@ if (!$r) json_error('Invalid or expired reset link', 400);
 // Update password
 $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 $db->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([$hash, $r['uid']]);
+try { require_once __DIR__ . '/../_core/email_verify.php'; hcri_verify_ensure($db); $db->prepare('UPDATE users SET email_verified_at = COALESCE(email_verified_at, NOW()) WHERE id = ?')->execute([$r['uid']]); } catch (\Throwable $e) {}   // resetting by email proves the mailbox
 
 // Mark token used
 $db->prepare('UPDATE password_resets SET used = 1 WHERE token = ?')->execute([$resetToken]);
