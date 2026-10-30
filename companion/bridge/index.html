@@ -314,7 +314,12 @@
 
     <section id="updating">
       <h2><span class="num">10</span> Updating the firmware</h2>
-      <p>Updates are not delivered over Bluetooth. To update, repeat <a href="#firmware">Installing the firmware</a>: put the board in download mode and flash the new file. Settings in the app are kept. The newest tested release is always <code>prod-latest</code>.</p>
+      <h3>From the app (no cable)</h3>
+      <p>Open hCRI Companion, go to <strong>Settings &rarr; Bridge &rarr; Update bridge firmware</strong> and tap it. The app connects to the bridge over Bluetooth, downloads the newest firmware for your board (the S3 or the S3 Pro), checks its checksum, sends it, and then confirms the bridge is running it. Power the bridge on, keep the phone close, and leave it alone for a minute or two; the bridge shows a progress bar and restarts by itself. The bridge does not need an instrument plugged in, and Android and iPhone work the same way. If the new firmware fails to start, the bridge goes back to the old one on its own.</p>
+      <div class="card"><h4>One cable flash first</h4>
+        <p>A bridge that was flashed before this feature needs <strong>one</strong> flash from a computer (the steps in <a href="#firmware">Installing the firmware</a>, with the newest <code>prod-latest</code> file) because the board's memory layout changed. After that, updates from the app work. That flash also resets the screen-flip setting.</p></div>
+      <h3>From a computer</h3>
+      <p>Repeat <a href="#firmware">Installing the firmware</a>: put the board in download mode and flash the new file. The newest tested release is always <code>prod-latest</code>; the app follows <code>prod-latest</code> too (development builds of the app follow <code>dev-latest</code>).</p>
     </section>
 
     <section id="troubleshooting">
