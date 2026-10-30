@@ -30,3 +30,14 @@ function method(string ...$allowed): void {
     if (!in_array($_SERVER['REQUEST_METHOD'], $allowed, true))
         json_error('Method not allowed', 405);
 }
+
+/** Logs the full exception server-side (never sent to the client). */
+function hcri_log_exception(\Throwable $e): void {
+    error_log('hCRI error: ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . basename($e->getFile()) . ':' . $e->getLine());
+}
+
+/** Answers an unexpected failure with a generic message; the details go to the server log only. */
+function hcri_fail(\Throwable $e, int $status = 500): never {
+    hcri_log_exception($e);
+    json_error('Server error', $status);
+}

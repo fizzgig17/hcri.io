@@ -6,7 +6,8 @@ error_reporting(E_ALL);
 set_exception_handler(function($e) {
     if (!headers_sent()) header('Content-Type: application/json');
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]);
+    if (function_exists('hcri_log_exception')) hcri_log_exception($e); else error_log((string)$e);
+    echo json_encode(['error' => 'Server error']);
     exit;
 });
 

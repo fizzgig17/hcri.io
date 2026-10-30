@@ -216,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $response = process_uploaded_report($db, $user, $file['tmp_name'], $file['name'], $label, $maxBytes);
         json_out($response, 201);
     } catch (\Throwable $e) {
-        json_error($e->getMessage(), str_contains($e->getMessage(), 'Need') ? 422 : 500);
+        str_contains($e->getMessage(), 'Need') ? json_error($e->getMessage(), 422) : hcri_fail($e);
     }
 }
 
