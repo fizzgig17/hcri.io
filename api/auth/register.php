@@ -58,8 +58,13 @@ if ($action === 'register') {
     }
     $id = (int)$db->lastInsertId();
     // Not signed in yet: the account is usable once the emailed link has been opened.
-    hcri_verify_send($db, $id, strtolower($email), $name);
-    json_out(['verifyRequired' => true, 'email' => strtolower($email)], 201);
+    if (hcri_verify_send($db, $id, strtolower($email), $name)) {
+        json_out(['verifyRequired' => true, 'email' => strtolower($email)], 201);
+    }
+    // The confirmation email could not be sent (mail not working): do not lock the person out, sign them in as before.
+    try { $db->prepare('UPDATE users SET email_verified_at = NOW() WHERE id = ?')->execute([$id]); } catch (\Throwable $e) {}
+    $token = jwt_sign(['id' => $id, 'email' => strtolower($email), 'name' => $name]);
+    json_out(['token' => $token, 'user' => ['id' => $id, 'email' => strtolower($email), 'name' => $name]], 201);
 }
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────

@@ -64,9 +64,12 @@ function hcri_pid_preload(PDO $db, array $ids): void
     $need = [];
     foreach ($ids as $i) { $i = (int)$i; if ($i > 0 && !isset($c[$i])) $need[$i] = $i; }
     foreach (array_chunk(array_values($need), 500) as $chunk) {
-        $q = $db->prepare('SELECT id, public_id FROM reports WHERE id IN (' . implode(',', array_fill(0, count($chunk), '?')) . ')');
-        $q->execute($chunk);
-        foreach ($q->fetchAll() as $r) {
+        try {
+            $q = $db->prepare('SELECT id, public_id FROM reports WHERE id IN (' . implode(',', array_fill(0, count($chunk), '?')) . ')');
+            $q->execute($chunk);
+            $rows = $q->fetchAll();
+        } catch (\Throwable $e) { return; }   // no public_id column (setup could not run): ids fall back to the numeric ones
+        foreach ($rows as $r) {
             $pid = (string)($r['public_id'] ?? '');
             if ($pid === '') {   // created since the last backfill
                 $pid = hcri_pid_generate();
