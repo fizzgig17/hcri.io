@@ -9,10 +9,8 @@
 //    real per-sample rfSamples/sampleHues when the instrument/analysis
 //    provided them (real=true), falling back to interpolating the 16
 //    hue-bin averages the way the stale version always did.
-//  - RawDataPanel (de): a collapsible "Raw Instrument Data" section listing
-//    the instrument's raw headers and the full wavelength/intensity table,
-//    with a "Download CSV" button. Entirely new -- the stale ReportView.jsx
-//    this replaces had no raw-data view at all.
+//  - (The "Raw Instrument Data" panel and its CSV download were removed on purpose: report pages no longer show or hand
+//    out the raw instrument headers or the wavelength table.)
 
 import { useRef, useEffect, useState } from 'react';
 import HelpTip from './HelpTip.jsx';
@@ -201,106 +199,6 @@ export function CESBars({ rfBins, rfSamples, sampleHues, theme: T = {}, noHelp }
         <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 6 }}>
           <HelpTip text={'COLOR SAMPLE FIDELITY, RF,CES\n\n\n\nFidelity for each of the 99 individual CIE test-color samples used in TM-30, rather than the 16 hue-angle averages above. A dip here shows exactly which color is hardest for this source to render, even if its hue bin looks fine on average.'} />
         </span>
-      )}
-    </div>
-  );
-}
-
-// RawDataPanel: a collapsible section listing the instrument's raw header
-// key/value pairs and the full wavelength/intensity table, with a button
-// to download both as a CSV. Renders nothing if there's neither.
-export function RawDataPanel({ headers, wls, vals, label, C: T, isMobile }) {
-  const [open, setOpen] = useState(false);
-  const entries = headers && typeof headers === 'object' ? Object.entries(headers) : [];
-  const hasSpectral = Array.isArray(wls) && Array.isArray(vals) && wls.length > 0;
-  if (entries.length === 0 && !hasSpectral) return null;
-
-  function download(ev) {
-    ev?.stopPropagation?.();
-    const name = (label || 'spectral_data').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const lines = [];
-    entries.forEach(([k, v]) => lines.push('# ' + k + ',' + v));
-    lines.push('Wavelength (nm),Intensity');
-    if (hasSpectral) for (let i = 0; i < wls.length; i++) lines.push(wls[i] + ',' + vals[i]);
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name + '_raw.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  const canExpand = entries.length > 0 || hasSpectral;
-  return (
-    <div style={{ marginTop: 16, border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
-      <div
-        onClick={() => canExpand && setOpen((o) => !o)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 12px 8px 16px', background: T.surface2, gap: 10,
-          cursor: canExpand ? 'pointer' : 'default', userSelect: 'none',
-        }}
-      >
-        <span style={{ color: T.dim, fontSize: 12, fontFamily: 'monospace', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-          Raw Instrument Data
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={download}
-            title="Download raw spectral data as CSV"
-            style={{
-              padding: '5px 12px', background: T.accent, color: '#04121e', border: 'none',
-              borderRadius: 5, cursor: 'pointer', fontSize: 11, fontFamily: 'monospace',
-              fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap',
-            }}
-          >
-            ↓ CSV
-          </button>
-          {canExpand && <span style={{ color: T.dim, fontSize: 13, lineHeight: 1 }}>{open ? '▲' : '▼'}</span>}
-        </div>
-      </div>
-      {open && (
-        <div>
-          {entries.length > 0 && (
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'monospace' }}>
-                <tbody>
-                  {entries.map(([k, v]) => (
-                    <tr key={k} style={{ borderBottom: `1px solid ${T.border}40` }}>
-                      <td style={{ padding: '5px 14px', color: T.dim, whiteSpace: 'nowrap', width: 1, fontWeight: 700 }}>{k}</td>
-                      <td style={{ padding: '5px 14px', color: T.text }}>{v}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {hasSpectral && (
-            <div style={{ borderTop: `1px solid ${T.border}` }}>
-              <div style={{ padding: '6px 16px', background: T.surface2, color: T.dim, fontSize: 11, fontFamily: 'monospace', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Spectral Data ({wls.length} points)
-              </div>
-              <div style={{ maxHeight: 340, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'monospace' }}>
-                  <thead>
-                    <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                      <th style={{ padding: '5px 14px', textAlign: 'left', color: T.dim, fontWeight: 700, position: 'sticky', top: 0, background: T.surface2 }}>Wavelength (nm)</th>
-                      <th style={{ padding: '5px 14px', textAlign: 'left', color: T.dim, fontWeight: 700, position: 'sticky', top: 0, background: T.surface2 }}>Intensity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {wls.map((w, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${T.border}40` }}>
-                        <td style={{ padding: '4px 14px', color: T.dim, whiteSpace: 'nowrap', width: 1 }}>{w}</td>
-                        <td style={{ padding: '4px 14px', color: T.text }}>{typeof vals[i] === 'number' ? vals[i].toFixed(4) : vals[i]}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
       )}
     </div>
   );
