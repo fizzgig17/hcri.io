@@ -499,7 +499,7 @@ export default function AnnexEModal({ report, onClose }) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647, background: 'rgba(0,0,0,0.92)', overflowY: 'scroll', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
       <div style={{ padding: 16, minHeight: '100%', boxSizing: 'border-box' }}>
-        <div style={{ maxWidth: 865, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ maxWidth: 825, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 8, padding: '10px 16px', gap: 6 }}>
             <div style={{ fontFamily: 'monospace', fontWeight: 700, color: T.white, fontSize: 15 }}>
               TM-30-18<span style={{ fontSize: 11, color: T.dim, fontWeight: 400, marginLeft: 6 }}>{data.label}</span>
