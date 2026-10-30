@@ -88,12 +88,12 @@ export default function AnnexEModal({ report, onClose }) {
       c.fillStyle = dark ? '#e8f0fa' : '#ffffff'; c.font = 'bold 16px sans-serif';
       c.textAlign = 'left'; c.textBaseline = 'middle';
       c.fillText('IES TM-30-18', 22, 20);
-      c.fillStyle = dark ? 'rgba(14,20,32,0.65)' : 'rgba(255,255,255,0.65)'; c.font = '11px sans-serif';
+      c.fillStyle = dark ? 'rgba(232,240,250,0.7)' : 'rgba(255,255,255,0.65)'; c.font = '11px sans-serif';
       c.fillText('Color Rendition Report', 22, 35);
       c.textAlign = 'right';
-      c.fillStyle = dark ? 'rgba(14,20,32,0.9)' : 'rgba(255,255,255,0.9)'; c.font = 'bold 13px sans-serif';
+      c.fillStyle = dark ? 'rgba(232,240,250,0.95)' : 'rgba(255,255,255,0.9)'; c.font = 'bold 13px sans-serif';
       c.fillText('hcri.io', 803, 20);
-      c.fillStyle = dark ? 'rgba(14,20,32,0.5)' : 'rgba(255,255,255,0.5)'; c.font = '10px sans-serif';
+      c.fillStyle = dark ? 'rgba(232,240,250,0.6)' : 'rgba(255,255,255,0.5)'; c.font = '10px sans-serif';
       c.fillText(fmtTZ((r.createdAt || '').replace(' ', 'T'), { year: 'numeric', month: 'short', day: 'numeric' }, true), 803, 35);
 
       c.fillStyle = dark ? '#161f30' : '#f0f4f8'; c.fillRect(0, 52, 825, 34);
