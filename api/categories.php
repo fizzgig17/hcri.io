@@ -6,6 +6,7 @@ require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
 require_once __DIR__ . '/_core/report_leds.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -42,7 +43,7 @@ if ($m === 'POST' && ($path === '' || $path === '/')) {
 // body: { reportId, kind, value }  (empty value clears the assignment)
 if ($m === 'POST' && $path === '/assign') {
     $b        = body();
-    $reportId = (int)($b['reportId'] ?? 0);
+    $reportId = hcri_rid($db, $b['reportId'] ?? 0);
     $kind     = $b['kind'] ?? '';
     $value    = trim((string)($b['value'] ?? ''));
     if (!$reportId)               json_error('reportId required', 400);
@@ -88,7 +89,7 @@ if ($m === 'POST' && $path === '/assign') {
 // straight away) and left blank in that LED. Returns { leds, requested }.
 if ($m === 'POST' && $path === '/leds') {
     $b        = body();
-    $reportId = (int)($b['reportId'] ?? 0);
+    $reportId = hcri_rid($db, $b['reportId'] ?? 0);
     if (!$reportId) json_error('reportId required', 400);
     if (!isset($b['leds']) || !is_array($b['leds'])) json_error("'leds' list required", 400);
     $own = $db->prepare('SELECT user_id FROM reports WHERE id = ?');
@@ -113,7 +114,7 @@ if ($m === 'POST' && $path === '/leds') {
 //                      NO values assigned for that kind (existing choices are left alone).
 if ($m === 'POST' && $path === '/bulk_assign') {
     $b         = body();
-    $reportIds = array_values(array_unique(array_map('intval', (array)($b['reportIds'] ?? []))));
+    $reportIds = array_values(array_unique(array_map(fn($x) => hcri_rid($db, $x), (array)($b['reportIds'] ?? []))));
     $valuesIn  = is_array($b['values'] ?? null) ? $b['values'] : [];
     $overwrite = !empty($b['overwrite']);
 

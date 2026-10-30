@@ -25,6 +25,7 @@ require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/api_token.php';
 require_once __DIR__ . '/_core/flicker.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 header('Cache-Control: no-store');
@@ -97,7 +98,7 @@ if ($method === 'GET') {
     $sql = flicker_select_sql(false) . ' WHERE f.user_id=?';
     $args = [$listFor];
     if (!empty($_GET['unattached'])) $sql .= ' AND r.id IS NULL';
-    if (!empty($_GET['report_id']))  { $sql .= ' AND f.report_id=?'; $args[] = (int)$_GET['report_id']; }
+    if (!empty($_GET['report_id']))  { $sql .= ' AND f.report_id=?'; $args[] = hcri_rid($db, $_GET['report_id']); }
     $sql .= ' ORDER BY COALESCE(f.captured_at, f.created_at) DESC, f.id DESC LIMIT 500';
     $s = $db->prepare($sql);
     $s->execute($args);
@@ -111,7 +112,7 @@ if ($method === 'POST' && !$id) {
     $b = body();
     try { $c = flicker_clean_payload($b, true); }
     catch (InvalidArgumentException $e) { json_error($e->getMessage(), 400); }
-    $reportId = isset($b['reportId']) && $b['reportId'] !== null && $b['reportId'] !== '' ? (int)$b['reportId'] : null;
+    $reportId = isset($b['reportId']) && $b['reportId'] !== null && $b['reportId'] !== '' ? hcri_rid($db, $b['reportId']) : null;
     if ($reportId) own_report_or_fail($db, $reportId, $myId);
     $label = trim((string)($b['label'] ?? ''));
     if ($label === '') $label = 'Flicker ' . gmdate('Y-m-d H:i');
@@ -140,7 +141,7 @@ if ($method === 'PATCH') {
     if (array_key_exists('label', $b)) { $l = trim((string)$b['label']); if ($l === '') json_error('Title cannot be empty', 400); $set[] = 'label=?'; $args[] = mb_substr($l, 0, 255); }
     if (array_key_exists('notes', $b)) { $set[] = 'notes=?'; $args[] = (string)$b['notes']; }
     if (array_key_exists('reportId', $b)) {
-        $rid = $b['reportId'] === null || $b['reportId'] === '' ? null : (int)$b['reportId'];
+        $rid = $b['reportId'] === null || $b['reportId'] === '' ? null : hcri_rid($db, $b['reportId']);
         if ($rid) own_report_or_fail($db, $rid, $ownerId);
         $set[] = 'report_id=?'; $args[] = $rid;
     }
