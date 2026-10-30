@@ -14,9 +14,9 @@ require_once __DIR__ . '/db.php';
 
 const HCRI_RATE_GROUPS = [
     //          guest min/hour   signed-in min/hour
-    'item' => [90, 600,          300, 3000],   // one report, shared report, share/OG images
-    'list' => [60, 400,          200, 2000],   // explore list, stats
-    'pdf'  => [15, 60,           40,  300],    // server-built PDFs
+    'item' => [90, 600,          120, 1000],   // one report, shared report, share/OG images
+    'list' => [60, 400,          100, 800],    // explore list, stats
+    'pdf'  => [15, 60,           30,  150],    // server-built PDFs
 ];
 
 /** Which group a path belongs to, or null when it isn't limited. */
@@ -59,11 +59,11 @@ function hcri_rate_limit(string $group, string $uri = ''): void
 {
     $lim = HCRI_RATE_GROUPS[$group] ?? null;
     if (!$lim) return;
-    $signedIn = false;
+    $signedIn = false; $userId = 0;
     try {
         require_once __DIR__ . '/auth.php';
         $h = get_auth_header();
-        if (str_starts_with($h, 'Bearer ')) { $p = jwt_verify(substr($h, 7)); $signedIn = $p && isset($p['id']); }
+        if (str_starts_with($h, 'Bearer ')) { $p = jwt_verify(substr($h, 7)); $signedIn = $p && isset($p['id']); if ($signedIn) $userId = (int)$p['id']; }
     } catch (\Throwable $e) {}
     [$perMin, $perHour] = $signedIn ? [$lim[2], $lim[3]] : [$lim[0], $lim[1]];
 
@@ -83,8 +83,9 @@ function hcri_rate_limit(string $group, string $uri = ''): void
             $get->execute([$key, $kind, $slot]);
             if ((int)$get->fetchColumn() > $max) $over = max($over, $wait);
         }
+        if ($userId > 0) hcri_account_activity($db, $userId, $minute, $hour);
         if (random_int(1, 200) === 1) {   // tidy old counters now and then
-            $db->prepare("DELETE FROM rate_limits WHERE (kind = 'm' AND slot < ?) OR (kind = 'h' AND slot < ?)")->execute([$minute - 2, $hour - 2]);
+            $db->prepare("DELETE FROM rate_limits WHERE (kind IN ('m','u') AND slot < ?) OR (kind IN ('h','a') AND slot < ?)")->execute([$minute - 2, $hour - 2]);
         }
         if ($over > 0) {
             http_response_code(429);
@@ -95,4 +96,33 @@ function hcri_rate_limit(string $group, string $uri = ''): void
             exit;
         }
     } catch (\Throwable $e) { /* fail open */ }
+}
+
+// A signed-in account making more than this many limited requests in a minute gets reported by email (at most once an hour per account).
+const HCRI_ACCOUNT_ALERT_PER_MIN = 30;
+
+function hcri_account_activity(PDO $db, int $userId, int $minute, int $hour): void
+{
+    try {
+        $k = 'u' . str_pad((string)$userId, 31, '0', STR_PAD_LEFT);
+        $db->prepare("INSERT INTO rate_limits (k, kind, slot, hits) VALUES (?, 'u', ?, 1) ON DUPLICATE KEY UPDATE hits = hits + 1")->execute([$k, $minute]);
+        $q = $db->prepare("SELECT hits FROM rate_limits WHERE k = ? AND kind = 'u' AND slot = ?");
+        $q->execute([$k, $minute]);
+        $hits = (int)$q->fetchColumn();
+        if ($hits <= HCRI_ACCOUNT_ALERT_PER_MIN) return;
+        // once per hour per account: the first insert wins
+        $a = $db->prepare("INSERT IGNORE INTO rate_limits (k, kind, slot, hits) VALUES (?, 'a', ?, 1)");
+        $a->execute([$k, $hour]);
+        if ($a->rowCount() !== 1) return;
+        $u = $db->prepare('SELECT name, email FROM users WHERE id = ?');
+        $u->execute([$userId]);
+        $user = $u->fetch();
+        if (!$user) return;
+        require_once __DIR__ . '/mailer.php';
+        $to = getenv('HCRI_ALERT_EMAIL') ?: (defined('HCRI_ALERT_EMAIL') ? HCRI_ALERT_EMAIL : 'fizzgig@hcri.io');
+        send_email($to, 'hCRI.io admin', 'hCRI.io: heavy activity from ' . $user['name'],
+            "Account \"" . $user['name'] . "\" (" . $user['email'] . ", user id $userId) made $hits requests in one minute"
+            . " (alert threshold " . HCRI_ACCOUNT_ALERT_PER_MIN . ").\n\nHost: " . ($_SERVER['HTTP_HOST'] ?? '') . "\nIP: " . hcri_client_ip()
+            . "\nTime: " . gmdate('Y-m-d H:i:s') . " UTC\n\nYou get at most one of these per account per hour.");
+    } catch (\Throwable $e) { error_log('hCRI activity alert failed: ' . $e->getMessage()); }
 }
