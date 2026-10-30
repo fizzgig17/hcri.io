@@ -94,9 +94,23 @@ $out = [
     'createdAt'         => $r['created_at'],
 ];
 if (!empty($r['spd_data'])) {
-    $pairs2      = json_decode($r['spd_data'], true);
+    $pairs2 = json_decode($r['spd_data'], true);
+    // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
+    // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
+    $fullRes = $isSuper
+        || ($myId > 0 && $myId === (int)$r['user_id'])
+        || ($shareTok !== '' && !empty($r['share_token']) && hash_equals((string)$r['share_token'], $shareTok));
+    if (!$fullRes && is_array($pairs2)) {
+        $kept = []; $nextWl = null;
+        foreach ($pairs2 as $pt) {
+            $w = (float)$pt[0];
+            if ($nextWl === null || $w >= $nextWl - 1e-6) { $kept[] = $pt; $nextWl = (floor($w / 5 + 1e-6) + 1) * 5; }
+        }
+        $pairs2 = $kept;
+    }
     $out['wls']  = array_column($pairs2, 0);
     $out['vals'] = array_column($pairs2, 1);
+    $out['reduced'] = !$fullRes;
 }
 $out['categories'] = report_categories_map($db, (int)$r['id']);
 json_out($out);
@@ -187,9 +201,23 @@ $out = [
     'createdAt'         => $r['created_at'],
 ];
 if (!empty($r['spd_data'])) {
-    $pairs2      = json_decode($r['spd_data'], true);
+    $pairs2 = json_decode($r['spd_data'], true);
+    // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
+    // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
+    $fullRes = $isSuper
+        || ($myId > 0 && $myId === (int)$r['user_id'])
+        || ($shareTok !== '' && !empty($r['share_token']) && hash_equals((string)$r['share_token'], $shareTok));
+    if (!$fullRes && is_array($pairs2)) {
+        $kept = []; $nextWl = null;
+        foreach ($pairs2 as $pt) {
+            $w = (float)$pt[0];
+            if ($nextWl === null || $w >= $nextWl - 1e-6) { $kept[] = $pt; $nextWl = (floor($w / 5 + 1e-6) + 1) * 5; }
+        }
+        $pairs2 = $kept;
+    }
     $out['wls']  = array_column($pairs2, 0);
     $out['vals'] = array_column($pairs2, 1);
+    $out['reduced'] = !$fullRes;
 }
 $out['categories'] = report_categories_map($db, (int)$r['id']);
 json_out($out);
