@@ -130,7 +130,6 @@ export default function ExploreReportCard({ r, onClick, T: t, selected, onToggle
           {r.private && (
             <span title="Private — only you can see this" style={{ fontSize: 14, lineHeight: 1, opacity: 0.75 }}>🔒</span>
           )}
-          <span title="Report ID" style={{ fontSize: 10, color: t.dim, opacity: 0.5, fontFamily: 'monospace', lineHeight: 1 }}>#{r.id}</span>
         </div>
         <Votes reportId={r.id} theme={t} initialUp={r.up} initialDown={r.down} />
       </div>

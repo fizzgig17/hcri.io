@@ -389,7 +389,7 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
                       <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
                         <span style={{ width:12, height:12, borderRadius:'50%', background:cc, boxShadow:`0 0 8px ${cc}99`, flexShrink:0, border:'1px solid rgba(255,255,255,0.3)' }} />
                         <div style={{ fontSize:14, fontWeight:800, color:T.text, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                          {rep.label || 'Report #' + rep.id}
+                          {rep.label || 'Untitled report'}
                         </div>
                       </div>
                       <div style={{ fontSize:12, color:T.dim, marginTop:6 }}>

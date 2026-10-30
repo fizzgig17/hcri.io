@@ -312,7 +312,6 @@ function ReportCard({ r: e, onClick, T: n, selected, onToggle, mine, onDelete, f
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {e.private && <span title="Private — only you can see this" style={{ fontSize: 14, lineHeight: 1, opacity: 0.75 }}>🔒</span>}
-          <span title="Report ID" style={{ fontSize: 10, color: n.dim, opacity: 0.5, fontFamily: 'monospace', lineHeight: 1 }}>#{e.id}</span>
           {e.hasFlicker && (
             <svg title="Has a flicker reading" width="16" height="12" viewBox="0 0 16 12" fill="none" stroke={n.accent} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.85 }}>
               <title>Has a flicker reading</title>
