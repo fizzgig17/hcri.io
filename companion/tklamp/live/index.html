@@ -244,8 +244,8 @@
       <label>Chart width <select id="win"><option value="30">30 seconds</option><option value="120" selected>2 minutes</option><option value="600">10 minutes</option><option value="0">Whole run</option></select></label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="trim" checked> Trim the dark start</label>
-      <label><input type="checkbox" id="trimPeak" checked> Start at the peak of the output</label>
+      <label><input type="checkbox" id="trim" checked> Start at the first reading</label>
+      <label><input type="checkbox" id="trimPeak"> Start at the peak</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
@@ -363,7 +363,7 @@ function trimLeading(vals, step) {
   if (peak <= 0) return { vals: vals, trimmed: 0 };
   var first = 0;
   for (var j = 0; j < vals.length; j++) if (vals[j] >= peak * 0.02) { first = j; break; }
-  var start = Math.max(0, first - Math.ceil(1 / step));
+  var start = first;   // the first lit reading: no lead-in from zero
   if (start <= 0 || vals.length - start < 2) return { vals: vals, trimmed: 0 };
   return { vals: vals.slice(start), trimmed: start };
 }
@@ -378,8 +378,8 @@ function buildRun(ts, vs, started, ended, scale, trim, trimPeak) {
   var out = resample(ts, vs);
   if (!out) return null;
   var step = out.step, vals = out.vals, trimmed = 0;
-  if (trim) { var t = trimLeading(vals, step); vals = t.vals; trimmed = t.trimmed; }
-  if (trimPeak) { var tp = trimToPeak(vals); vals = tp.vals; trimmed += tp.trimmed; }
+  if (trimPeak) { var tp = trimToPeak(vals); vals = tp.vals; trimmed = tp.trimmed; }
+  else if (trim) { var t = trimLeading(vals, step); vals = t.vals; trimmed = t.trimmed; }
   if (trimmed) started = new Date(started.getTime() + trimmed * step * 1000);
   var dur = (vals.length - 1) * step;
   var label = 'TKLamp run ' + fmtTS(started).slice(0, 16);
@@ -909,8 +909,8 @@ $('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun()
 ['limStart', 'limStop', 'dur', 'limIdle'].forEach(function (id) { $(id).addEventListener('change', function () { setPref(id, $(id).value); }); });
 $('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); };
 $('win').onchange = function () { setPref('win', $('win').value); S.ymax = S.ymax; redraw(); };
-$('trim').onchange = function () { setPref('trim', $('trim').checked); };
-$('trimPeak').onchange = function () { setPref('trimPeak', $('trimPeak').checked); };
+$('trim').onchange = function () { setPref('trim', $('trim').checked); if ($('trim').checked) { $('trimPeak').checked = false; setPref('trimPeak', false); } };
+$('trimPeak').onchange = function () { setPref('trimPeak', $('trimPeak').checked); if ($('trimPeak').checked) { $('trim').checked = false; setPref('trim', false); } };
 $('showLog').onchange = function () { setPref('showLog', $('showLog').checked); $('logWrap').hidden = !$('showLog').checked; };
 
 function redraw() {
@@ -944,7 +944,7 @@ function tick() {
 
 window.addEventListener('resize', function () { redraw(); drawRun(hcv, selRun()); });
 (function init() {
-  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('trimPeak').checked = pref('trimPeak', true);
+  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('trimPeak').checked = pref('trimPeak', false);
   $('limStart').value = pref('limStart', ''); $('limStop').value = pref('limStop', ''); $('dur').value = pref('dur', ''); $('limIdle').value = pref('limIdle', '5');
   $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked;
   if (!navigator.serial) { $('unsupported').hidden = false; $('connectBtn').disabled = true; $('otherBtn').hidden = true; }
