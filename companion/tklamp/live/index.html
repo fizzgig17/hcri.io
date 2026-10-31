@@ -245,6 +245,7 @@
     </div>
     <div class="row">
       <label><input type="checkbox" id="trim" checked> Trim the dark start</label>
+      <label><input type="checkbox" id="trimPeak" checked> Start at the peak of the output</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
@@ -366,11 +367,20 @@ function trimLeading(vals, step) {
   if (start <= 0 || vals.length - start < 2) return { vals: vals, trimmed: 0 };
   return { vals: vals.slice(start), trimmed: start };
 }
-function buildRun(ts, vs, started, ended, scale, trim) {
+function trimToPeak(vals) {
+  if (vals.length < 3) return { vals: vals, trimmed: 0 };
+  var best = 0;
+  for (var i = 1; i < vals.length; i++) if (vals[i] > vals[best]) best = i;
+  if (best <= 0 || vals.length - best < 2) return { vals: vals, trimmed: 0 };
+  return { vals: vals.slice(best), trimmed: best };
+}
+function buildRun(ts, vs, started, ended, scale, trim, trimPeak) {
   var out = resample(ts, vs);
   if (!out) return null;
   var step = out.step, vals = out.vals, trimmed = 0;
-  if (trim) { var t = trimLeading(vals, step); vals = t.vals; trimmed = t.trimmed; if (trimmed) started = new Date(started.getTime() + trimmed * step * 1000); }
+  if (trim) { var t = trimLeading(vals, step); vals = t.vals; trimmed = t.trimmed; }
+  if (trimPeak) { var tp = trimToPeak(vals); vals = tp.vals; trimmed += tp.trimmed; }
+  if (trimmed) started = new Date(started.getTime() + trimmed * step * 1000);
   var dur = (vals.length - 1) * step;
   var label = 'TKLamp run ' + fmtTS(started).slice(0, 16);
   return { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
@@ -661,7 +671,7 @@ function stopRun(why, auto, endedAt) {
   S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0;
   addRow('-- Stopped ' + fmtTS(ended) + (why ? ': ' + why : '') + ' --');
   updateButtons();
-  var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked);
+  var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked, $('trimPeak').checked);
   if (!run) { msg((auto ? why + ' ' : '') + 'The recording was too short to keep (it needs at least 2 seconds of readings).'); dropPartial(stamp); return; }
   run._stamp = stamp;
   if (auto) {
@@ -680,7 +690,7 @@ function stopRun(why, auto, endedAt) {
 function saveDialog(run, why) {
   var m = run.meta;
   $('saveInfo').textContent = (why ? why + '\n' : '') + 'Length ' + clock(m.durationSeconds) + ', ' + m.readings + ' readings, ' + fixed(run.values[0], 0) + ' to ' +
-    fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nDark start trimmed: ' + m.trimmedLeadingSeconds + ' s' : '');
+    fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nStart trimmed: ' + m.trimmedLeadingSeconds + ' s' : '');
   $('saveName').value = run.label;
   $('saveUp').checked = !!sessionToken(); $('saveShare').checked = false;
   var d = $('saveDlg');
@@ -859,7 +869,7 @@ function checkRecover() {
       var ts = [], vs = [];
       parts.forEach(function (p) { ts = ts.concat(p.t); vs = vs.concat(p.v); });
       var started = parseTS(parts[0].started) || new Date(), ended = parseTS(parts[parts.length - 1].at) || new Date();
-      var run = buildRun(ts, vs, started, ended, parts[0].scale || S.scale, $('trim').checked);
+      var run = buildRun(ts, vs, started, ended, parts[0].scale || S.scale, $('trim').checked, $('trimPeak').checked);
       $('recover').hidden = true;
       if (!run) { msg('That run was too short to recover.'); dropPartial(stamp); return; }
       run._stamp = stamp; saveDialog(run, 'Recovered run.');
@@ -900,6 +910,7 @@ $('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun()
 $('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); };
 $('win').onchange = function () { setPref('win', $('win').value); S.ymax = S.ymax; redraw(); };
 $('trim').onchange = function () { setPref('trim', $('trim').checked); };
+$('trimPeak').onchange = function () { setPref('trimPeak', $('trimPeak').checked); };
 $('showLog').onchange = function () { setPref('showLog', $('showLog').checked); $('logWrap').hidden = !$('showLog').checked; };
 
 function redraw() {
@@ -933,7 +944,7 @@ function tick() {
 
 window.addEventListener('resize', function () { redraw(); drawRun(hcv, selRun()); });
 (function init() {
-  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true);
+  $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('trimPeak').checked = pref('trimPeak', true);
   $('limStart').value = pref('limStart', ''); $('limStop').value = pref('limStop', ''); $('dur').value = pref('dur', ''); $('limIdle').value = pref('limIdle', '5');
   $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked;
   if (!navigator.serial) { $('unsupported').hidden = false; $('connectBtn').disabled = true; $('otherBtn').hidden = true; }
