@@ -238,8 +238,8 @@ def resample(points):
     return step, vals
 
 
-def trim_leading(vals, step, fraction=0.02, keep_s=1):
-    """Drops the dark start (before the light came on): everything before the output first reaches 2% of the peak."""
+def trim_leading(vals, step, fraction=0.02, keep_s=0):
+    """Starts the run at the first lit reading: drops everything before the output first reaches 2% of the peak (keep_s seconds of lead-in can be kept; none by default, so the curve does not jump from 0)."""
     if len(vals) < 2:
         return vals, 0
     peak = max(vals)
@@ -638,18 +638,17 @@ def write_run(base, run):
             f.write(f"{round(i * run['intervalSeconds'] / 60.0, 4)},{v}\n")
 
 
-def build_run(pts, started, ended, scale, trim=True, trim_peak=True):
+def build_run(pts, started, ended, scale, trim=True, trim_peak=False):
     """Turns the recorded readings into a run (1 s bins, dark start and anything before the peak trimmed). None if it is too short."""
     out = resample(pts)
     if not out:
         return None
     step, vals = out
     trimmed = 0
-    if trim:
-        vals, trimmed = trim_leading(vals, step)
     if trim_peak:
-        vals, more = trim_to_peak(vals)
-        trimmed += more
+        vals, trimmed = trim_to_peak(vals)
+    elif trim:
+        vals, trimmed = trim_leading(vals, step)
     if trimmed:
         started = started + datetime.timedelta(seconds=trimmed * step)
     dur = (len(vals) - 1) * step
@@ -1037,9 +1036,9 @@ class TkApp:
         opts = ttk.Frame(f)
         opts.pack(fill="x", pady=2)
         self.trim_var = tk.BooleanVar(value=not self.args.no_trim)
-        ttk.Checkbutton(opts, text="Trim the dark start", variable=self.trim_var).pack(side="left", padx=14)
-        self.peak_var = tk.BooleanVar(value=not self.args.no_trim_peak)
-        ttk.Checkbutton(opts, text="Start at the peak of the output", variable=self.peak_var).pack(side="left", padx=14)
+        ttk.Checkbutton(opts, text="Start at the first reading", variable=self.trim_var, command=lambda: self.peak_var.set(False) if self.trim_var.get() else None).pack(side="left", padx=14)
+        self.peak_var = tk.BooleanVar(value=bool(self.args.trim_peak))
+        ttk.Checkbutton(opts, text="Start at the peak", variable=self.peak_var, command=lambda: self.trim_var.set(False) if self.peak_var.get() else None).pack(side="left", padx=14)
         self.show_var = tk.BooleanVar(value=(not self.args.no_readout) and self.cfg.get("readout", True))
         ttk.Checkbutton(opts, text="Show readings", variable=self.show_var, command=self.toggle_readout).pack(side="left")
 
@@ -1394,7 +1393,7 @@ class TkApp:
         self.live_t, self.live_v, self.live_t0, self.ymax = [], [], time.monotonic(), 0.0
         self.add_row(f"-- Stopped {ended.strftime(TS)}" + (f": {why}" if why else "") + " --")
         self.update_buttons()
-        run = build_run(pts, started, ended, self.scale, bool(self.trim_var.get()), bool(self.peak_var.get()))
+        run = build_run(pts, started, ended, self.scale, bool(self.trim_var.get()) and not self.peak_var.get(), bool(self.peak_var.get()))
         if not run:
             if auto:
                 self.msg(f"{why} The recording was too short to keep.")
@@ -1927,8 +1926,8 @@ def main():
     ap.add_argument("--stop-below", type=float, metavar="LM", help="Stop when the output stays below this many lumens (after it has been above it)")
     ap.add_argument("--idle-timeout", type=float, metavar="MIN", help=f"Stop when no reading has arrived for this many minutes (default {DEFAULT_IDLE_MIN}; 0 = off)")
     ap.add_argument("--save-settings", action="store_true", help="Remember --start-at, --stop-below, --duration and --idle-timeout for next time")
-    ap.add_argument("--no-trim", action="store_true", help="Keep the dark start of the run (default: trimmed)")
-    ap.add_argument("--no-trim-peak", action="store_true", help="Keep the readings before the peak (default: the run starts at its peak)")
+    ap.add_argument("--no-trim", action="store_true", help="Keep the dark readings before the first lit one (default: the run starts at its first lit reading)")
+    ap.add_argument("--trim-peak", action="store_true", help="Start the run at its peak instead of its first lit reading")
     ap.add_argument("--output-dir", default=None, help="Where to save runs (default: the current folder in the terminal, "
                     "'TKLamp runs' in your home folder in the window)")
     ap.add_argument("--cli", action="store_true", help="Use the terminal instead of the window")
@@ -1997,7 +1996,7 @@ def main():
     pts, started, ended, spool, reason = res
     if spool:
         spool.close()
-    run = build_run(pts, started, ended, scale, not args.no_trim, not args.no_trim_peak)
+    run = build_run(pts, started, ended, scale, not args.no_trim, args.trim_peak)
     if not run:
         print("The recording was too short to keep (needs at least 2 seconds of readings).")
         return
