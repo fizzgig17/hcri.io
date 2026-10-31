@@ -229,7 +229,11 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.30.3, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.31.1, iOS 1.28)</h3>
+      <ul>
+        <li><strong>TKLamp: start a run at its peak.</strong> <code>Settings &rarr; TKLamp tester &rarr; Start a run at its peak</code> (on by default) drops everything before the highest reading when you stop a run, so the saved and uploaded curve starts at the peak of the output. The web logger and <code>tklamp_live.py</code> have the same option.</li>
+      </ul>
+      <h3>Android 2026.10.30.3, iOS 1.28</h3>
       <ul>
         <li><strong>Update the ESP32 bridge from the app.</strong> <code>Settings → Bridge → Update bridge firmware</code> downloads the newest firmware and sends it to the bridge over Bluetooth, with a progress bar on the bridge's screen. It works with no meter plugged in, and the bridge goes back to its old firmware by itself if the new one does not start. The bridge needs one USB flash with the latest firmware first (it changes how the bridge's memory is divided); after that, updates come from the phone. See the <a href="../bridge/">bridge guide</a>.</li>
       </ul>
@@ -799,7 +803,7 @@
       <h3>Bridge</h3>
       <p><code>Flip screen</code> turns the hCRI Bridge's screen 180° (for a Torch Bearer or a ColorMunki), so it reads upright the other way round. It takes effect right away while the bridge is connected and needs the latest bridge firmware. It does not affect HPCS meters. The Torch Bearer spectrum is sent exactly as the meter reports it, so there is no correction setting.</p>
       <h3>TKLamp tester</h3>
-      <p><code>Counts per lumen</code> (default 313.2) is the scale from the tester's raw count to lumens; <code>Chart width (seconds)</code> (default 120) is how much time the live and saved charts show across the screen before you swipe. <code>Trim the dark start of a run</code> (on by default) drops the near-dark readings before the light came on when you stop a run, so the saved and uploaded curve starts when the light does. See <a href="#tklamp">Using a TKLamp tester</a>.</p>
+      <p><code>Counts per lumen</code> (default 313.2) is the scale from the tester's raw count to lumens; <code>Chart width (seconds)</code> (default 120) is how much time the live and saved charts show across the screen before you swipe. <code>Trim the dark start of a run</code> (on by default) drops the near-dark readings before the light came on when you stop a run, so the saved and uploaded curve starts when the light does. <code>Start a run at its peak</code> (also on by default) then drops everything before the highest reading, so the curve starts at the peak of the output. See <a href="#tklamp">Using a TKLamp tester</a>.</p>
       <h3>ColorMunki</h3>
       <p><code>Calibration limit (hours)</code>: how old the ColorMunki's calibration may be before the app asks you to calibrate again. The default is 1 hour; 0 turns the check off. The bridge itself still needs one calibration after it powers up.</p>
       <h3>Readings</h3>
