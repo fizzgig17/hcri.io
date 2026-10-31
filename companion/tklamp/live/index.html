@@ -263,6 +263,7 @@
     <div class="row">
       <button class="btn plain" data-act="view">View</button>
       <button class="btn plain" data-act="rename">Rename...</button>
+      <button class="btn plain" data-act="trim">Trim start...</button>
       <button class="btn" data-act="upload">Upload</button>
       <button class="btn plain" data-act="share">Share link</button>
       <button class="btn plain" data-act="unshare">Stop sharing</button>
@@ -279,6 +280,9 @@
 </div>
 
 <dialog id="saveDlg"><h3>Save this run</h3><div class="note" id="saveInfo" style="white-space:pre-line"></div>
+  <canvas class="chart" id="scv" style="height:220px;margin:8px 0"></canvas>
+  <div class="row" id="scRow"><button class="btn plain" id="scChoose">Choose where the run starts</button><button class="btn plain" id="scDef" hidden>Use default</button><button class="btn" id="scDone" hidden>Done</button></div>
+  <div class="note" id="scHint" style="color:#d92b2b;font-weight:600" hidden>Drag the glowing red line to where the run should start. Everything before it is left out.</div>
   <div class="f"><label for="saveName">Name</label><input type="text" id="saveName" maxlength="160"></div>
   <label class="chk"><input type="checkbox" id="saveUp"> Upload to Runtime on hCRI.io</label>
   <label class="chk"><input type="checkbox" id="saveShare"> Make a share link</label>
@@ -296,6 +300,11 @@
   <div class="f"><label for="signPw">Password</label><input type="password" id="signPw" autocomplete="current-password"></div>
   <div class="err" id="signErr"></div>
   <div class="btns"><button class="btn plain" id="signCancel">Cancel</button><button class="btn" id="signGo">Sign in</button></div></dialog>
+
+<dialog id="trimDlg"><h3 id="trimTitle"></h3>
+  <div class="note" style="color:#d92b2b;font-weight:600">Drag the glowing red line to where the run should start. Everything before it is cut off.</div>
+  <canvas class="chart" id="tcv" style="height:260px;margin:8px 0"></canvas>
+  <div class="btns"><button class="btn plain" id="trimCancel">Cancel</button><button class="btn" id="trimApply">Cut the start here</button></div></dialog>
 
 <dialog id="viewDlg"><h3 id="viewTitle"></h3><div class="detail" id="viewDetail"></div><canvas class="chart" id="vcv"></canvas>
   <div class="btns"><button class="btn plain" id="viewClose">Close</button></div></dialog>
@@ -427,7 +436,7 @@ function gridLabelEvery(px) {
   for (var i = 0; i < a.length; i++) if (a[i] >= need) return a[i];
   return 20;
 }
-function drawChart(cv, ts, vs, windowS, ymax) {
+function drawChart(cv, ts, vs, windowS, ymax, extra) {
   var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   if (!w || !h) return 0;
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
@@ -467,8 +476,67 @@ function drawChart(cv, ts, vs, windowS, ymax) {
   for (var n = 0; n < st.length; n++) { if (st[n] > t1) break; var px = X(st[n]), py = Y(sv[n]); if (!any) { g.moveTo(px, py); any = true; } else g.lineTo(px, py); }
   if (any) { if (st.length === 1) { g.fillStyle = line; g.fillRect(X(st[0]) - 2, Y(sv[0]) - 2, 4, 4); } else g.stroke(); }
   g.restore();
+  cv._geo = { L: L, pw: pw, t0: t0, t1: t1 };
+  if (extra && extra.t != null) {   // the draggable start line (see Trimmer)
+    var cx = X(extra.t);
+    g.save();
+    if (extra.glow) { g.fillStyle = 'rgba(217,43,43,' + (0.2 + 0.35 * (0.5 + 0.5 * Math.sin(Date.now() / 220))).toFixed(3) + ')'; g.fillRect(cx - 7, T, 14, ph); }
+    g.strokeStyle = '#d92b2b'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(cx, T); g.lineTo(cx, T + ph); g.stroke();
+    if (extra.grab) { g.fillStyle = '#d92b2b'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.arc(cx, T + 3, 8, 0, 6.2832); g.fill(); g.stroke(); }
+    if (extra.text) {
+      g.font = 'bold 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      var tw = g.measureText(extra.text).width + 16, bx = Math.max(L, Math.min(L + pw - tw, cx - tw / 2));
+      g.fillStyle = 'rgba(0,0,0,0.82)'; g.fillRect(bx, T + 16, tw, 22);
+      g.fillStyle = '#fff'; g.fillText(extra.text, bx + tw / 2, T + 27);
+    }
+    g.restore();
+  }
   return topV;
 }
+
+// ---- choose where a run starts: a draggable red line on the chart -----------------------------------------------------------
+// Like the cursor on the hCRI Companion's chart. The line shows where the run starts now; "Choose where the run starts" makes it
+// pulse (so it is clear it can be grabbed) and says what to do; while it is dragged a label shows the seconds and lumens there.
+function Trimmer(cv, onChange) {
+  var self = this;
+  this.cv = cv; this.vals = []; this.step = 1; this.idx = 0; this.active = false; this.glow = false; this.dragging = false; this.onChange = onChange;
+  function xOf(e) { return e.clientX - cv.getBoundingClientRect().left; }
+  function cursorX() { var g = cv._geo; return g ? g.L + (self.idx * self.step - g.t0) / (g.t1 - g.t0) * g.pw : -999; }
+  cv.addEventListener('pointerdown', function (e) {
+    if (!self.active || Math.abs(xOf(e) - cursorX()) > 26) return;
+    self.dragging = true; self.glow = false; try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+    e.preventDefault(); self.draw();
+  });
+  cv.addEventListener('pointermove', function (e) {
+    var g = cv._geo;
+    if (!self.dragging || !g) return;
+    var t = g.t0 + (xOf(e) - g.L) / g.pw * (g.t1 - g.t0);
+    var i = Math.round(t / self.step);
+    self.idx = Math.max(0, Math.min(self.vals.length - 2, i));
+    self.draw(); if (self.onChange) self.onChange(self.idx);
+  });
+  function end() { if (self.dragging) { self.dragging = false; self.draw(); } }
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  (function tick() { if (self.active && self.glow && !self.dragging && cv.offsetParent) self.draw(); requestAnimationFrame(tick); })();
+}
+Trimmer.prototype.set = function (vals, step, idx) { this.vals = vals; this.step = step; this.idx = idx; this.draw(); };
+Trimmer.prototype.activate = function (on) { this.active = on; this.glow = on; this.dragging = false; this.cv.style.touchAction = on ? 'none' : ''; this.cv.style.cursor = on ? 'ew-resize' : ''; this.draw(); };
+Trimmer.prototype.draw = function () {
+  var self = this, ts = this.vals.map(function (_, i) { return i * self.step; });
+  var v = this.vals[this.idx] || 0;
+  drawChart(this.cv, ts, this.vals, 0, 0, { t: this.idx * this.step, glow: this.glow && !this.dragging, grab: this.active, text: this.dragging ? fixed(this.idx * this.step, 1) + ' s \u00b7 ' + fixed(v, v >= 100 ? 0 : 1) + ' lm' : '' });
+};
+// A run starting `idx` readings into `full` (an untrimmed run that remembers its real start time in _started).
+function cutRun(full, idx) {
+  var step = full.intervalSeconds, vals = full.values.slice(idx), started = new Date(full._started.getTime() + idx * step * 1000), m = full.meta;
+  var label = 'TKLamp run ' + fmtTS(started).slice(0, 16);
+  return { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
+    meta: { started: fmtTS(started), ended: m.ended, durationSeconds: (vals.length - 1) * step, readings: m.readings, countsPerLumen: m.countsPerLumen,
+      trimmedLeadingSeconds: idx * step, source: m.source, label: label } };
+}
+
+var saveTrimmer = new Trimmer($('scv'), null);
+var trimTrimmer = new Trimmer($('tcv'), null);
 
 // ---- storage: runs live in this browser (IndexedDB) -------------------------------------------------------------------
 var dbp = null;
@@ -674,6 +742,7 @@ function stopRun(why, auto, endedAt) {
   var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked, $('trimPeak').checked);
   if (!run) { msg((auto ? why + ' ' : '') + 'The recording was too short to keep (it needs at least 2 seconds of readings).'); dropPartial(stamp); return; }
   run._stamp = stamp;
+  if (!auto) { var fullRun = buildRun(ts, vs, started, ended, S.scale, false, false); if (fullRun) { fullRun._started = started; run._full = fullRun; } }
   if (auto) {
     // Nobody may be at the computer: keep the run now under its suggested name; rename or upload it from History.
     dropPartial(stamp); delete run._stamp;
@@ -694,15 +763,33 @@ function saveDialog(run, why) {
   $('saveName').value = run.label;
   $('saveUp').checked = !!sessionToken(); $('saveShare').checked = false;
   var d = $('saveDlg');
+  // Start line: shown where the checkboxes put the start; "Choose where the run starts" lets the person drag it.
+  var full = run._full, stamp0 = run._stamp, tr = saveTrimmer;
+  $('scv').hidden = $('scRow').hidden = !full; $('scHint').hidden = true; $('scChoose').hidden = false; $('scDef').hidden = $('scDone').hidden = true;
+  function refreshInfo() { m = run.meta; $('saveInfo').textContent = (why ? why + '\n' : '') + 'Length ' + clock(m.durationSeconds) + ', ' + m.readings + ' readings, ' + fixed(run.values[0], 0) + ' to ' + fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nStart trimmed: ' + m.trimmedLeadingSeconds + ' s' : ''); }
+  function useIdx(i) {
+    var oldLabel = run.label, nr = cutRun(full, i);
+    nr._stamp = stamp0; nr._full = full; run = nr;
+    if ($('saveName').value.trim() === oldLabel) $('saveName').value = run.label;
+    refreshInfo();
+  }
+  if (full) {
+    var defIdx = full.values.length - run.values.length;
+    tr.set(full.values, full.intervalSeconds, defIdx); tr.activate(false); tr.onChange = function (i) { useIdx(i); };
+    $('scChoose').onclick = function () { tr.activate(true); $('scHint').hidden = false; $('scChoose').hidden = true; $('scDef').hidden = $('scDone').hidden = false; };
+    $('scDef').onclick = function () { tr.idx = defIdx; tr.glow = true; tr.draw(); useIdx(defIdx); };
+    $('scDone').onclick = function () { tr.activate(false); $('scHint').hidden = true; $('scChoose').hidden = false; $('scChoose').textContent = 'Change where the run starts'; $('scDef').hidden = $('scDone').hidden = true; };
+    setTimeout(function () { tr.draw(); }, 50);
+  }
   function done(save) {
     var name = $('saveName').value.trim();
     if (save && !name) { $('saveName').focus(); return; }
-    d.close();
+    d.close(); tr.activate(false);
     dropPartial(run._stamp);
     if (!save) { msg('Run discarded.'); return; }
     run.label = run.meta.label = name.slice(0, 160);
     var up = $('saveUp').checked, sh = $('saveShare').checked;
-    delete run._stamp;
+    delete run._stamp; delete run._full;
     idbPut('runs', run).then(function () {
       S.runs.unshift(run); S.runs.sort(byStart); S.sel = run.id; showTab('hist'); renderRuns();
       msg('Saved in this browser.');
@@ -795,6 +882,26 @@ function drawRun(canvas, r) {
   drawChart(canvas, ts, r.values, 0, 0);
 }
 function saveRun(r) { return idbPut('runs', r).catch(function (e) { msg('Could not update the saved copy: ' + (e && e.message || e)); }); }
+function trimRun(r) {
+  if (r.values.length < 3) { msg('That run is too short to trim.'); return; }
+  var tt = trimTrimmer;
+  $('trimTitle').textContent = 'Choose where ' + r.label + ' starts';
+  $('trimDlg').showModal();
+  tt.set(r.values, r.intervalSeconds, 0); tt.activate(true);
+  $('trimDlg').onclose = function () { tt.activate(false); };
+  $('trimCancel').onclick = function () { $('trimDlg').close(); };
+  $('trimApply').onclick = function () {
+    var i = tt.idx, step = r.intervalSeconds, rem = r.meta.remote || {};
+    $('trimDlg').close();
+    if (i <= 0) { msg('The run already starts there.'); return; }
+    var st = parseTS(r.meta.started);
+    r.values = r.values.slice(i);
+    if (st) r.meta.started = fmtTS(new Date(st.getTime() + i * step * 1000));
+    r.meta.durationSeconds = (r.values.length - 1) * step;
+    r.meta.trimmedLeadingSeconds = (r.meta.trimmedLeadingSeconds || 0) + i * step;
+    saveRun(r).then(function () { S.runs.sort(byStart); renderRuns(); msg('Cut ' + i * step + ' s off the start.' + (rem.id ? ' Upload it again to update the copy on hCRI.io.' : '')); });
+  };
+}
 function viewRun() { var r = needSel(); if (!r) return; $('viewTitle').textContent = r.label; $('viewDetail').textContent = describe(r); $('viewDlg').showModal(); drawRun($('vcv'), r); }
 $('viewClose').onclick = function () { $('viewDlg').close(); };
 function download(name, mime, text) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
@@ -818,6 +925,7 @@ document.querySelectorAll('[data-act]').forEach(function (b) {
     var act = b.getAttribute('data-act'), r = needSel(); if (!r) return;
     var rem = r.meta.remote || {};
     if (act === 'view') viewRun();
+    else if (act === 'trim') trimRun(r);
     else if (act === 'csv') download(fileBase(r) + '.csv', 'text/csv', csvOf(r));
     else if (act === 'json') download(fileBase(r) + '.json', 'application/json', JSON.stringify({ label: r.label, intervalSeconds: r.intervalSeconds, unit: r.unit, values: r.values, meta: r.meta }));
     else if (act === 'upload') doUpload(r, false);

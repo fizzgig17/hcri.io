@@ -27,5 +27,9 @@ function get_db(): PDO {
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
 
+    // Names and descriptions with accented letters need utf8mb4 columns (see charset_migrate.php); applied once, then a file check.
+    require_once __DIR__ . '/charset_migrate.php';
+    utf8mb4_text_ensure($pdo);
+
     return $pdo;
 }
