@@ -250,6 +250,8 @@ export default function RuntimeTab({ T, isAdmin }) {
   const [msg, setMsg] = useState('');
   const [sel, setSel] = useState([]);
   const [q, setQ] = useState('');
+  const [view, setViewState] = useState(() => { try { return localStorage.getItem('runtime_view') === 'newest' ? 'newest' : 'group'; } catch (e) { return 'group'; } });
+  const setView = (v) => { setViewState(v); try { localStorage.setItem('runtime_view', v); } catch (e) { /* private mode */ } };
   const [rt, setRt] = useState(rtFromUrl);
   const [comparing, setComparing] = useState(false);
   const [showUp, setShowUp] = useState(false);
@@ -430,6 +432,10 @@ export default function RuntimeTab({ T, isAdmin }) {
   const shown = (list || []).filter((c) => !needle || c.label.toLowerCase().includes(needle) || (c.group || '').toLowerCase().includes(needle));
   const groups = {};
   shown.forEach((c) => { (groups[c.group || 'Ungrouped'] = groups[c.group || 'Ungrouped'] || []).push(c); });
+  // Grouped (A-Z by group), or one flat list with the most recently saved light first.
+  const sections = view === 'newest'
+    ? [[null, [...shown].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))]]
+    : Object.keys(groups).sort().map((g) => [g, groups[g]]);
   const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const input = { background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, padding: '6px 10px', fontSize: 13, fontFamily: 'monospace' };
 
@@ -437,6 +443,10 @@ export default function RuntimeTab({ T, isAdmin }) {
     <div ref={rootRef} style={wrap}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>Runtime <span style={{ color: T.dim, fontWeight: 400, fontSize: 13 }}>output over time · private until you share a link</span></h2>
+        <select style={input} value={view} onChange={(e) => setView(e.target.value)} title="How to list the lights">
+          <option value="group">Grouped</option>
+          <option value="newest">Newest first</option>
+        </select>
         <input style={{ ...input, width: 170 }} placeholder="Search lights…" value={q} onChange={(e) => setQ(e.target.value)} />
         {shown.length > 0 && <button style={btn('dim')} onClick={() => setSel(shown.every((c) => sel.includes(c.id)) ? [] : shown.map((c) => c.id))}>{shown.every((c) => sel.includes(c.id)) ? 'Clear all' : `Select all (${shown.length})`}</button>}
         <button style={btn('accent')} onClick={() => setShowUp((v) => !v)}>Upload CSV</button>
@@ -471,19 +481,19 @@ export default function RuntimeTab({ T, isAdmin }) {
           No runtime curves yet. Upload a CSV (or send them with your API token to <code>/api/v1/runtime</code>); they will show up here, private to you.
         </div>
       )}
-      {Object.keys(groups).sort().map((g) => (
-        <div key={g} style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 6px' }}>{g} <span style={{ fontWeight: 400 }}>({groups[g].length})</span>
-            <button onClick={() => { const ids = groups[g].map((c) => c.id); setSel((x) => (ids.every((i) => x.includes(i)) ? x.filter((i) => !ids.includes(i)) : [...new Set([...x, ...ids])])); }}
-              style={{ background: 'none', border: 'none', color: T.accent, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11, marginLeft: 8, textTransform: 'none' }}>select group</button></div>
-          {groups[g].map((c) => {
+      {sections.map(([g, rows]) => (
+        <div key={g || 'all'} style={{ marginBottom: 18 }}>
+          {g !== null && <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 6px' }}>{g} <span style={{ fontWeight: 400 }}>({rows.length})</span>
+            <button onClick={() => { const ids = rows.map((c) => c.id); setSel((x) => (ids.every((i) => x.includes(i)) ? x.filter((i) => !ids.includes(i)) : [...new Set([...x, ...ids])])); }}
+              style={{ background: 'none', border: 'none', color: T.accent, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11, marginLeft: 8, textTransform: 'none' }}>select group</button></div>}
+          {rows.map((c) => {
             const on = sel.includes(c.id);
             const st = stats(c);
             return (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', marginBottom: 6, background: T.surface, border: `1px solid ${on ? T.accent : T.border}`, borderRadius: 8 }}>
                 <input type="checkbox" checked={on} onChange={() => toggle(c.id)} title="Select to compare" style={{ width: 18, height: 18, flexShrink: 0, accentColor: T.accent }} />
                 <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => open(c.id)}>
-                  <div style={{ fontWeight: 800, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}{c.shareToken && <span style={{ color: T.accent, fontSize: 11, fontWeight: 700, marginLeft: 8 }}>shared</span>}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}{view === 'newest' && <span style={{ color: T.dim, fontSize: 11, fontWeight: 400, marginLeft: 8 }}>{c.group || 'Ungrouped'}{c.updatedAt ? ` · ${String(c.updatedAt).slice(0, 16)}` : ''}</span>}{c.shareToken && <span style={{ color: T.accent, fontSize: 11, fontWeight: 700, marginLeft: 8 }}>shared</span>}</div>
                   {st && <div style={{ fontSize: 12, color: T.dim, marginTop: 3 }}>
                     {fmtVal(st.start)}{c.unit ? ' ' + c.unit : ''} start · {MARKS.filter((m) => valueAt(c, m) != null && m <= 10).map((m) => `${fmtPctV(st.at[m].pct)} @${m}m`).join(' · ')} · {fmtPctV(st.endPct)} @{Math.round(st.durationMin)}m
                     {c.meta && c.meta.cct != null ? ` · ${Math.round(c.meta.cct)} K${c.meta.cri != null ? ` · Ra ${c.meta.cri.toFixed(1)}` : ''}` : ''}
