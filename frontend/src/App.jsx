@@ -59,6 +59,7 @@ import PasswordReset from './components/PasswordReset';
 import { handlePanelPopState } from './lib/panelHistory';
 import usePanelBackClose from './hooks/usePanelBackClose';
 import { SharedRuntime } from './components/RuntimeTab';
+import { LiveView } from './components/LiveStation';
 
 export default function App() {
   const { theme: T, themeName, toggleTheme } = useTheme();
@@ -297,6 +298,33 @@ export default function App() {
     setExploreAuthOpen(false);
     setExploreOpen(true);
     return r;
+  }
+
+  // ── Live station link (?live=<token>) ────────────────────────────────────
+  const liveToken = (() => {
+    try { const t = (new URLSearchParams(window.location.search).get('live') || '').trim(); return /^[a-f0-9]{24}$/.test(t) ? t : ''; } catch { return ''; }
+  })();
+  if (liveToken) {
+    return (
+      <>
+        <TopNotices theme={T} />
+        <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: T.bg, overflow: 'auto' }}>
+          <div style={{ background: T.surface2, borderBottom: `1px solid ${T.border}`, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ fontWeight: 900, fontSize: 18, color: T.white, fontFamily: 'monospace' }}>
+              hCRI<span style={{ color: T.accent }}>.io</span>
+              <span style={{ fontSize: 12, color: T.dim, fontWeight: 400, marginLeft: 12 }}>Live</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={toggleTheme} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, width: 40, height: 34, padding: 0, fontSize: 16, cursor: 'pointer' }}>
+                {themeName === 'dark' ? '☀' : '🌙'}
+              </button>
+              <a href={window.location.pathname} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, padding: '7px 14px', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, textDecoration: 'none' }}>hCRI.io →</a>
+            </div>
+          </div>
+          <LiveView T={T} token={liveToken} />
+        </div>
+      </>
+    );
   }
 
   // ── Shared runtime link (?runtime=<token>[,<token>...]) ──────────────────

@@ -8,6 +8,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
+import { LiveStationPanel } from './LiveStation.jsx';
 import { MARKS, stats, valueAt, timeToFraction, fmtVal, fmtPctV, fmtMin } from '../lib/runtime';
 
 const PALETTE = ['#4aa3ff', '#ff8a3d', '#3dd68c', '#e5539b', '#f2c94c', '#9b7bff', '#2fc4c4', '#ff5d5d', '#a3c43a', '#c08a5a', '#7f8fa6', '#d36bff'];
@@ -451,6 +452,7 @@ export default function RuntimeTab({ T, isAdmin }) {
         {shown.length > 0 && <button style={btn('dim')} onClick={() => setSel(shown.every((c) => sel.includes(c.id)) ? [] : shown.map((c) => c.id))}>{shown.every((c) => sel.includes(c.id)) ? 'Clear all' : `Select all (${shown.length})`}</button>}
         <button style={btn('accent')} onClick={() => setShowUp((v) => !v)}>Upload CSV</button>
       </div>
+      {!forUser && <LiveStationPanel T={T} />}
       {isAdmin && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13 }}>
           <span style={{ color: T.dim }}>Admin: working on</span>
