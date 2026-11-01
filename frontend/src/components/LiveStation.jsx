@@ -27,7 +27,7 @@ const num = (v) => (v == null ? '–' : Math.abs(v) >= 100 ? String(Math.round(v
 
 /** Polls a station and keeps its readings. */
 function useLiveRun(token, pollMs = POLL_MS) {
-  const [state, setState] = useState({ loading: true, err: '', live: true, run: null, values: [] });
+  const [state, setState] = useState({ loading: true, err: '', live: true, run: null, values: [], info: null });
   const vals = useRef([]);
   const whole = useRef(false);   // true while the server sends every reading (not averaged down), so only new ones need fetching
   const [now, setNow] = useState(() => Date.now());
@@ -43,7 +43,7 @@ function useLiveRun(token, pollMs = POLL_MS) {
         else vals.current = vals.current.concat(d.values || []);
         whole.current = d.run.points === vals.current.length;
       } else vals.current = [];
-      setState({ loading: false, err: '', live: d.live, run: d.run, values: vals.current, got: Date.now() });
+      setState({ loading: false, err: '', live: d.live, run: d.run, values: vals.current, info: d.info || null, got: Date.now() });
     } catch {
       setState((s) => ({ ...s, loading: false, err: 'Could not reach hCRI.io. Trying again…' }));
     }
@@ -62,38 +62,40 @@ function useLiveRun(token, pollMs = POLL_MS) {
 }
 
 export function LiveView({ T, token, embedded = false }) {
-  const { loading, err, live, run, values, got, now } = useLiveRun(token);
+  const { loading, err, live, run, values, got, now, info } = useLiveRun(token);
   const wrap = embedded ? { fontFamily: 'monospace', color: T.text } : { maxWidth: 980, margin: '0 auto', padding: '16px 16px 60px', fontFamily: 'monospace', color: T.text };
   if (loading) return <div style={wrap}><p style={{ color: T.dim }}>Loading…</p></div>;
   if (!run && err) return <div style={wrap}><p style={{ color: T.bad }}>{err}</p></div>;
   if (!live) return <div style={wrap}><p style={{ color: T.dim }}>This live station is switched off by its owner.</p></div>;
-  if (!run || run.status === 'idle' || !run.runId) return <div style={wrap}><h2 style={{ margin: '0 0 6px', fontSize: 18 }}>Live station</h2><p style={{ color: T.dim }}>Nothing is running right now. This page updates by itself when a run starts.</p></div>;
+  if (!run || run.status === 'idle' || !run.runId) return <div style={wrap}><h2 style={{ margin: '0 0 6px', fontSize: 18 }}>Live station</h2><p style={{ color: T.dim }}>Nothing is live right now. This page updates by itself when a tester starts sending.</p></div>;
 
   const behind = got ? Math.max(0, (now - got) / 1000) : 0;
   const age = run.ageSeconds == null ? null : run.ageSeconds + behind;
+  const isRun = run.kind !== 'monitor';
   let chip, color;
-  if (run.status === 'finished') { chip = 'Finished'; color = T.dim; }
+  if (run.status === 'finished') { chip = isRun ? 'Finished' : 'Stopped'; color = T.dim; }
   else if (run.status === 'error') { chip = 'Problem'; color = T.bad; }
   else if (run.stale) { chip = `No data for ${fmtDur(age || 0)}`; color = T.warn || '#f0a020'; }
-  else { chip = 'Live'; color = T.good || '#3dd68c'; }
+  else { chip = isRun ? 'Live run' : 'Live'; color = isRun ? (T.accent || '#4aa3ff') : (T.good || '#3dd68c'); }
   const last = values.length ? values[values.length - 1] : run.last;
   const interval = run.intervalSeconds || 1;
   const elapsed = run.status === 'running' && run.startedAt && !run.stale
     ? (now - new Date(run.startedAt).getTime()) / 1000
     : values.length * interval;
-  const curve = { id: 'live', label: run.label || 'Run', values, intervalSeconds: interval, unit: run.unit || 'lm' };
+  const curve = { id: 'live', label: (info && info.title) || (isRun ? (run.label || 'Run') : 'Live reading'), values, intervalSeconds: interval, unit: run.unit || 'lm' };
   return (
     <div style={wrap}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-        <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>{run.label || 'TKLamp run'}</h2>
+        <h2 style={{ margin: 0, fontSize: 18, flex: 1 }}>{(info && info.title) || (isRun ? (run.label || 'TKLamp run') : 'Live reading')}</h2>
         <span style={{ border: `1.5px solid ${color}`, color, borderRadius: 14, padding: '3px 12px', fontSize: 13, fontWeight: 800 }}>
           {run.status === 'running' && !run.stale && <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: color, marginRight: 7 }} />}{chip}
         </span>
       </div>
+      {info && info.details && <div style={{ color: T.text, fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap', margin: '4px 0 8px' }}>{info.details}</div>}
       {run.status === 'error' && run.message && <div style={{ color: T.bad, marginBottom: 8 }}>{run.message}</div>}
       <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'baseline', margin: '8px 0 12px' }}>
         <div><span style={{ fontSize: 38, fontWeight: 900 }}>{num(last)}</span> <span style={{ color: T.dim }}>{run.unit || 'lm'}</span></div>
-        <div style={{ color: T.dim, fontSize: 13 }}>Running for {fmtDur(elapsed)}</div>
+        {isRun && <div style={{ color: T.dim, fontSize: 13 }}>Running for {fmtDur(elapsed)}</div>}
         <div style={{ color: T.dim, fontSize: 13 }}>Last reading {fmtAgo(age)}</div>
       </div>
       <RuntimeChart curves={[curve]} T={T} mode="abs" />
@@ -112,7 +114,7 @@ export function LiveStationPanel({ T }) {
   const act = (body) => api.post('/live', body).then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message));
   const setting = (k, v) => act({ action: 'settings', settings: { [k]: v } });
   const run = st && st.run;
-  const status = !st ? '' : !st.enabled ? 'Off' : !run || run.status === 'idle' ? 'On, nothing running' : run.status === 'running' ? (run.stale ? 'No data' : 'Running now') : run.status === 'finished' ? 'Last run finished' : 'Problem';
+  const status = !st ? '' : !st.enabled ? 'Off' : !run || run.status === 'idle' ? 'On, nothing running' : run.status === 'running' ? (run.stale ? 'No data' : run.kind === 'monitor' ? 'Live reading' : 'Live run') : run.status === 'finished' ? (run.kind === 'monitor' ? 'Tester stopped' : 'Last run finished') : 'Problem';
   const btn = (c = 'accent') => ({ background: `${T[c]}20`, border: `1.5px solid ${T[c]}`, color: T[c], borderRadius: 6, padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 });
   const input = { background: T.surface, border: `1px solid ${T.border}`, color: T.text, borderRadius: 6, padding: '6px 10px', fontSize: 13, fontFamily: 'monospace' };
   const chk = (k, label) => (
@@ -141,6 +143,16 @@ export function LiveStationPanel({ T }) {
               <button style={btn('accent')} onClick={() => { try { navigator.clipboard.writeText(st.url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* copy by hand */ } }}>{copied ? 'Copied' : 'Copy'}</button>
               <a style={{ ...btn('accent'), textDecoration: 'none' }} href={st.url} target="_blank" rel="noreferrer">Open</a>
             </div>
+          )}
+          {st.enabled && (
+            <>
+              <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>What you are testing (shown on the live page)</div>
+              <input style={{ ...input, width: '100%', boxSizing: 'border-box', marginBottom: 8 }} maxLength={160} placeholder="Name, e.g. Olight Warrior 3, turbo" defaultValue={st.info.title} key={'t' + st.info.title}
+                onBlur={(e) => { if (e.target.value !== st.info.title) act({ action: 'info', title: e.target.value, details: st.info.details }); }} />
+              <textarea style={{ ...input, width: '100%', boxSizing: 'border-box', minHeight: 64, marginBottom: 6 }} maxLength={2000} placeholder="Details: cell, driver mode, notes… (changes show on the live page within seconds)" defaultValue={st.info.details} key={'d' + st.info.details}
+                onBlur={(e) => { if (e.target.value !== st.info.details) act({ action: 'info', title: st.info.title, details: e.target.value }); }} />
+              <div style={{ marginBottom: 12 }}><button style={btn('dim')} onClick={() => act({ action: 'info', title: '', details: '' })}>Clear</button></div>
+            </>
           )}
           <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>Email me when</div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>

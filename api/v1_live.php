@@ -9,8 +9,9 @@ declare(strict_types=1);
 //   POST /api/v1/live {"action":"disable"} -> turns it off; the link shows "not live"
 //   POST /api/v1/live {"action":"rotate"}  -> a new link; the old one stops working
 //   POST /api/v1/live {"action":"settings","settings":{emailDone,emailLow,emailStale,emailError,lowLm,staleMin}}
+//   POST /api/v1/live {"action":"info","title":"...","details":"..."} -> what you are testing, shown on the live page (empty clears it)
 //   POST /api/v1/live {"action":"clear"}   -> forgets the current/last run
-//   POST /api/v1/live {"runId","label","unit","intervalSeconds","startIndex","values":[...],"status":"running|finished|error","message"}
+//   POST /api/v1/live {"runId","kind":"run|monitor","label","unit","intervalSeconds","startIndex","values":[...],"status":"running|finished|error","message"}
 //        -> {"count":N}   Sends readings. startIndex is where "values" begin in the run; sending an empty list is a heartbeat.
 //        If startIndex is past what the server has, the answer is {"count":N,"resend":true}: send again from N.
 
@@ -53,8 +54,12 @@ if ($action !== '') {
         $in = is_array($b['settings'] ?? null) ? $b['settings'] : [];
         $merged = array_merge(live_settings($r['settings']), $in);
         $db->prepare('UPDATE live_stations SET settings = ? WHERE user_id = ?')->execute([json_encode(live_settings(json_encode($merged))), $uid]);
+    } elseif ($action === 'info') {
+        $title = mb_substr(trim((string)($b['title'] ?? '')), 0, 160);
+        $details = mb_substr(trim((string)($b['details'] ?? '')), 0, 2000);
+        $db->prepare('UPDATE live_stations SET info_title = ?, info_text = ? WHERE user_id = ?')->execute([$title, $details === '' ? null : $details, $uid]);
     } elseif ($action === 'clear') {
-        $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, payload = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
+        $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
     } else {
         json_error('Unknown action', 400);
     }
@@ -80,6 +85,7 @@ $message = mb_substr(trim((string)($b['message'] ?? '')), 0, 200);
 $label = mb_substr(trim((string)($b['label'] ?? '')), 0, 160);
 $unit = mb_substr(trim((string)($b['unit'] ?? 'lm')), 0, 16) ?: 'lm';
 $interval = max(0.05, min(3600, (float)($b['intervalSeconds'] ?? 1)));
+$kind = ($b['kind'] ?? 'run') === 'monitor' ? 'monitor' : 'run';
 
 $db->beginTransaction();
 try {
@@ -89,21 +95,26 @@ try {
     $now = time();
     $fresh = $r['run_id'] !== $runId;
     $have = $fresh ? [] : (json_decode((string)$r['payload'], true) ?: []);
-    if ($start > count($have)) {
+    $base = $fresh ? 0 : (int)($r['base'] ?? 0);
+    $count = $base + count($have);
+    if ($start > $count) {
         $db->commit();
-        json_out(['count' => count($have), 'resend' => true]);
+        json_out(['count' => $count, 'resend' => true]);
     }
-    $merged = array_merge(array_slice($have, 0, $start), $values);
-    if (count($merged) > LIVE_MAX_POINTS) $merged = array_slice($merged, -LIVE_MAX_POINTS);
+    if ($start < $base) { $values = array_slice($values, $base - $start); $start = $base; }   // the monitor already dropped those
+    $merged = array_merge(array_slice($have, 0, $start - $base), $values);
+    $cap = $kind === 'monitor' ? LIVE_MONITOR_POINTS : LIVE_MAX_POINTS;
+    if (count($merged) > $cap) { $base += count($merged) - $cap; $merged = array_slice($merged, -$cap); }
+    $total = $base + count($merged);
     $alerts = $fresh ? [] : (json_decode((string)$r['alerts'], true) ?: []);
     if ($values) unset($alerts['stale']);   // data is flowing again: a later silence may alert again
     $row = array_merge($r, [
         'run_id' => $runId, 'label' => $label !== '' ? $label : ($fresh ? '' : $r['label']), 'unit' => $unit, 'interval_s' => $interval,
-        'points' => count($merged), 'status' => $status, 'message' => $status === 'running' ? '' : $message,
+        'points' => $total, 'kind' => $kind, 'status' => $status, 'message' => $status === 'running' ? '' : $message,
     ]);
     live_alerts($db, $row, $alerts, $merged);
-    $db->prepare('UPDATE live_stations SET run_id=?, label=?, unit=?, interval_s=?, points=?, payload=?, status=?, message=?, started_at=?, last_at=?, alerts=? WHERE user_id=?')
-       ->execute([$runId, $row['label'], $unit, $interval, count($merged), json_encode($merged), $status, $row['message'],
+    $db->prepare('UPDATE live_stations SET run_id=?, label=?, unit=?, interval_s=?, points=?, payload=?, kind=?, base=?, status=?, message=?, started_at=?, last_at=?, alerts=? WHERE user_id=?')
+       ->execute([$runId, $row['label'], $unit, $interval, $total, json_encode($merged), $kind, $base, $status, $row['message'],
                   $fresh ? $now : ($r['started_at'] ?: $now), $now, json_encode($alerts), $uid]);
     $db->commit();
 } catch (\Throwable $e) {
@@ -111,4 +122,4 @@ try {
     error_log('live push: ' . $e->getMessage());
     json_error('Could not save the readings', 500);
 }
-json_out(['count' => count($merged)]);
+json_out(['count' => $total]);

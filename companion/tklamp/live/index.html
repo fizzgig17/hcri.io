@@ -248,6 +248,11 @@
       <label><input type="checkbox" id="trimPeak"> Start at the peak</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
+    <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station: what you are testing (shown on the live page)</legend>
+      <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
+      <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
+      <div class="note" id="liveUrl" style="flex-basis:100%"></div>
+    </fieldset>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
       <label>Start at <input type="number" id="limStart" min="0" step="any" placeholder="off"> lm</label>
       <label>Stop below <input type="number" id="limStop" min="0" step="any" placeholder="off"> lm</label>
@@ -636,7 +641,7 @@ function onReading(tSec, raw) {
     var why = stopLevelReason(avgNow(), tSec - S.t0);
     if (why && !S.pendingStop) S.pendingStop = { why: why, ended: null };
   }
-  else { S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
+  else { liveMon(tSec, lm); S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
 }
 function now() { return performance.now() / 1000; }
 
@@ -687,11 +692,13 @@ function startSim() {
 }
 function disconnect() {
   if (S.recording) return Promise.resolve();
+  liveMonStop();
   var s = S.source; S.source = null; S.connected = false; S.recent = [];
   updateButtons();
   return s ? s.close() : Promise.resolve();
 }
 function lost(text) {
+  liveMonStop();
   var s = S.source; S.source = null; S.connected = false; S.recent = [];
   if (s) s.close();
   updateButtons();
@@ -701,23 +708,23 @@ if (navigator.serial) navigator.serial.addEventListener('disconnect', function (
 
 // ---- live station -------------------------------------------------------------------------------------------------------
 // While a run records, send it to hCRI.io (api/v1_live.php) so it can be watched at hcri.io/?live=... and so hCRI.io can email
-// about problems. One averaged value per second, sent every 10 s; anything the server misses is sent again next time.
-var Live = null;
-function liveBegin() {
-  Live = null;
-  if (!sessionToken()) return;
-  var L = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null, ok: null };
-  Live = L;
+// about problems. One averaged value per second, sent every 5 s; anything the server misses is sent again next time.
+var Live = null, Mon = null;   // the run being recorded, and the plain live reading while no run is going
+function liveStart(kind) {
+  if (!sessionToken()) return null;
+  var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null };
   call('GET', '/v1/live').then(function (info) {
-    if (Live !== L) return;
     if (!info.enabled) { L.off = true; return; }
-    L.ok = info; msg('Live station is on: this run can be watched at ' + info.url);
-  }).catch(function () { if (Live === L) L.off = true; });
+    if (kind === 'run') msg('Live station is on: this run can be watched at ' + info.url);
+  }).catch(function () { L.off = true; });
   L.first = setTimeout(function () { liveFlush(L, 'running', ''); }, 3000);
-  L.timer = setInterval(function () { liveFlush(L, 'running', ''); }, 10000);
+  L.timer = setInterval(function () { liveFlush(L, 'running', ''); }, 5000);
+  return L;
 }
-function liveAdd(tSec, lm) {
-  var L = Live; if (!L || L.off) return;
+function liveBegin() { liveMonStop(); Live = liveStart('run'); }
+function liveAdd(tSec, lm) { liveAddTo(Live, tSec, lm); }
+function liveAddTo(L, tSec, lm) {
+  if (!L || L.off) return;
   if (L.origin === null) L.origin = tSec;
   var i = Math.max(0, Math.floor(tSec - L.origin));
   if (i > L.idx) {
@@ -728,7 +735,10 @@ function liveAdd(tSec, lm) {
   }
   L.sum += lm; L.n++;
 }
-function liveName() { return (S.source && S.source.kind === 'sim' ? 'Simulated: ' : '') + 'TKLamp run ' + fmtTS(S.started).slice(0, 16); }
+// While no run is recording, the tester's live number is sent too, so the Live station shows "Live" instead of nothing.
+function liveMon(tSec, lm) { if (!Mon) Mon = liveStart('monitor'); liveAddTo(Mon, tSec, lm); }
+function liveMonStop() { var L = Mon; Mon = null; if (L) liveEnd(L, ''); }
+function liveName(L) { return L.kind === 'monitor' ? 'Live reading' : (S.source && S.source.kind === 'sim' ? 'Simulated: ' : '') + 'TKLamp run ' + fmtTS(S.started).slice(0, 16); }
 function liveFlush(L, status, message) {
   if (L.off || L.busy) return Promise.resolve(false);
   L.busy = true;
@@ -736,7 +746,7 @@ function liveFlush(L, status, message) {
   function step() {
     var chunk = L.vals.slice(L.sent, L.sent + 1000), last = L.sent + chunk.length >= L.vals.length;
     if (!chunk.length && status === 'running') { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
-    var body = { runId: L.id, label: liveName(), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
+    var body = { runId: L.id, kind: L.kind, label: L.label || (L.label = liveName(L)), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
     if (last && message) body.message = message;
     return call('POST', '/v1/live', body).then(function (r) {
       if (r.enabled === false) { L.off = true; L.busy = false; return true; }
@@ -747,12 +757,12 @@ function liveFlush(L, status, message) {
   }
   return step().catch(function () { L.busy = false; return false; });
 }
-function liveFinish(why) {
-  var L = Live; if (!L) return; Live = null;
+function liveFinish(why) { var L = Live; Live = null; if (L) liveEnd(L, why); }
+function liveEnd(L, why) {
   clearTimeout(L.first); clearInterval(L.timer);
   if (L.off) return;
   if (L.n > 0) { L.vals.push(L.sum / L.n); L.n = 0; }
-  var bad = why && /stopped sending|no readings|lost/i.test(why);
+  var bad = L.kind === 'run' && why && /stopped sending|no readings|lost/i.test(why);
   var tries = 0;
   (function go() {
     if (L.busy) { if (tries++ < 6) setTimeout(go, 1500); return; }
@@ -885,7 +895,26 @@ $('calMeasure').onclick = function () {
 $('calSave').onclick = function () { S.scale = calNew; setPref('scale', S.scale); msg('Scale saved: ' + S.scale + ' counts per lumen.'); $('calDlg').close(); updateButtons(); };
 
 // ---- account -----------------------------------------------------------------------------------------------------------
+// What you are testing: typed here, shown on the live page and updated there within seconds.
+var liveInfoSaved = { title: '', details: '' };
+function loadLiveInfo() {
+  var box = $('liveInfoBox');
+  if (!sessionToken()) { box.hidden = true; return; }
+  call('GET', '/v1/live').then(function (i) {
+    box.hidden = !i.enabled;
+    if (!i.enabled) return;
+    liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
+    $('liveUrl').textContent = 'Watch at ' + i.url;
+  }).catch(function () { box.hidden = true; });
+}
+function saveLiveInfo() {
+  var t = $('liveTitle').value.trim(), d = $('liveDetails').value.trim();
+  if (t === liveInfoSaved.title && d === liveInfoSaved.details) return;
+  call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); });
+}
+$('liveTitle').onchange = saveLiveInfo; $('liveDetails').onchange = saveLiveInfo;
 function showAccount() {
+  loadLiveInfo();
   if (sessionToken()) {
     $('acctBtn').textContent = 'Sign out';
     call('GET', '/auth/me').then(function (u) { $('acct').textContent = 'hCRI.io: ' + (u.name || u.email); }).catch(function () { $('acct').textContent = ''; });

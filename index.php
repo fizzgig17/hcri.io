@@ -257,6 +257,12 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/og/live.png') {
+
+        require __DIR__ . '/api/og_live.php'; exit;
+
+    }
+
     if ($uri === '/api/og/runtime.png') {
 
         require __DIR__ . '/api/og_runtime.php'; exit;
@@ -1120,6 +1126,35 @@ if ($rtRaw !== '' && $shareTok === '' && $reportId === 0 && $cmpRaw === '') {
             }
         } catch (\Throwable $e) { /* fall back to site defaults */ }
     }
+}
+
+$liveRaw = isset($_GET['live']) ? (string)$_GET['live'] : '';
+if (preg_match('/^[a-f0-9]{24}$/', $liveRaw) === 1 && $shareTok === '' && $reportId === 0 && $cmpRaw === '' && $rtRaw === '') {
+    try {
+        require_once __DIR__ . '/api/_core/db.php';
+        require_once __DIR__ . '/api/_core/live_station.php';
+        $lvDb = get_db();
+        live_ensure($lvDb);
+        $lvq = $lvDb->prepare('SELECT * FROM live_stations WHERE token = ? AND enabled = 1');
+        $lvq->execute([$liveRaw]);
+        $lvr = $lvq->fetch();
+        if ($lvr && $lvr['run_id'] !== '') {
+            $lvs = live_run_summary($lvr);
+            $lvIsRun = $lvs['kind'] === 'run';
+            $lvNum = $lvs['last'] === null ? null : (abs($lvs['last']) >= 100 ? (string)round($lvs['last']) : number_format($lvs['last'], 1)) . ' ' . ($lvs['unit'] ?: 'lm');
+            $lvState = $lvs['status'] === 'finished' ? ($lvIsRun ? 'finished' : 'stopped') : ($lvs['status'] === 'error' ? 'problem' : ($lvs['stale'] ? 'no data' : ($lvIsRun ? 'live run' : 'live')));
+            $lvInfo = live_info($lvr);
+            $lvWhat = $lvInfo['title'] !== '' ? $lvInfo['title'] : ($lvIsRun ? ($lvs['label'] !== '' ? $lvs['label'] : 'TKLamp run') : 'Live reading');
+            $ogTitle = ($lvs['status'] === 'running' && !$lvs['stale'] ? ($lvIsRun ? 'Live run: ' : 'Live: ') : '') . $lvWhat . ($lvNum ? ' — ' . $lvNum : '') . ' — hCRI.io';
+            $ogDesc  = 'A TKLamp tester' . ($lvIsRun ? ' recording a run' : ' reading') . ' on hCRI.io: ' . ($lvNum ? 'last reading ' . $lvNum . ', ' : '') . $lvState . ' when this preview was made.' . ($lvInfo['details'] !== '' ? ' ' . mb_substr(preg_replace('/\s+/', ' ', $lvInfo['details']), 0, 160) : '') . ' Open the link to watch it live.';
+            $ogUrl   = $ogBase . '?live=' . $liveRaw;
+            $ogType  = 'article';
+            if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/live.png?t=' . $liveRaw . '&v=' . substr(md5((string)$lvs['lastAt'] . (string)$lvs['status'] . $lvInfo['title']), 0, 8);
+        } else {
+            $ogTitle = 'Live station — hCRI.io';
+            $ogDesc  = 'Watch a TKLamp tester live on hCRI.io.';
+        }
+    } catch (\Throwable $e) { /* fall back to site defaults */ }
 }
 
 $ogH = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');

@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 const LIVE_MAX_POINTS = 200000;
+const LIVE_MONITOR_POINTS = 1800;   // a monitor keeps the last 30 minutes
 const LIVE_DEFAULTS = ['emailDone' => true, 'emailLow' => false, 'emailStale' => true, 'emailError' => true, 'lowLm' => 0, 'staleMin' => 5];
 
 function live_ensure(PDO $db): void
@@ -36,6 +37,14 @@ function live_ensure(PDO $db): void
         try { $db->exec("CREATE TABLE IF NOT EXISTS live_stations ($cols, CONSTRAINT fk_live_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE)"); }
         catch (\Throwable $e) { $db->exec("CREATE TABLE IF NOT EXISTS live_stations ($cols)"); }
     } catch (\Throwable $e) { error_log('live_stations: ' . $e->getMessage()); }
+    // kind: 'run' (a recording) or 'monitor' (just the tester's live reading, no run). base: absolute index of payload[0] (a monitor keeps only its last readings).
+    try {
+        if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'kind'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN kind VARCHAR(8) NOT NULL DEFAULT 'run', ADD COLUMN base INT NOT NULL DEFAULT 0");
+    } catch (\Throwable $e) { error_log('live_stations kind: ' . $e->getMessage()); }
+    // What the owner is testing, typed by hand ("Olight Warrior 3, turbo, fresh cell"); shown on the live page and changeable mid-run.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'info_title'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN info_title VARCHAR(160) NOT NULL DEFAULT '', ADD COLUMN info_text TEXT NULL");
+    } catch (\Throwable $e) { error_log('live_stations info: ' . $e->getMessage()); }
 }
 
 function live_valid_token(mixed $t): bool
@@ -100,8 +109,14 @@ function live_owner_view(array $r): array
         'token'    => $r['token'],
         'url'      => $r['token'] ? live_url($r['token']) : null,
         'settings' => live_settings($r['settings']),
+        'info'     => live_info($r),
         'run'      => live_run_summary($r),
     ];
+}
+
+function live_info(array $r): array
+{
+    return ['title' => (string)($r['info_title'] ?? ''), 'details' => (string)($r['info_text'] ?? '')];
 }
 
 function live_run_summary(array $r): array
@@ -109,7 +124,7 @@ function live_run_summary(array $r): array
     $v = json_decode((string)$r['payload'], true);
     $last = is_array($v) && $v ? (float)end($v) : null;
     return [
-        'runId' => $r['run_id'], 'label' => $r['label'], 'unit' => $r['unit'], 'status' => $r['status'], 'message' => $r['message'],
+        'runId' => $r['run_id'], 'kind' => ($r['kind'] ?? 'run') === 'monitor' ? 'monitor' : 'run', 'label' => $r['label'], 'unit' => $r['unit'], 'status' => $r['status'], 'message' => $r['message'],
         'points' => (int)$r['points'], 'intervalSeconds' => (float)$r['interval_s'], 'last' => $last,
         'startedAt' => $r['started_at'] ? gmdate('c', (int)$r['started_at']) : null,
         'lastAt' => $r['last_at'] ? gmdate('c', (int)$r['last_at']) : null,
@@ -142,6 +157,7 @@ function live_fmt_duration(int $s): string
 /** Sends each kind of alert at most once per run. $alerts is changed in place; the caller saves it. */
 function live_alerts(PDO $db, array $r, array &$alerts, ?array $values = null): void
 {
+    if (($r['kind'] ?? 'run') !== 'run') return;   // a plain live reading is not a run: no emails
     $set = live_settings($r['settings']);
     $uid = (int)$r['user_id'];
     $label = $r['label'] !== '' ? $r['label'] : 'TKLamp run';
@@ -177,7 +193,7 @@ function live_check_all(PDO $db, bool $force = false): int
     @touch($flag);
     $n = 0;
     try {
-        $rows = $db->query("SELECT * FROM live_stations WHERE enabled = 1 AND status = 'running' AND last_at IS NOT NULL")->fetchAll();
+        $rows = $db->query("SELECT * FROM live_stations WHERE enabled = 1 AND status = 'running' AND kind = 'run' AND last_at IS NOT NULL")->fetchAll();
         foreach ($rows as $r) {
             if (!live_is_stale($r)) continue;
             $alerts = json_decode((string)$r['alerts'], true) ?: [];

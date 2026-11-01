@@ -42,15 +42,16 @@ $vals = json_decode((string)$r['payload'], true);
 $vals = is_array($vals) ? $vals : [];
 $interval = (float)$r['interval_s'];
 $since = isset($_GET['since']) ? (int)$_GET['since'] : -1;
-if ($since >= 0 && $since <= count($vals) && count($vals) <= 4000) {
+if ($run['kind'] === 'run' && $since >= 0 && $since <= count($vals) && count($vals) <= 4000) {
     $out['from'] = $since;
     $out['values'] = array_slice($vals, $since);
     $run['intervalSeconds'] = $interval;
 } else {
-    [$dv, $di] = runtime_downsample($vals, $interval);
+    [$dv, $di] = $run['kind'] === 'monitor' ? [$vals, $interval] : runtime_downsample($vals, $interval);
     $out['from'] = 0;
     $out['values'] = $dv;
     $run['intervalSeconds'] = $di;
 }
 $out['run'] = $run;
+$out['info'] = live_info($r);
 json_out($out);
