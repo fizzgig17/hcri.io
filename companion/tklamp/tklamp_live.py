@@ -38,8 +38,11 @@ import getpass
 import json
 import math
 import os
+import re
 import platform
+import random
 import ssl
+import threading
 import stat
 import sys
 import time
@@ -359,7 +362,7 @@ def enter_pressed():
     return False
 
 
-def live(ser, scale, limits, spool_path, readout=True):
+def live(ser, scale, limits, spool_path, readout=True, relay_factory=None):
     """Shows live lumens. Enter starts (or waits for the start level), Enter stops. Returns
     (points, started_wall, ended_wall, spool, reason) or None."""
     reader = FrameReader()
@@ -377,6 +380,7 @@ def live(ser, scale, limits, spool_path, readout=True):
     last_row = 0.0
     spool = None
     st = {"spool": None}
+    relay = [None]
 
     def avg_now():
         return sum(recent) / len(recent) if recent else 0.0
@@ -387,6 +391,7 @@ def live(ser, scale, limits, spool_path, readout=True):
         guard.reset()
         t_start_mono = now
         started_wall = datetime.datetime.now()
+        relay[0] = relay_factory(started_wall) if relay_factory else None
         spool = open(spool_path, "w", encoding="utf-8")
         spool.write("seconds,lumens\n")
         spool_written[0] = 0
@@ -395,6 +400,9 @@ def live(ser, scale, limits, spool_path, readout=True):
             print("  clock       elapsed       lumens")
 
     def finish_rec(reason=None, ended=None):
+        if relay[0]:
+            relay[0].finish(reason or "")
+            relay[0] = None
         return pts, started_wall, ended or datetime.datetime.now(), spool, reason
 
     notes = []
@@ -425,6 +433,8 @@ def live(ser, scale, limits, spool_path, readout=True):
                     begin(now)
                 if recording:
                     pts.append((now - t_start_mono, lm))
+                    if relay[0]:
+                        relay[0].add(now, lm)
                     why = guard.on_reading(avg_now(), now - t_start_mono)
                     if why:
                         print(f"\nStopped: {why}.")
@@ -537,6 +547,108 @@ def api(site, token, method, path, body=None):
         raise RuntimeError(f"hCRI.io said {e.code}: {msg or e.reason}")
     except urllib.error.URLError as e:
         raise RuntimeError(net_error(e))
+
+
+
+class LiveRelay:
+    """Sends the run that is recording to hCRI.io (api/v1_live.php) so it can be watched at hcri.io/?live=... and so hCRI.io can
+    email about problems. One averaged value per second, sent every 10 s from a background thread; anything the server misses is
+    sent again next time. Does nothing unless Live station is switched on for the account (Runtime > Live station on the website)."""
+
+    def __init__(self, site, token, label, simulated=False):
+        self.site, self.token = site, token
+        self.label = ("Simulated: " if simulated else "") + label
+        self.id = "p" + format(int(time.time() * 1000), "x") + format(random.randrange(10000), "x")
+        self.vals, self.sent = [], 0
+        self.origin, self.idx, self.sum, self.n = None, 0, 0.0, 0
+        self.lock = threading.Lock()
+        self.stop_evt = threading.Event()
+        self.final = ("finished", "")
+        self.off = False
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    @staticmethod
+    def maybe(site, token, started, simulated=False):
+        """A relay for a run that started at `started`, or None when nobody is signed in."""
+        if not token:
+            return None
+        return LiveRelay(site, token, "TKLamp run " + started.strftime("%Y-%m-%d %H:%M"), simulated)
+
+    def add(self, t, lm):
+        if self.off:
+            return
+        with self.lock:
+            if self.origin is None:
+                self.origin = t
+            i = max(0, int(t - self.origin))
+            if i > self.idx:
+                mean = self.sum / self.n if self.n else (self.vals[-1] if self.vals else 0.0)
+                self.vals.append(mean)
+                self.vals.extend([mean] * (i - self.idx - 1))
+                self.idx, self.sum, self.n = i, 0.0, 0
+            self.sum += lm
+            self.n += 1
+
+    def finish(self, why=""):
+        bad = bool(why) and re.search(r"stopped sending|no readings|lost", why, re.I) is not None
+        self.final = ("error", "The tester stopped sending readings.") if bad else ("finished", "")
+        self.stop_evt.set()
+        if threading.current_thread() is threading.main_thread() and not self.off:
+            self.thread.join(15)    # the terminal version exits right after: let the last readings go out first
+
+    def _flush(self, status, message):
+        for _ in range(50):
+            with self.lock:
+                vals = list(self.vals)
+            chunk = vals[self.sent:self.sent + 1000]
+            last = self.sent + len(chunk) >= len(vals)
+            if not chunk and status == "running":
+                return True     # nothing new: stay quiet so the server can notice a silent run
+            body = {"runId": self.id, "label": self.label, "unit": "lm", "intervalSeconds": 1, "startIndex": self.sent,
+                    "values": [round(v, 3) for v in chunk], "status": status if last else "running"}
+            if last and message:
+                body["message"] = message
+            r = api(self.site, self.token, "POST", "/v1/live", body)
+            if r.get("enabled") is False:
+                self.off = True
+                return True
+            if r.get("resend"):
+                self.sent = min(int(r.get("count", 0)), len(vals))
+                continue
+            self.sent = int(r.get("count", 0))
+            if last:
+                return True
+        return True
+
+    def _loop(self):
+        try:
+            if not api(self.site, self.token, "GET", "/v1/live").get("enabled"):
+                self.off = True
+                return
+        except RuntimeError:
+            self.off = True
+            return
+        wait = 3.0
+        while True:
+            stopped = self.stop_evt.wait(wait)
+            wait = 10.0
+            if stopped:
+                with self.lock:
+                    if self.n:
+                        self.vals.append(self.sum / self.n)
+                        self.sum, self.n = 0.0, 0
+                for _ in range(4):
+                    try:
+                        if self._flush(*self.final):
+                            return
+                    except RuntimeError:
+                        time.sleep(3)
+                return
+            try:
+                self._flush("running", "")
+            except RuntimeError:
+                pass    # offline for now: the next send carries everything the server is missing
 
 
 def raw_post(site, path, body, token=None):
@@ -933,6 +1045,7 @@ class TkApp:
         self.ymax, self.calib = 0.0, None
         self.runs, self.port_map = [], {}
         self.armed, self.pending_stop, self.last_rx_wall = False, None, datetime.datetime.now()
+        self.live, self.sim_mode = None, False
         lim = limits_from_cfg(cfg)
         for key, name in (("start_at", "start_at"), ("stop_below", "stop_below"), ("duration", "duration"), ("idle_min", "idle_timeout")):
             v = getattr(args, name, None)
@@ -1213,6 +1326,7 @@ class TkApp:
         self.connected = True
         self.recent, self.last_rx = [], 0.0
         self.live_t, self.live_v, self.live_t0, self.ymax = [], [], time.monotonic(), 0.0
+        self.sim_mode = not dev
         self.msg("Reading the tester." if dev else "Simulation: a made-up fading light.")
         self.update_buttons()
 
@@ -1256,6 +1370,8 @@ class TkApp:
             self.begin_run(t)
         if self.recording:
             self.pts.append((t - self.t0, lm))
+            if self.live:
+                self.live.add(t, lm)
             why = self.guard.on_reading(avg, t - self.t0)
             if why and not self.pending_stop:
                 self.pending_stop = (why, None)
@@ -1368,6 +1484,7 @@ class TkApp:
         self.pending_stop = None
         self.recording = True
         self.pts, self.t0, self.started, self.ymax = [], now, datetime.datetime.now(), 0.0
+        self.live = LiveRelay.maybe(self.site, self.token(), self.started, self.sim_mode)
         self.stamp = self.started.strftime("%Y-%m-%d-%H.%M.%S")
         self.spool_n = 0
         try:
@@ -1384,6 +1501,9 @@ class TkApp:
             return
         ended = ended or datetime.datetime.now()
         self.recording = False
+        if self.live:
+            self.live.finish(why or "")
+            self.live = None
         if self.spool:
             self.spool.close()
             self.spool = None
@@ -1987,7 +2107,10 @@ def main():
         stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H.%M.%S")
         spool_path = os.path.join(args.output_dir, f"TKLamp_{stamp}.partial.csv")
         spool_written[0] = 0
-        res = live(ser, scale, limits, spool_path, not args.no_readout)
+        live_site = args.site or cfg.get("site") or DEFAULT_SITE
+        live_token = args.token or os.environ.get("HCRI_TOKEN") or cfg.get("token")
+        res = live(ser, scale, limits, spool_path, not args.no_readout,
+                   lambda started: LiveRelay.maybe(live_site, live_token, started, bool(args.simulate)))
     finally:
         ser.close()
     if not res:
