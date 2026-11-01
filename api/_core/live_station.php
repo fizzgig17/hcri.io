@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 const LIVE_MAX_POINTS = 200000;
+const LIVE_CMD_TTL = 60;
 const LIVE_MONITOR_POINTS = 1800;   // a monitor keeps the last 30 minutes
 const LIVE_DEFAULTS = ['emailDone' => true, 'emailLow' => false, 'emailStale' => true, 'emailError' => true, 'lowLm' => 0, 'staleMin' => 5];
 
@@ -45,6 +46,25 @@ function live_ensure(PDO $db): void
     try {
         if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'info_title'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN info_title VARCHAR(160) NOT NULL DEFAULT '', ADD COLUMN info_text TEXT NULL");
     } catch (\Throwable $e) { error_log('live_stations info: ' . $e->getMessage()); }
+
+    // Remote control: the owner (website or app) leaves a command; whichever sender is connected to the tester picks it up with its next push.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'cmd'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN cmd VARCHAR(8) NOT NULL DEFAULT '', ADD COLUMN cmd_id VARCHAR(16) NOT NULL DEFAULT '', ADD COLUMN cmd_at BIGINT NULL DEFAULT NULL");
+    } catch (\Throwable $e) { error_log('live_stations cmd: ' . $e->getMessage()); }
+}
+
+/** The command waiting for a sender, or null (commands expire after a minute so an old Start never fires by surprise). */
+function live_pending_command(array $r): ?array
+{
+    if (($r['cmd'] ?? '') === '' || empty($r['cmd_at']) || time() - (int)$r['cmd_at'] > LIVE_CMD_TTL) return null;
+    return ['id' => $r['cmd_id'], 'action' => $r['cmd'], 'ageSeconds' => time() - (int)$r['cmd_at']];
+}
+
+/** The "command" part of a push answer: the waiting command, unless this push just acknowledged it. */
+function live_cmd_reply(array $r, string $ack): array
+{
+    $c = live_pending_command($r);
+    return $c && $c['id'] !== $ack ? ['command' => ['id' => $c['id'], 'action' => $c['action']]] : [];
 }
 
 function live_valid_token(mixed $t): bool
@@ -111,6 +131,7 @@ function live_owner_view(array $r): array
         'settings' => live_settings($r['settings']),
         'info'     => live_info($r),
         'run'      => live_run_summary($r),
+        'command'  => live_pending_command($r),
     ];
 }
 

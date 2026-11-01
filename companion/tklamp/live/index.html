@@ -170,6 +170,7 @@
   .toolbar .grow{flex:1 1 auto}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:0 13px;border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
   .btn:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .btn:active:not(:disabled){transform:translateY(1px);background:color-mix(in srgb,var(--accent) 34%,transparent)}
   .btn:disabled{opacity:.4;cursor:default}
   .btn.plain{background:transparent;border-color:var(--border);color:var(--text)}
   .btn.rec{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:var(--bad);color:var(--bad)}
@@ -186,7 +187,7 @@
   canvas.chart{width:100%;height:280px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px}
   .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
   .row label{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
-  input[type=text],input[type=password],input[type=number],select{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
+  input[type=text],input[type=password],input[type=number],select,textarea{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
   input[type=number]{width:84px}
   .log{font-size:12px;height:150px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;white-space:pre;margin-top:6px}
   .log b{color:var(--dim)}
@@ -248,10 +249,19 @@
       <label><input type="checkbox" id="trimPeak"> Start at the peak</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
-    <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station: what you are testing (shown on the live page)</legend>
+    <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station</legend>
+      <label style="flex-basis:100%"><input type="checkbox" id="liveOn"> Share live (a link anyone can open to watch your tester and runs)</label>
+      <div id="liveFields" style="flex:1 1 100%;display:none;flex-wrap:wrap;gap:8px">
       <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
       <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
-      <div class="note" id="liveUrl" style="flex-basis:100%"></div>
+      <button type="button" class="btn" id="liveSave">Save note</button> <span class="note" id="liveSaved"></span>
+      <div class="note" id="liveUrl" style="flex-basis:100%;word-break:break-all"></div>
+      <div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn plain" id="liveCopy">Copy link</button>
+        <button type="button" class="btn plain" id="liveOpen">Open</button>
+        <button type="button" class="btn plain" id="liveNew">New link</button>
+      </div>
+      </div>
     </fieldset>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
       <label>Start at <input type="number" id="limStart" min="0" step="any" placeholder="off"> lm</label>
@@ -739,16 +749,28 @@ function liveAddTo(L, tSec, lm) {
 function liveMon(tSec, lm) { if (!Mon) Mon = liveStart('monitor'); liveAddTo(Mon, tSec, lm); }
 function liveMonStop() { var L = Mon; Mon = null; if (L) liveEnd(L, ''); }
 function liveName(L) { return L.kind === 'monitor' ? 'Live reading' : (S.source && S.source.kind === 'sim' ? 'Simulated: ' : '') + 'TKLamp run ' + fmtTS(S.started).slice(0, 16); }
+// Remote control: Start / Stop / Clear asked for from the website or the app arrive in the answer to a send; each is carried out once and acknowledged with the next send.
+var cmdAck = '', cmdSeen = '';
+function liveCommand(c) {
+  if (!c || c.id === cmdSeen) return;
+  cmdSeen = c.id; cmdAck = c.id;
+  if (c.action === 'start') { if (S.recording) return; msg('Start asked for from the live page.'); startRun(); }
+  else if (c.action === 'stop') { if (!S.recording) return; msg('Stop asked for from the live page.'); stopRun('Stopped from the live page.', true); }
+  else if (c.action === 'clear') { if (S.recording) return; msg('Clear asked for from the live page.'); $('clearBtn').onclick(); }
+}
 function liveFlush(L, status, message) {
   if (L.off || L.busy) return Promise.resolve(false);
   L.busy = true;
   var guard = 0;
   function step() {
     var chunk = L.vals.slice(L.sent, L.sent + 1000), last = L.sent + chunk.length >= L.vals.length;
-    if (!chunk.length && status === 'running') { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
+    if (!chunk.length && status === 'running' && !cmdAck) { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
     var body = { runId: L.id, kind: L.kind, label: L.label || (L.label = liveName(L)), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
     if (last && message) body.message = message;
+    var sentAck = cmdAck; if (sentAck) body.ack = sentAck;
     return call('POST', '/v1/live', body).then(function (r) {
+      if (sentAck && cmdAck === sentAck) cmdAck = '';
+      if (r.command) liveCommand(r.command);
       if (r.enabled === false) { L.off = true; L.busy = false; return true; }
       if (r.resend) L.sent = Math.min(r.count, L.vals.length); else { L.sent = r.count; if (last) { L.busy = false; return true; } }
       if (++guard > 50) { L.busy = false; return true; }
@@ -901,18 +923,59 @@ function loadLiveInfo() {
   var box = $('liveInfoBox');
   if (!sessionToken()) { box.hidden = true; return; }
   call('GET', '/v1/live').then(function (i) {
-    box.hidden = !i.enabled;
-    if (!i.enabled) return;
-    liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
-    $('liveUrl').textContent = 'Watch at ' + i.url;
+    box.hidden = false;
+    showLiveState(i);
   }).catch(function () { box.hidden = true; });
 }
+function showLiveState(i) {
+  $('liveOn').checked = !!i.enabled; $('liveFields').style.display = i.enabled ? 'flex' : 'none';
+  if (!i.enabled) { $('liveUrl').textContent = ''; liveLink = ''; return; }
+  liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
+  liveLink = i.url; $('liveUrl').textContent = 'Watch at ' + i.url;
+}
+var liveLink = '';
+// Brief on-button feedback ("Copied") so a click is always seen, even when the message line is out of view.
+function flashBtn(id, text) {
+  var b = $(id), old = b.dataset.t || (b.dataset.t = b.textContent);
+  b.textContent = text; b.disabled = true;
+  clearTimeout(b._ft); b._ft = setTimeout(function () { b.textContent = old; b.disabled = false; }, 1500);
+}
+$('liveCopy').onclick = function () {
+  function done(ok) { msg(ok ? 'Live link copied.' : 'Could not copy: select the link above and copy it.'); flashBtn('liveCopy', ok ? 'Copied \u2713' : 'Could not copy'); }
+  try { navigator.clipboard.writeText(liveLink).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+};
+$('liveOpen').onclick = function () { flashBtn('liveOpen', 'Opening\u2026'); if (liveLink) window.open(liveLink, '_blank', 'noopener'); };
+$('liveNew').onclick = function () {
+  if (!confirm('Make a new link? The old link will stop working.')) return;
+  call('POST', '/v1/live', { action: 'rotate' }).then(function (i) { showLiveState(i); msg('New live link: ' + i.url); flashBtn('liveNew', 'New link made \u2713'); }).catch(function (e) { msg('Could not make a new link: ' + (e && e.message || e)); });
+};
+$('liveOn').onchange = function () {
+  var on = $('liveOn').checked;
+  call('POST', '/v1/live', { action: on ? 'enable' : 'disable' }).then(function (i) {
+    showLiveState(i);
+    msg(on ? 'Live station is on: watch at ' + i.url : 'Live station is off.');
+    if (on && S.connected && !S.recording) { liveMonStop(); }   // starts the live reading again on the next reading
+  }).catch(function (e) { $('liveOn').checked = !on; msg('Could not change Live station: ' + (e && e.message || e)); });
+};
+// A note saved elsewhere (the website, the app, the script) shows up here within seconds, unless this box has unsaved typing.
+setInterval(function () {
+  if ($('liveInfoBox').hidden || !sessionToken() || document.hidden) return;
+  var t = $('liveTitle'), d = $('liveDetails');
+  if (document.activeElement === $('liveOn')) return;
+  if (document.activeElement === t || document.activeElement === d || t.value.trim() !== liveInfoSaved.title || d.value.trim() !== liveInfoSaved.details) return;
+  call('GET', '/v1/live').then(function (i) {
+    if (!i.enabled !== ($('liveFields').style.display === 'none')) { showLiveState(i); return; }
+    if (!i.enabled) return;
+    if (i.info.title !== liveInfoSaved.title || i.info.details !== liveInfoSaved.details) { liveInfoSaved = i.info; t.value = i.info.title; d.value = i.info.details; }
+  }).catch(function () {});
+}, 5000);
 function saveLiveInfo() {
   var t = $('liveTitle').value.trim(), d = $('liveDetails').value.trim();
-  if (t === liveInfoSaved.title && d === liveInfoSaved.details) return;
-  call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); });
+  if (t === liveInfoSaved.title && d === liveInfoSaved.details) return Promise.resolve(true);
+  return call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; return true; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); return false; });
 }
-$('liveTitle').onchange = saveLiveInfo; $('liveDetails').onchange = saveLiveInfo;
+$('liveSave').onclick = function () { $('liveSaved').textContent = ''; saveLiveInfo().then(function (ok) { if (ok) { $('liveSaved').textContent = 'Saved'; flashBtn('liveSave', 'Saved \u2713'); } }); };
+$('liveTitle').oninput = $('liveDetails').oninput = function () { $('liveSaved').textContent = ''; };
 function showAccount() {
   loadLiveInfo();
   if (sessionToken()) {
@@ -1106,7 +1169,14 @@ $('otherBtn').onclick = function () { connectSerial(true, true); };
 $('simBtn').onclick = startSim;
 $('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun(); };
 ['limStart', 'limStop', 'dur', 'limIdle'].forEach(function (id) { $(id).addEventListener('change', function () { setPref(id, $(id).value); }); });
-$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); };
+$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); liveClear(); };
+// Clearing the chart clears the live page too; it starts again with the next reading.
+function liveClear() {
+  var L = Mon; Mon = null;
+  if (L) { clearTimeout(L.first); clearInterval(L.timer); L.off = true; }
+  if (!sessionToken()) return;
+  setTimeout(function () { call('POST', '/v1/live', { action: 'clear' }).catch(function () {}); }, 1200);   // after any send already under way
+}
 $('win').onchange = function () { setPref('win', $('win').value); S.ymax = S.ymax; redraw(); };
 $('trim').onchange = function () { setPref('trim', $('trim').checked); if ($('trim').checked) { $('trimPeak').checked = false; setPref('trimPeak', false); } };
 $('trimPeak').onchange = function () { setPref('trimPeak', $('trimPeak').checked); if ($('trimPeak').checked) { $('trim').checked = false; setPref('trim', false); } };

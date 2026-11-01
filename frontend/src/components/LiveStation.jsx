@@ -109,8 +109,21 @@ export function LiveStationPanel({ T }) {
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
   const [copied, setCopied] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const titleRef = useRef(null);
+  const detailsRef = useRef(null);
+  const dirty = useRef(false);   // typed in the note boxes and not saved yet
   const load = useCallback(() => api.get('/live').then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message)), []);
   useEffect(() => { load(); }, [load]);
+  // A note saved elsewhere (web logger, app, script) shows up here within seconds, unless the boxes are being edited.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.hidden) return;
+      if (dirty.current || (titleRef.current && titleRef.current === document.activeElement) || (detailsRef.current && detailsRef.current === document.activeElement)) return;
+      load();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [load]);
   const act = (body) => api.post('/live', body).then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message));
   const setting = (k, v) => act({ action: 'settings', settings: { [k]: v } });
   const run = st && st.run;
@@ -144,14 +157,35 @@ export function LiveStationPanel({ T }) {
               <a style={{ ...btn('accent'), textDecoration: 'none' }} href={st.url} target="_blank" rel="noreferrer">Open</a>
             </div>
           )}
+          {st.enabled && (() => {
+            const online = run && run.status === 'running' && !run.stale && (run.ageSeconds == null || run.ageSeconds < 30);
+            const running = online && run.kind === 'run';
+            const pending = st.command ? ({ start: 'Start', stop: 'Stop', clear: 'Clear' })[st.command.action] : '';
+            const send = (c) => { act({ action: 'command', command: c }); [2000, 4000, 6000, 8000, 11000].forEach((ms) => setTimeout(load, ms)); };   // look again soon: the buttons follow the run
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>Control the run</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button style={{ ...btn('accent'), opacity: online && !running && !pending ? 1 : 0.4 }} disabled={!online || running || !!pending} onClick={() => send('start')}>Start run</button>
+                  <button style={{ ...btn('bad'), opacity: running && !pending ? 1 : 0.4 }} disabled={!running || !!pending} onClick={() => send('stop')}>Stop run</button>
+                  <button style={{ ...btn('dim'), opacity: !running && !pending ? 1 : 0.4 }} disabled={running || !!pending} onClick={() => send('clear')}>Clear</button>
+                  <span style={{ color: T.dim, fontSize: 12 }}>
+                    {pending ? (st.command.ageSeconds >= 15 ? `${pending} not picked up yet. Reload the web logger page, or update the app: older versions and the Python script cannot take remote commands.` : `${pending} sent: waiting for the logger or app (up to 5 seconds)…`) : online ? 'Carried out by the web logger or the app that is connected to the tester.' : 'Needs the web logger or the app connected to the tester, with Live on.'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
           {st.enabled && (
             <>
               <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>What you are testing (shown on the live page)</div>
-              <input style={{ ...input, width: '100%', boxSizing: 'border-box', marginBottom: 8 }} maxLength={160} placeholder="Name, e.g. Olight Warrior 3, turbo" defaultValue={st.info.title} key={'t' + st.info.title}
-                onBlur={(e) => { if (e.target.value !== st.info.title) act({ action: 'info', title: e.target.value, details: st.info.details }); }} />
-              <textarea style={{ ...input, width: '100%', boxSizing: 'border-box', minHeight: 64, marginBottom: 6 }} maxLength={2000} placeholder="Details: cell, driver mode, notes… (changes show on the live page within seconds)" defaultValue={st.info.details} key={'d' + st.info.details}
-                onBlur={(e) => { if (e.target.value !== st.info.details) act({ action: 'info', title: st.info.title, details: e.target.value }); }} />
-              <div style={{ marginBottom: 12 }}><button style={btn('dim')} onClick={() => act({ action: 'info', title: '', details: '' })}>Clear</button></div>
+              <input ref={titleRef} style={{ ...input, width: '100%', boxSizing: 'border-box', marginBottom: 8 }} maxLength={160} placeholder="Name, e.g. Olight Warrior 3, turbo" defaultValue={st.info.title} key={'t' + st.info.title} onChange={() => { dirty.current = true; setNoteSaved(false); }} />
+              <textarea ref={detailsRef} style={{ ...input, width: '100%', boxSizing: 'border-box', minHeight: 64, marginBottom: 8 }} maxLength={2000} placeholder="Details: cell, driver mode, notes… (shows on the live page within seconds of saving)" defaultValue={st.info.details} key={'d' + st.info.details} onChange={() => { dirty.current = true; setNoteSaved(false); }} />
+              <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button style={btn('accent')} onClick={() => act({ action: 'info', title: titleRef.current.value.trim(), details: detailsRef.current.value.trim() }).then(() => { dirty.current = false; setNoteSaved(true); })}>Save</button>
+                <button style={btn('dim')} onClick={() => act({ action: 'info', title: '', details: '' }).then(() => { dirty.current = false; setNoteSaved(false); })}>Clear</button>
+                {noteSaved && <span style={{ color: T.good || T.accent, fontSize: 13 }}>Saved</span>}
+              </div>
             </>
           )}
           <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>Email me when</div>
