@@ -52,7 +52,7 @@ import urllib.error
 import urllib.request
 
 DEFAULT_SITE = "https://hcri.io"
-SCRIPT_VERSION = "2026.11.01.1"    # bumped with each release; the start-up check compares it with the copy on the site
+SCRIPT_VERSION = "2026.11.01.2"    # bumped with each release; the start-up check compares it with the copy on the site
 DEFAULT_SCALE = 313.2            # counts per lumen
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".hcri_tklamp.json")
 MAX_POINTS = 100000              # hCRI.io's limit per curve
@@ -1092,7 +1092,7 @@ class TkApp:
     # ---- layout --------------------------------------------------------------------------------------------------
     def build_ui(self):
         r = self.root
-        r.title("TKLamp Live Logger - hCRI.io")
+        r.title("TKLamp Live Logger - hCRI.io (v" + SCRIPT_VERSION + ")")
         try:
             self.icon = tk.PhotoImage(data=ICON_B64)
             r.iconphoto(True, self.icon)
