@@ -170,6 +170,7 @@
   .toolbar .grow{flex:1 1 auto}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:0 13px;border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
   .btn:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .btn:active:not(:disabled){transform:translateY(1px);background:color-mix(in srgb,var(--accent) 34%,transparent)}
   .btn:disabled{opacity:.4;cursor:default}
   .btn.plain{background:transparent;border-color:var(--border);color:var(--text)}
   .btn.rec{background:color-mix(in srgb,var(--bad) 18%,transparent);border-color:var(--bad);color:var(--bad)}
@@ -933,14 +934,20 @@ function showLiveState(i) {
   liveLink = i.url; $('liveUrl').textContent = 'Watch at ' + i.url;
 }
 var liveLink = '';
+// Brief on-button feedback ("Copied") so a click is always seen, even when the message line is out of view.
+function flashBtn(id, text) {
+  var b = $(id), old = b.dataset.t || (b.dataset.t = b.textContent);
+  b.textContent = text; b.disabled = true;
+  clearTimeout(b._ft); b._ft = setTimeout(function () { b.textContent = old; b.disabled = false; }, 1500);
+}
 $('liveCopy').onclick = function () {
-  function done(ok) { msg(ok ? 'Live link copied.' : 'Could not copy: select the link above and copy it.'); }
+  function done(ok) { msg(ok ? 'Live link copied.' : 'Could not copy: select the link above and copy it.'); flashBtn('liveCopy', ok ? 'Copied \u2713' : 'Could not copy'); }
   try { navigator.clipboard.writeText(liveLink).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
 };
-$('liveOpen').onclick = function () { if (liveLink) window.open(liveLink, '_blank', 'noopener'); };
+$('liveOpen').onclick = function () { flashBtn('liveOpen', 'Opening\u2026'); if (liveLink) window.open(liveLink, '_blank', 'noopener'); };
 $('liveNew').onclick = function () {
   if (!confirm('Make a new link? The old link will stop working.')) return;
-  call('POST', '/v1/live', { action: 'rotate' }).then(function (i) { showLiveState(i); msg('New live link: ' + i.url); }).catch(function (e) { msg('Could not make a new link: ' + (e && e.message || e)); });
+  call('POST', '/v1/live', { action: 'rotate' }).then(function (i) { showLiveState(i); msg('New live link: ' + i.url); flashBtn('liveNew', 'New link made \u2713'); }).catch(function (e) { msg('Could not make a new link: ' + (e && e.message || e)); });
 };
 $('liveOn').onchange = function () {
   var on = $('liveOn').checked;
@@ -967,7 +974,7 @@ function saveLiveInfo() {
   if (t === liveInfoSaved.title && d === liveInfoSaved.details) return Promise.resolve(true);
   return call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; return true; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); return false; });
 }
-$('liveSave').onclick = function () { $('liveSaved').textContent = ''; saveLiveInfo().then(function (ok) { if (ok) $('liveSaved').textContent = 'Saved'; }); };
+$('liveSave').onclick = function () { $('liveSaved').textContent = ''; saveLiveInfo().then(function (ok) { if (ok) { $('liveSaved').textContent = 'Saved'; flashBtn('liveSave', 'Saved \u2713'); } }); };
 $('liveTitle').oninput = $('liveDetails').oninput = function () { $('liveSaved').textContent = ''; };
 function showAccount() {
   loadLiveInfo();
