@@ -229,12 +229,15 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.10.31.3, iOS 1.28)</h3>
+      <h3>What's new in the latest update (Android 2026.10.31.4, iOS 1.28)</h3>
       <ul>
+        <li><strong>Fixed:</strong> Show a test reading, copy link, replacing a report and attaching flicker all work again with the new report ids.</li>
         <li><strong>ColorMunki calibration limit is now in minutes</strong> (default 30; an old 1 hour setting reads 60).</li>
         <li><strong>Names with accents</strong> (like K&omacr;sen) now work in usernames, folders and descriptions in the app and on the website.</li>
         <li><strong>Bridge:</strong> shows "Bridge" until it knows which meter is plugged in; Take reading and pull-to-read are off when no meter is plugged in. The Main screen's measurement settings are collapsible, and TM-30 is hidden after a TKLamp run.</li>
       </ul>
+      <h3>Android 2026.10.31.3, iOS 1.28</h3>
+      <ul><li>Calibration limit in minutes, accents in names, Bridge naming and other fixes.</li></ul>
       <h3>Android 2026.10.31.2, iOS 1.28</h3>
       <ul>
         <li><strong>TKLamp: choose where a run starts.</strong> <code>Settings &rarr; TKLamp tester</code> has <code>Start at the first reading</code> (on by default, no jump from 0) and <code>Start at the peak</code> (off by default). The web logger and <code>tklamp_live.py</code> have the same two options. After you stop a run you can also drag a red start line to exactly where it should begin: tap <code>Choose where the run starts</code> in the app (the web logger shows the line in its Save dialog and in History &rarr; <code>Trim start...</code>); a label shows the seconds and lumens while you drag.</li>

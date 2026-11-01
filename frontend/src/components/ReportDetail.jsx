@@ -630,7 +630,7 @@ export function MetricGrid({ report, C: t }) {
 }
 
 // ── ReportDetail (_e) ─────────────────────────────────────────────────────
-export default function ReportDetail({ report, allReports = [], isGuest = false, onMetaSave, onRefresh, isShared = false, preview }) {
+export default function ReportDetail({ report, allReports = [], isGuest = false, onMetaSave, onRefresh, isShared = false, preview, isAdmin = false }) {
   const { theme: T, themeName, toggleTheme } = useTheme();
   const [tab, setTab] = useState('report'); // 'report' | 'cie' -- no in-component UI currently switches this away from 'report'
   const [downloading, setDownloading] = useState(false); // unused in the current UI; kept for fidelity
@@ -835,9 +835,19 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
           <div>
             <RenameField
               value={report.label}
-              disabled={isGuest || !report.id}
+              disabled={(isGuest && !isAdmin) || !report.id}
               onSave={async (val) => {
                 if (!report.id || !val.trim()) return;
+                // An admin renaming someone else's report goes through the admin endpoint (the owner one refuses).
+                if (isGuest && isAdmin) {
+                  const res = await fetch(`./index.php/api/admin/reports/${report.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                    body: JSON.stringify({ label: val }),
+                  });
+                  if (res.ok) onMetaSave && onMetaSave({ ...report, label: val });
+                  return;
+                }
                 await fetch(`./index.php/api/reports/${report.id}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },

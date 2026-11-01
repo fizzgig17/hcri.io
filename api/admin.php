@@ -301,14 +301,14 @@ function admin_report_payload(PDO $db, int $rid): ?array {
     return $out;
 }
 // ── GET /api/admin/reports/:id — fetch any report for viewing ──
-if ($m === 'GET' && preg_match('#^/reports/(\d+)$#', $path, $rm)) {
-    $out = admin_report_payload($db, (int)$rm[1]);
+if ($m === 'GET' && preg_match('#^/reports/([A-Za-z0-9]+)$#', $path, $rm)) {
+    $out = admin_report_payload($db, hcri_rid($db, $rm[1]));
     if (!$out) json_error('Report not found', 404);
     json_out($out);
 }
 // ── PATCH /api/admin/reports/:id — edit title/notes/categories on any report ──
-if ($m === 'PATCH' && preg_match('#^/reports/(\d+)$#', $path, $rm)) {
-    $rid = (int)$rm[1];
+if ($m === 'PATCH' && preg_match('#^/reports/([A-Za-z0-9]+)$#', $path, $rm)) {
+    $rid = hcri_rid($db, $rm[1]);
     $chk = $db->prepare('SELECT id FROM reports WHERE id=?'); $chk->execute([$rid]);
     if (!$chk->fetch()) json_error('Report not found', 404);
     $b = body();
