@@ -317,6 +317,18 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if (preg_match('#^/api/live_shared/?$#', $uri)) {
+
+        require __DIR__ . '/api/live_shared.php'; exit;
+
+    }
+
+    if (preg_match('#^/api/(v1/)?live/?$#', $uri)) {
+
+        require __DIR__ . '/api/v1_live.php'; exit;
+
+    }
+
     if (preg_match('#^/api/runtime_shared/?$#', $uri)) {
 
         require __DIR__ . '/api/runtime_shared.php'; exit;
