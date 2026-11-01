@@ -254,7 +254,12 @@
       <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
       <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
       <button type="button" id="liveSave">Save note</button> <span class="note" id="liveSaved"></span>
-      <div class="note" id="liveUrl" style="flex-basis:100%"></div>
+      <div class="note" id="liveUrl" style="flex-basis:100%;word-break:break-all"></div>
+      <div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" id="liveCopy">Copy link</button>
+        <button type="button" id="liveOpen">Open</button>
+        <button type="button" id="liveNew">New link</button>
+      </div>
       </div>
     </fieldset>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
@@ -911,10 +916,20 @@ function loadLiveInfo() {
 }
 function showLiveState(i) {
   $('liveOn').checked = !!i.enabled; $('liveFields').style.display = i.enabled ? 'flex' : 'none';
-  if (!i.enabled) { $('liveUrl').textContent = ''; return; }
+  if (!i.enabled) { $('liveUrl').textContent = ''; liveLink = ''; return; }
   liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
-  $('liveUrl').textContent = 'Watch at ' + i.url;
+  liveLink = i.url; $('liveUrl').textContent = 'Watch at ' + i.url;
 }
+var liveLink = '';
+$('liveCopy').onclick = function () {
+  function done(ok) { msg(ok ? 'Live link copied.' : 'Could not copy: select the link above and copy it.'); }
+  try { navigator.clipboard.writeText(liveLink).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+};
+$('liveOpen').onclick = function () { if (liveLink) window.open(liveLink, '_blank', 'noopener'); };
+$('liveNew').onclick = function () {
+  if (!confirm('Make a new link? The old link will stop working.')) return;
+  call('POST', '/v1/live', { action: 'rotate' }).then(function (i) { showLiveState(i); msg('New live link: ' + i.url); }).catch(function (e) { msg('Could not make a new link: ' + (e && e.message || e)); });
+};
 $('liveOn').onchange = function () {
   var on = $('liveOn').checked;
   call('POST', '/v1/live', { action: on ? 'enable' : 'disable' }).then(function (i) {
