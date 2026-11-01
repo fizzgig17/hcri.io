@@ -186,7 +186,7 @@
   canvas.chart{width:100%;height:280px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px}
   .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
   .row label{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
-  input[type=text],input[type=password],input[type=number],select{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
+  input[type=text],input[type=password],input[type=number],select,textarea{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
   input[type=number]{width:84px}
   .log{font-size:12px;height:150px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;white-space:pre;margin-top:6px}
   .log b{color:var(--dim)}
@@ -253,12 +253,12 @@
       <div id="liveFields" style="flex:1 1 100%;display:none;flex-wrap:wrap;gap:8px">
       <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
       <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
-      <button type="button" id="liveSave">Save note</button> <span class="note" id="liveSaved"></span>
+      <button type="button" class="btn" id="liveSave">Save note</button> <span class="note" id="liveSaved"></span>
       <div class="note" id="liveUrl" style="flex-basis:100%;word-break:break-all"></div>
       <div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap">
-        <button type="button" id="liveCopy">Copy link</button>
-        <button type="button" id="liveOpen">Open</button>
-        <button type="button" id="liveNew">New link</button>
+        <button type="button" class="btn plain" id="liveCopy">Copy link</button>
+        <button type="button" class="btn plain" id="liveOpen">Open</button>
+        <button type="button" class="btn plain" id="liveNew">New link</button>
       </div>
       </div>
     </fieldset>
