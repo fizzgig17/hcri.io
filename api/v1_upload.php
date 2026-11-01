@@ -5,6 +5,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/api_token.php';
 require_once __DIR__ . '/_core/ingest.php';
+require_once __DIR__ . '/_core/public_id.php';
 
 cors_headers();
 header('Cache-Control: no-store');
@@ -46,9 +47,10 @@ try {
         $srcPath = $tmp;
     }
 
-    $replaceId = (int)($_POST['replaceId'] ?? $_GET['replaceId'] ?? ($_SERVER['HTTP_X_REPLACE_ID'] ?? 0));
+    $replaceId = hcri_rid($db, (string)($_POST['replaceId'] ?? $_GET['replaceId'] ?? ($_SERVER['HTTP_X_REPLACE_ID'] ?? '')));
     $response = ingest_spd_upload($db, (int)$user['id'], $srcPath, $origName, $label, true, $replaceId);
     if ($tmp) @unlink($tmp);
+    if (isset($response['id'])) $response['id'] = hcri_pid($db, (int)$response['id']);   // outside the server, a report is only ever known by its public id
     json_out($response, !empty($response['replaced']) ? 200 : 201);
 
 } catch (\Throwable $e) {
