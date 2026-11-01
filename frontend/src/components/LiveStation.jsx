@@ -109,6 +109,9 @@ export function LiveStationPanel({ T }) {
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
   const [copied, setCopied] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const titleRef = useRef(null);
+  const detailsRef = useRef(null);
   const load = useCallback(() => api.get('/live').then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message)), []);
   useEffect(() => { load(); }, [load]);
   const act = (body) => api.post('/live', body).then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message));
@@ -147,11 +150,13 @@ export function LiveStationPanel({ T }) {
           {st.enabled && (
             <>
               <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>What you are testing (shown on the live page)</div>
-              <input style={{ ...input, width: '100%', boxSizing: 'border-box', marginBottom: 8 }} maxLength={160} placeholder="Name, e.g. Olight Warrior 3, turbo" defaultValue={st.info.title} key={'t' + st.info.title}
-                onBlur={(e) => { if (e.target.value !== st.info.title) act({ action: 'info', title: e.target.value, details: st.info.details }); }} />
-              <textarea style={{ ...input, width: '100%', boxSizing: 'border-box', minHeight: 64, marginBottom: 6 }} maxLength={2000} placeholder="Details: cell, driver mode, notes… (changes show on the live page within seconds)" defaultValue={st.info.details} key={'d' + st.info.details}
-                onBlur={(e) => { if (e.target.value !== st.info.details) act({ action: 'info', title: st.info.title, details: e.target.value }); }} />
-              <div style={{ marginBottom: 12 }}><button style={btn('dim')} onClick={() => act({ action: 'info', title: '', details: '' })}>Clear</button></div>
+              <input ref={titleRef} style={{ ...input, width: '100%', boxSizing: 'border-box', marginBottom: 8 }} maxLength={160} placeholder="Name, e.g. Olight Warrior 3, turbo" defaultValue={st.info.title} key={'t' + st.info.title} onChange={() => setNoteSaved(false)} />
+              <textarea ref={detailsRef} style={{ ...input, width: '100%', boxSizing: 'border-box', minHeight: 64, marginBottom: 8 }} maxLength={2000} placeholder="Details: cell, driver mode, notes… (shows on the live page within seconds of saving)" defaultValue={st.info.details} key={'d' + st.info.details} onChange={() => setNoteSaved(false)} />
+              <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button style={btn('accent')} onClick={() => act({ action: 'info', title: titleRef.current.value.trim(), details: detailsRef.current.value.trim() }).then(() => setNoteSaved(true))}>Save</button>
+                <button style={btn('dim')} onClick={() => act({ action: 'info', title: '', details: '' }).then(() => setNoteSaved(false))}>Clear</button>
+                {noteSaved && <span style={{ color: T.good || T.accent, fontSize: 13 }}>Saved</span>}
+              </div>
             </>
           )}
           <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>Email me when</div>

@@ -251,6 +251,7 @@
     <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station: what you are testing (shown on the live page)</legend>
       <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
       <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
+      <button type="button" id="liveSave">Save note</button> <span class="note" id="liveSaved"></span>
       <div class="note" id="liveUrl" style="flex-basis:100%"></div>
     </fieldset>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
@@ -909,10 +910,11 @@ function loadLiveInfo() {
 }
 function saveLiveInfo() {
   var t = $('liveTitle').value.trim(), d = $('liveDetails').value.trim();
-  if (t === liveInfoSaved.title && d === liveInfoSaved.details) return;
-  call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); });
+  if (t === liveInfoSaved.title && d === liveInfoSaved.details) return Promise.resolve(true);
+  return call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; return true; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); return false; });
 }
-$('liveTitle').onchange = saveLiveInfo; $('liveDetails').onchange = saveLiveInfo;
+$('liveSave').onclick = function () { $('liveSaved').textContent = ''; saveLiveInfo().then(function (ok) { if (ok) $('liveSaved').textContent = 'Saved'; }); };
+$('liveTitle').oninput = $('liveDetails').oninput = function () { $('liveSaved').textContent = ''; };
 function showAccount() {
   loadLiveInfo();
   if (sessionToken()) {
