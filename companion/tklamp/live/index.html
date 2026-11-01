@@ -1150,7 +1150,14 @@ $('otherBtn').onclick = function () { connectSerial(true, true); };
 $('simBtn').onclick = startSim;
 $('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun(); };
 ['limStart', 'limStop', 'dur', 'limIdle'].forEach(function (id) { $(id).addEventListener('change', function () { setPref(id, $(id).value); }); });
-$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); };
+$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); liveClear(); };
+// Clearing the chart clears the live page too; it starts again with the next reading.
+function liveClear() {
+  var L = Mon; Mon = null;
+  if (L) { clearTimeout(L.first); clearInterval(L.timer); L.off = true; }
+  if (!sessionToken()) return;
+  setTimeout(function () { call('POST', '/v1/live', { action: 'clear' }).catch(function () {}); }, 1200);   // after any send already under way
+}
 $('win').onchange = function () { setPref('win', $('win').value); S.ymax = S.ymax; redraw(); };
 $('trim').onchange = function () { setPref('trim', $('trim').checked); if ($('trim').checked) { $('trimPeak').checked = false; setPref('trimPeak', false); } };
 $('trimPeak').onchange = function () { setPref('trimPeak', $('trimPeak').checked); if ($('trimPeak').checked) { $('trim').checked = false; setPref('trim', false); } };
