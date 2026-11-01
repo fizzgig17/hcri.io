@@ -170,7 +170,7 @@ export function LiveStationPanel({ T }) {
                   <button style={{ ...btn('bad'), opacity: running && !pending ? 1 : 0.4 }} disabled={!running || !!pending} onClick={() => send('stop')}>Stop run</button>
                   <button style={{ ...btn('dim'), opacity: !running && !pending ? 1 : 0.4 }} disabled={running || !!pending} onClick={() => send('clear')}>Clear</button>
                   <span style={{ color: T.dim, fontSize: 12 }}>
-                    {pending ? `${pending} sent: waiting for the logger or app (up to 5 seconds)…` : online ? 'Carried out by the web logger or the app that is connected to the tester.' : 'Needs the web logger or the app connected to the tester, with Live on.'}
+                    {pending ? (st.command.ageSeconds >= 15 ? `${pending} not picked up yet. Reload the web logger page, or update the app: older versions and the Python script cannot take remote commands.` : `${pending} sent: waiting for the logger or app (up to 5 seconds)…`) : online ? 'Carried out by the web logger or the app that is connected to the tester.' : 'Needs the web logger or the app connected to the tester, with Live on.'}
                   </span>
                 </div>
               </div>
