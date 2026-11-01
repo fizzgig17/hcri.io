@@ -114,6 +114,16 @@ export function LiveStationPanel({ T }) {
   const detailsRef = useRef(null);
   const load = useCallback(() => api.get('/live').then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message)), []);
   useEffect(() => { load(); }, [load]);
+  // A note saved elsewhere (web logger, app, script) shows up here within seconds, unless the boxes are being edited.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.hidden) return;
+      const t = titleRef.current, d = detailsRef.current;
+      if (t && d && (t === document.activeElement || d === document.activeElement || t.value !== t.defaultValue || d.value !== d.defaultValue)) return;
+      load();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [load]);
   const act = (body) => api.post('/live', body).then((d) => { setSt(d); setErr(''); }).catch((e) => setErr(e.message));
   const setting = (k, v) => act({ action: 'settings', settings: { [k]: v } });
   const run = st && st.run;

@@ -908,6 +908,16 @@ function loadLiveInfo() {
     $('liveUrl').textContent = 'Watch at ' + i.url;
   }).catch(function () { box.hidden = true; });
 }
+// A note saved elsewhere (the website, the app, the script) shows up here within seconds, unless this box has unsaved typing.
+setInterval(function () {
+  if ($('liveInfoBox').hidden || !sessionToken() || document.hidden) return;
+  var t = $('liveTitle'), d = $('liveDetails');
+  if (document.activeElement === t || document.activeElement === d || t.value.trim() !== liveInfoSaved.title || d.value.trim() !== liveInfoSaved.details) return;
+  call('GET', '/v1/live').then(function (i) {
+    if (!i.enabled) { $('liveInfoBox').hidden = true; return; }
+    if (i.info.title !== liveInfoSaved.title || i.info.details !== liveInfoSaved.details) { liveInfoSaved = i.info; t.value = i.info.title; d.value = i.info.details; }
+  }).catch(function () {});
+}, 5000);
 function saveLiveInfo() {
   var t = $('liveTitle').value.trim(), d = $('liveDetails').value.trim();
   if (t === liveInfoSaved.title && d === liveInfoSaved.details) return Promise.resolve(true);
