@@ -188,7 +188,7 @@
 
   <main>
     <h1 class="doc-title">TKLamp Live Logger</h1>
-    <div class="doc-meta">Last updated October 27, 2026 · Windows, macOS and Linux · <a href="tklamp_live.py" download>Download tklamp_live.py</a></div>
+    <div class="doc-meta">Last updated November 1, 2026 · Windows, macOS and Linux · <a href="tklamp_live.py" download>Download tklamp_live.py</a></div>
 
     <section id="what">
       <h2><span class="num">01</span> What it does</h2>
@@ -200,12 +200,14 @@
         <li><strong>Run limits</strong>: start when the light reaches a level, stop when it falls below a level, stop after a set time, and stop automatically when the tester has sent no readings for 5 minutes (changeable). The values are remembered.</li>
         <li><strong>Calibrate</strong> the counts-per-lumen scale with a lamp of known output.</li>
         <li><strong>History</strong> of every run with its chart, <strong>rename</strong>, <strong>upload</strong> to hCRI.io, <strong>share link</strong>, stop sharing and delete.</li>
+        <li><strong>Live station</strong>: while you are signed in, the reading goes to a link you can open on any phone or computer (<code>hcri.io/?live=...</code>), also when no run is recording. See <a href="#livestation">Live station</a>.</li>
+        <li><strong>Updates itself</strong>: the script checks for a newer version when it starts.</li>
         <li><strong>Sign in</strong> from the window to create the hCRI.io token for you, the same way Companion's Settings does.</li>
       </ul>
       <div class="card tip"><h4>Why use it instead of Transfer Data?</h4>
         <p>The tester's own Transfer Data sends the stored readings after the test, with no date or time, so the real start and end of the run are unknown. Because this script records while the test is running, the start time, end time and length are exact. You choose the name, and it can upload and make a share link for you.</p></div>
       <div class="card tip"><h4>No install? Use it in your browser</h4>
-        <p><a href="live/">Open the browser version</a> in Chrome or Edge on a Mac, Windows or Linux computer. It uses Chrome's built-in USB serial access, so there is nothing to install (the Windows CH340 driver is still needed if the tester does not show up). It has the same live chart, calibrate, history, rename, upload and share, and uses your hCRI.io website sign-in. It does not run the Python script: it is a JavaScript version of the same logic. Runs are kept in that browser, so download or upload them to keep them. Safari, Firefox and phones cannot do this.</p></div>
+        <p><a href="live/">Open the browser version</a> in Chrome or Edge on a Mac, Windows or Linux computer. It uses Chrome's built-in USB serial access, so there is nothing to install (the Windows CH340 driver is still needed if the tester does not show up). It has the same live chart, calibrate, history, rename, upload and share, and uses your hCRI.io website sign-in. It does not run the Python script: it is a JavaScript version of the same logic. Runs are kept in that browser, so download or upload them to keep them. When you are signed in and Live station is on, it also sends the live reading to your live link (see <a href="#livestation">Live station</a>), with a box to type what you are testing. Safari, Firefox and phones cannot do this.</p></div>
       <div class="card"><h4>Prefer your phone?</h4>
         <p>hCRI Companion does the same with the ESP32 bridge, no computer needed. See <a href="../bridge/#tklamp">Using a TKLamp tester</a> and the <a href="../manual/#tklamp">manual</a>.</p></div>
     </section>
@@ -219,6 +221,7 @@
         <li><strong>Plug in the tester</strong><span>Connect the tester's USB cable to the computer and switch the tester on. It must be on and sending readings. The computer sees it as a CH340 USB serial device, which may need a driver (see <a href="#platforms">Mac, Windows and Linux</a>).</span></li>
         <li><strong>Run it</strong><span>In the folder where you saved it, run <code>python tklamp_live.py</code> (on a Mac you may need <code>python3</code>). The window opens. Use <code>--cli</code> for the terminal version.</span></li>
       </ol>
+      <p class="dim">The script checks for a newer version each time it starts and replaces itself when there is one (it keeps the old copy as <code>tklamp_live.py.bak</code>). Use <code>--no-update</code> to turn that off.</p>
       <p class="dim">No tester to hand? <code>python tklamp_live.py --simulate</code> makes a made-up fading light so you can try everything.</p>
     </section>
 
@@ -252,9 +255,16 @@
         <tr><td>Start at the peak</td><td>Drops everything before the highest reading, so the run starts at the peak (off by default; turning it on turns off Start at the first reading).</td></tr>
         <tr><td>Show readings</td><td>Shows a line of clock time, elapsed time and lumens every second under the chart, with REC marking the recorded ones. Untick it to hide the list; the setting is remembered. In the terminal the same line is turned off with <code>--no-readout</code>.</td></tr>
         <tr><td>Calibrate...</td><td>Put a lamp of known output in the sphere, enter its lumens and click Measure. It averages 8 seconds and shows the new counts-per-lumen scale; Save scale keeps it. See <a href="#scale">Calibrating the scale</a>.</td></tr>
+        <tr><td>Live note...</td><td>Type what you are testing and some details (for example &ldquo;Olight Warrior 3, turbo, fresh cell&rdquo;). They show on your live page and can be changed during a run.</td></tr>
         <tr><td>Sign in / Sign out</td><td>Creates or forgets the hCRI.io token (see above).</td></tr>
       </table>
       <p><strong>Saving a run.</strong> When you stop, give it a name (suggested: <em>TKLamp run 2026-10-27 18:00</em>) and choose whether to upload it to Runtime on hCRI.io and whether to make a share link. Click Save. Discard throws the run away. A <code>.partial.csv</code> copy is written every couple of seconds while recording, so a crash does not lose the run. Keep the computer awake and the cable in for the whole run; for a 24 hour run turn off sleep first. If the cable comes out mid-run, the run so far is kept and you can still Stop and save it. You cannot close the window while a run is recording.</p>
+    </section>
+
+    <section id="livestation">
+      <h2>Live station: watch from anywhere</h2>
+      <p>Switch it on once on hCRI.io (<code>Explore &rarr; Runtime &rarr; Live station</code>) or in the Companion app (<code>Settings &rarr; Live station</code>). While the script is signed in to your hCRI.io account, it sends the reading to your personal link every 5 seconds. The link shows <b>Live</b> with the current lumens when no run is recording, and <b>Live run</b> at the top while one is. Anyone with the link can watch; the same screen is in the app under <code>Settings &rarr; Live station</code> (the eye button). Runs also trigger emails when they finish, have a problem, go silent or fall below a limit you set; a plain live reading never does. A simulated run is sent as &ldquo;Simulated: ...&rdquo;.</p>
+      <p>Type what you are testing with <em>Live note...</em> (window) or <code>--live-title</code> / <code>--live-details</code> (terminal). Chat and social sites show a snapshot of that name and the lumens when they fetched the link; only the page itself is live.</p>
     </section>
 
     <section id="history">
@@ -311,6 +321,8 @@
         <tr><td><code>--login</code></td><td>Sign in with your hCRI.io email/username and password, create a token and remember it.</td></tr>
         <tr><td><code>--token T</code>, <code>--save-token</code></td><td>Use an API token you made on the website, and remember it.</td></tr>
         <tr><td><code>--site URL</code></td><td>Another hCRI.io address (default https://hcri.io).</td></tr>
+        <tr><td><code>--live-title TEXT</code>, <code>--live-details TEXT</code></td><td>What you are testing, shown on your live page (see Live station). An empty title clears it.</td></tr>
+        <tr><td><code>--no-update</code></td><td>Do not check for a newer version of the script at start-up.</td></tr>
         <tr><td><code>--upload FILE.json</code></td><td>Upload a run saved earlier, then exit.</td></tr>
         <tr><td><code>--simulate</code></td><td>No tester needed: a made-up fading light, to try the script.</td></tr>
       </table>

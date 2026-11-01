@@ -38,8 +38,13 @@ import getpass
 import json
 import math
 import os
+import re
 import platform
+import random
 import ssl
+import subprocess
+import shutil
+import threading
 import stat
 import sys
 import time
@@ -47,6 +52,7 @@ import urllib.error
 import urllib.request
 
 DEFAULT_SITE = "https://hcri.io"
+SCRIPT_VERSION = "2026.11.01.2"    # bumped with each release; the start-up check compares it with the copy on the site
 DEFAULT_SCALE = 313.2            # counts per lumen
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".hcri_tklamp.json")
 MAX_POINTS = 100000              # hCRI.io's limit per curve
@@ -359,7 +365,7 @@ def enter_pressed():
     return False
 
 
-def live(ser, scale, limits, spool_path, readout=True):
+def live(ser, scale, limits, spool_path, readout=True, relay_factory=None, monitor_factory=None):
     """Shows live lumens. Enter starts (or waits for the start level), Enter stops. Returns
     (points, started_wall, ended_wall, spool, reason) or None."""
     reader = FrameReader()
@@ -377,6 +383,13 @@ def live(ser, scale, limits, spool_path, readout=True):
     last_row = 0.0
     spool = None
     st = {"spool": None}
+    relay = [None]
+    mon = [None, False]     # the plain live reading while not recording: [relay, tried]
+
+    def stop_mon():
+        if mon[0]:
+            mon[0].finish("", True)
+            mon[0] = None
 
     def avg_now():
         return sum(recent) / len(recent) if recent else 0.0
@@ -387,6 +400,8 @@ def live(ser, scale, limits, spool_path, readout=True):
         guard.reset()
         t_start_mono = now
         started_wall = datetime.datetime.now()
+        stop_mon()
+        relay[0] = relay_factory(started_wall) if relay_factory else None
         spool = open(spool_path, "w", encoding="utf-8")
         spool.write("seconds,lumens\n")
         spool_written[0] = 0
@@ -395,6 +410,10 @@ def live(ser, scale, limits, spool_path, readout=True):
             print("  clock       elapsed       lumens")
 
     def finish_rec(reason=None, ended=None):
+        if relay[0]:
+            relay[0].finish(reason or "", True)
+            relay[0] = None
+        stop_mon()
         return pts, started_wall, ended or datetime.datetime.now(), spool, reason
 
     notes = []
@@ -425,10 +444,17 @@ def live(ser, scale, limits, spool_path, readout=True):
                     begin(now)
                 if recording:
                     pts.append((now - t_start_mono, lm))
+                    if relay[0]:
+                        relay[0].add(now, lm)
                     why = guard.on_reading(avg_now(), now - t_start_mono)
                     if why:
                         print(f"\nStopped: {why}.")
                         return finish_rec(why)
+                elif monitor_factory:
+                    if not mon[1]:
+                        mon[0], mon[1] = monitor_factory(), True
+                    if mon[0]:
+                        mon[0].add(now, lm)
             if enter_pressed():
                 if recording:
                     return finish_rec()
@@ -472,6 +498,7 @@ def live(ser, scale, limits, spool_path, readout=True):
         print("\nStopped.")
         if recording:
             return finish_rec()
+        stop_mon()
         return None
 
 
@@ -537,6 +564,115 @@ def api(site, token, method, path, body=None):
         raise RuntimeError(f"hCRI.io said {e.code}: {msg or e.reason}")
     except urllib.error.URLError as e:
         raise RuntimeError(net_error(e))
+
+
+
+class LiveRelay:
+    """Sends the run that is recording to hCRI.io (api/v1_live.php) so it can be watched at hcri.io/?live=... and so hCRI.io can
+    email about problems. One averaged value per second, sent every 5 s from a background thread; anything the server misses is
+    sent again next time. Does nothing unless Live station is switched on for the account (Runtime > Live station on the website)."""
+
+    def __init__(self, site, token, label, simulated=False, kind="run"):
+        self.site, self.token, self.kind = site, token, kind
+        self.label = ("Simulated: " if simulated else "") + label
+        self.id = ("p" if kind == "run" else "q") + format(int(time.time() * 1000), "x") + format(random.randrange(10000), "x")
+        self.vals, self.sent = [], 0
+        self.origin, self.idx, self.sum, self.n = None, 0, 0.0, 0
+        self.lock = threading.Lock()
+        self.stop_evt = threading.Event()
+        self.final = ("finished", "")
+        self.off = False
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
+
+    @staticmethod
+    def maybe(site, token, started, simulated=False):
+        """A relay for a run that started at `started`, or None when nobody is signed in."""
+        if not token:
+            return None
+        return LiveRelay(site, token, "TKLamp run " + started.strftime("%Y-%m-%d %H:%M"), simulated)
+
+    @staticmethod
+    def monitor(site, token, simulated=False):
+        """A relay for the plain live reading while no run is recording (the station then shows "Live" instead of nothing)."""
+        if not token:
+            return None
+        return LiveRelay(site, token, "Live reading", simulated, "monitor")
+
+    def add(self, t, lm):
+        if self.off:
+            return
+        with self.lock:
+            if self.origin is None:
+                self.origin = t
+            i = max(0, int(t - self.origin))
+            if i > self.idx:
+                mean = self.sum / self.n if self.n else (self.vals[-1] if self.vals else 0.0)
+                self.vals.append(mean)
+                self.vals.extend([mean] * (i - self.idx - 1))
+                self.idx, self.sum, self.n = i, 0.0, 0
+            self.sum += lm
+            self.n += 1
+
+    def finish(self, why="", wait=False):
+        bad = self.kind == "run" and bool(why) and re.search(r"stopped sending|no readings|lost", why, re.I) is not None
+        self.final = ("error", "The tester stopped sending readings.") if bad else ("finished", "")
+        self.stop_evt.set()
+        if wait and not self.off:
+            self.thread.join(15)    # the terminal version exits right after: let the last readings go out first
+
+    def _flush(self, status, message):
+        for _ in range(50):
+            with self.lock:
+                vals = list(self.vals)
+            chunk = vals[self.sent:self.sent + 1000]
+            last = self.sent + len(chunk) >= len(vals)
+            if not chunk and status == "running":
+                return True     # nothing new: stay quiet so the server can notice a silent run
+            body = {"runId": self.id, "kind": self.kind, "label": self.label, "unit": "lm", "intervalSeconds": 1, "startIndex": self.sent,
+                    "values": [round(v, 3) for v in chunk], "status": status if last else "running"}
+            if last and message:
+                body["message"] = message
+            r = api(self.site, self.token, "POST", "/v1/live", body)
+            if r.get("enabled") is False:
+                self.off = True
+                return True
+            if r.get("resend"):
+                self.sent = min(int(r.get("count", 0)), len(vals))
+                continue
+            self.sent = int(r.get("count", 0))
+            if last:
+                return True
+        return True
+
+    def _loop(self):
+        try:
+            if not api(self.site, self.token, "GET", "/v1/live").get("enabled"):
+                self.off = True
+                return
+        except RuntimeError:
+            self.off = True
+            return
+        wait = 3.0
+        while True:
+            stopped = self.stop_evt.wait(wait)
+            wait = 5.0
+            if stopped:
+                with self.lock:
+                    if self.n:
+                        self.vals.append(self.sum / self.n)
+                        self.sum, self.n = 0.0, 0
+                for _ in range(4):
+                    try:
+                        if self._flush(*self.final):
+                            return
+                    except RuntimeError:
+                        time.sleep(3)
+                return
+            try:
+                self._flush("running", "")
+            except RuntimeError:
+                pass    # offline for now: the next send carries everything the server is missing
 
 
 def raw_post(site, path, body, token=None):
@@ -933,6 +1069,8 @@ class TkApp:
         self.ymax, self.calib = 0.0, None
         self.runs, self.port_map = [], {}
         self.armed, self.pending_stop, self.last_rx_wall = False, None, datetime.datetime.now()
+        self.live, self.sim_mode = None, False
+        self.mon, self.mon_tried = None, False     # the plain live reading while no run is recording
         lim = limits_from_cfg(cfg)
         for key, name in (("start_at", "start_at"), ("stop_below", "stop_below"), ("duration", "duration"), ("idle_min", "idle_timeout")):
             v = getattr(args, name, None)
@@ -954,7 +1092,7 @@ class TkApp:
     # ---- layout --------------------------------------------------------------------------------------------------
     def build_ui(self):
         r = self.root
-        r.title("TKLamp Live Logger - hCRI.io")
+        r.title("TKLamp Live Logger - hCRI.io (v" + SCRIPT_VERSION + ")")
         try:
             self.icon = tk.PhotoImage(data=ICON_B64)
             r.iconphoto(True, self.icon)
@@ -1013,6 +1151,7 @@ class TkApp:
         self.clear_btn.pack(side="left", padx=6)
         self.cal_btn = ttk.Button(bar, text="Calibrate...", command=self.calibrate_dialog)
         self.cal_btn.pack(side="left")
+        ttk.Button(bar, text="Live note...", command=self.live_note).pack(side="left", padx=(6, 0))
         self.scale_lbl = ttk.Label(bar, text="")
         self.scale_lbl.pack(side="left", padx=8)
         self.win_var = tk.StringVar(value=self.WINDOWS[1][0])
@@ -1213,6 +1352,7 @@ class TkApp:
         self.connected = True
         self.recent, self.last_rx = [], 0.0
         self.live_t, self.live_v, self.live_t0, self.ymax = [], [], time.monotonic(), 0.0
+        self.sim_mode = not dev
         self.msg("Reading the tester." if dev else "Simulation: a made-up fading light.")
         self.update_buttons()
 
@@ -1223,7 +1363,38 @@ class TkApp:
         self.msg("Disconnected.")
         self.update_buttons()
 
+    def stop_mon(self):
+        if self.mon:
+            self.mon.finish("")
+        self.mon, self.mon_tried = None, False
+
+    def live_note(self):
+        """Live station: type what you are testing; it shows on the live page within seconds."""
+        if not self.need_token(self.live_note):
+            return
+        try:
+            info = api(self.site, self.token(), "GET", "/v1/live")
+        except RuntimeError as e:
+            messagebox.showerror("Live station", str(e))
+            return
+        if not info.get("enabled"):
+            messagebox.showinfo("Live station", "Live station is off. Turn it on at hCRI.io: Explore > Runtime > Live station.")
+            return
+        cur = info.get("info", {})
+        title = simpledialog.askstring("Live station", "What are you testing? (shown on the live page)", initialvalue=cur.get("title", ""), parent=self.root)
+        if title is None:
+            return
+        details = simpledialog.askstring("Live station", "Details (cell, mode, notes):", initialvalue=cur.get("details", ""), parent=self.root)
+        if details is None:
+            return
+        try:
+            api(self.site, self.token(), "POST", "/v1/live", {"action": "info", "title": title.strip(), "details": details.strip()})
+            self.msg("Live note saved.")
+        except RuntimeError as e:
+            messagebox.showerror("Live station", str(e))
+
     def drop_source(self):
+        self.stop_mon()
         if self.source:
             self.source.stop()
             self.source.join(1.5)
@@ -1256,10 +1427,16 @@ class TkApp:
             self.begin_run(t)
         if self.recording:
             self.pts.append((t - self.t0, lm))
+            if self.live:
+                self.live.add(t, lm)
             why = self.guard.on_reading(avg, t - self.t0)
             if why and not self.pending_stop:
                 self.pending_stop = (why, None)
         else:
+            if not self.mon_tried:
+                self.mon, self.mon_tried = LiveRelay.monitor(self.site, self.token(), self.sim_mode), True
+            if self.mon:
+                self.mon.add(t, lm)
             self.live_t.append(t - self.live_t0)
             self.live_v.append(lm)
             if len(self.live_t) > 8000:
@@ -1368,6 +1545,8 @@ class TkApp:
         self.pending_stop = None
         self.recording = True
         self.pts, self.t0, self.started, self.ymax = [], now, datetime.datetime.now(), 0.0
+        self.stop_mon()
+        self.live = LiveRelay.maybe(self.site, self.token(), self.started, self.sim_mode)
         self.stamp = self.started.strftime("%Y-%m-%d-%H.%M.%S")
         self.spool_n = 0
         try:
@@ -1384,6 +1563,9 @@ class TkApp:
             return
         ended = ended or datetime.datetime.now()
         self.recording = False
+        if self.live:
+            self.live.finish(why or "")
+            self.live = None
         if self.spool:
             self.spool.close()
             self.spool = None
@@ -1916,6 +2098,51 @@ def run_gui(args, cfg):
     return True
 
 
+def _version_key(v):
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except ValueError:
+        return ()
+
+
+def check_for_update(args, cfg):
+    """At start-up: if the copy of this script on the site is newer, download it over this file (the old one is kept as
+    tklamp_live.py.bak) and start it. Quiet when offline or when the file cannot be written; --no-update skips the check."""
+    if getattr(args, "no_update", False) or os.environ.get("TKLAMP_UPDATED") == "1":
+        return
+    site = (args.site or cfg.get("site") or DEFAULT_SITE).rstrip("/")
+    url = site + "/companion/tklamp/tklamp_live.py"
+    path = os.path.abspath(__file__)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "tklamp_live/" + SCRIPT_VERSION})
+        with urllib.request.urlopen(req, timeout=6, context=ssl_context()) as r:
+            src = r.read().decode("utf-8")
+        m = re.search(r'^SCRIPT_VERSION = "([0-9.]+)"', src, re.M)
+        if not m or _version_key(m.group(1)) <= _version_key(SCRIPT_VERSION) or not _version_key(m.group(1)):
+            return
+        compile(src, "tklamp_live.py", "exec")      # never replace a working script with a broken download
+    except Exception:
+        return
+    new = m.group(1)
+    try:
+        tmp = path + ".new"
+        with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(src)
+        try:
+            shutil.copyfile(path, path + ".bak")
+        except OSError:
+            pass
+        os.replace(tmp, path)
+    except OSError:
+        print(f"A newer version ({new}) is available but this file cannot be changed. Download it from {url}")
+        return
+    print(f"Updated tklamp_live.py {SCRIPT_VERSION} -> {new}. Starting the new version...")
+    env = dict(os.environ, TKLAMP_UPDATED="1")
+    if sys.platform == "win32":
+        sys.exit(subprocess.call([sys.executable, path] + sys.argv[1:], env=env))
+    os.execve(sys.executable, [sys.executable, path] + sys.argv[1:], env)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Live logger for a TKLamp TK2303D tester, with upload to hCRI.io Runtime.")
     ap.add_argument("--port", help="Serial port (COM5, /dev/tty.usbserial-..., /dev/ttyUSB0). Default: find it.")
@@ -1937,8 +2164,12 @@ def main():
     ap.add_argument("--login", action="store_true", help="Sign in with your hCRI.io email/username and password to create and save a token")
     ap.add_argument("--site", help=f"hCRI.io address (default {DEFAULT_SITE})")
     ap.add_argument("--upload", metavar="FILE.json", help="Upload a run saved earlier, then exit")
+    ap.add_argument("--live-title", metavar="TEXT", help="Live station: what you are testing (shown on the live page; \"\" clears it)")
+    ap.add_argument("--live-details", metavar="TEXT", help="Live station: details about it (cell, mode, notes)")
+    ap.add_argument("--no-update", action="store_true", help="Do not check for a newer version of this script at start-up")
     ap.add_argument("--simulate", action="store_true", help="No tester: a made-up fading light, to try the script")
     args = ap.parse_args()
+    check_for_update(args, load_config())
 
     cfg = load_config()
     if args.save_token:
@@ -1987,7 +2218,19 @@ def main():
         stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H.%M.%S")
         spool_path = os.path.join(args.output_dir, f"TKLamp_{stamp}.partial.csv")
         spool_written[0] = 0
-        res = live(ser, scale, limits, spool_path, not args.no_readout)
+        live_site = args.site or cfg.get("site") or DEFAULT_SITE
+        live_token = args.token or os.environ.get("HCRI_TOKEN") or cfg.get("token")
+        if live_token and (args.live_title is not None or args.live_details is not None):
+            try:
+                cur = api(live_site, live_token, "GET", "/v1/live").get("info", {})
+                api(live_site, live_token, "POST", "/v1/live", {"action": "info",
+                    "title": cur.get("title", "") if args.live_title is None else args.live_title,
+                    "details": cur.get("details", "") if args.live_details is None else args.live_details})
+            except RuntimeError as e:
+                print("Could not set the live note:", e)
+        res = live(ser, scale, limits, spool_path, not args.no_readout,
+                   lambda started: LiveRelay.maybe(live_site, live_token, started, bool(args.simulate)),
+                   lambda: LiveRelay.monitor(live_site, live_token, bool(args.simulate)))
     finally:
         ser.close()
     if not res:

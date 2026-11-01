@@ -248,6 +248,11 @@
       <label><input type="checkbox" id="trimPeak"> Start at the peak</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
+    <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station: what you are testing (shown on the live page)</legend>
+      <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
+      <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
+      <div class="note" id="liveUrl" style="flex-basis:100%"></div>
+    </fieldset>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
       <label>Start at <input type="number" id="limStart" min="0" step="any" placeholder="off"> lm</label>
       <label>Stop below <input type="number" id="limStop" min="0" step="any" placeholder="off"> lm</label>
@@ -632,10 +637,11 @@ function onReading(tSec, raw) {
   if (S.armed && !S.recording) { var a = limits().startAt; if (a === null || avgNow() >= a) beginRun(tSec); }
   if (S.recording) {
     S.rt.push(tSec - S.t0); S.rv.push(lm);
+    liveAdd(tSec, lm);
     var why = stopLevelReason(avgNow(), tSec - S.t0);
     if (why && !S.pendingStop) S.pendingStop = { why: why, ended: null };
   }
-  else { S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
+  else { liveMon(tSec, lm); S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
 }
 function now() { return performance.now() / 1000; }
 
@@ -686,17 +692,83 @@ function startSim() {
 }
 function disconnect() {
   if (S.recording) return Promise.resolve();
+  liveMonStop();
   var s = S.source; S.source = null; S.connected = false; S.recent = [];
   updateButtons();
   return s ? s.close() : Promise.resolve();
 }
 function lost(text) {
+  liveMonStop();
   var s = S.source; S.source = null; S.connected = false; S.recent = [];
   if (s) s.close();
   updateButtons();
   msg('Lost the tester: ' + text + (S.recording ? ' The run so far is kept; press Stop run to save it.' : ''));
 }
 if (navigator.serial) navigator.serial.addEventListener('disconnect', function () { if (S.source && S.source.kind === 'serial') lost('the USB cable was unplugged.'); });
+
+// ---- live station -------------------------------------------------------------------------------------------------------
+// While a run records, send it to hCRI.io (api/v1_live.php) so it can be watched at hcri.io/?live=... and so hCRI.io can email
+// about problems. One averaged value per second, sent every 5 s; anything the server misses is sent again next time.
+var Live = null, Mon = null;   // the run being recorded, and the plain live reading while no run is going
+function liveStart(kind) {
+  if (!sessionToken()) return null;
+  var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null };
+  call('GET', '/v1/live').then(function (info) {
+    if (!info.enabled) { L.off = true; return; }
+    if (kind === 'run') msg('Live station is on: this run can be watched at ' + info.url);
+  }).catch(function () { L.off = true; });
+  L.first = setTimeout(function () { liveFlush(L, 'running', ''); }, 3000);
+  L.timer = setInterval(function () { liveFlush(L, 'running', ''); }, 5000);
+  return L;
+}
+function liveBegin() { liveMonStop(); Live = liveStart('run'); }
+function liveAdd(tSec, lm) { liveAddTo(Live, tSec, lm); }
+function liveAddTo(L, tSec, lm) {
+  if (!L || L.off) return;
+  if (L.origin === null) L.origin = tSec;
+  var i = Math.max(0, Math.floor(tSec - L.origin));
+  if (i > L.idx) {
+    var mean = L.n > 0 ? L.sum / L.n : (L.vals.length ? L.vals[L.vals.length - 1] : 0);
+    L.vals.push(mean);
+    for (var k = L.idx + 1; k < i; k++) L.vals.push(mean);
+    L.idx = i; L.sum = 0; L.n = 0;
+  }
+  L.sum += lm; L.n++;
+}
+// While no run is recording, the tester's live number is sent too, so the Live station shows "Live" instead of nothing.
+function liveMon(tSec, lm) { if (!Mon) Mon = liveStart('monitor'); liveAddTo(Mon, tSec, lm); }
+function liveMonStop() { var L = Mon; Mon = null; if (L) liveEnd(L, ''); }
+function liveName(L) { return L.kind === 'monitor' ? 'Live reading' : (S.source && S.source.kind === 'sim' ? 'Simulated: ' : '') + 'TKLamp run ' + fmtTS(S.started).slice(0, 16); }
+function liveFlush(L, status, message) {
+  if (L.off || L.busy) return Promise.resolve(false);
+  L.busy = true;
+  var guard = 0;
+  function step() {
+    var chunk = L.vals.slice(L.sent, L.sent + 1000), last = L.sent + chunk.length >= L.vals.length;
+    if (!chunk.length && status === 'running') { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
+    var body = { runId: L.id, kind: L.kind, label: L.label || (L.label = liveName(L)), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
+    if (last && message) body.message = message;
+    return call('POST', '/v1/live', body).then(function (r) {
+      if (r.enabled === false) { L.off = true; L.busy = false; return true; }
+      if (r.resend) L.sent = Math.min(r.count, L.vals.length); else { L.sent = r.count; if (last) { L.busy = false; return true; } }
+      if (++guard > 50) { L.busy = false; return true; }
+      return step();
+    });
+  }
+  return step().catch(function () { L.busy = false; return false; });
+}
+function liveFinish(why) { var L = Live; Live = null; if (L) liveEnd(L, why); }
+function liveEnd(L, why) {
+  clearTimeout(L.first); clearInterval(L.timer);
+  if (L.off) return;
+  if (L.n > 0) { L.vals.push(L.sum / L.n); L.n = 0; }
+  var bad = L.kind === 'run' && why && /stopped sending|no readings|lost/i.test(why);
+  var tries = 0;
+  (function go() {
+    if (L.busy) { if (tries++ < 6) setTimeout(go, 1500); return; }
+    liveFlush(L, bad ? 'error' : 'finished', bad ? 'The tester stopped sending readings.' : '').then(function (ok) { if (!ok && tries++ < 4) setTimeout(go, 3000); });
+  })();
+}
 
 // ---- recording ----------------------------------------------------------------------------------------------------------
 function acquireWake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { S.wake = w; }, function () {}); } catch (e) {} }
@@ -717,7 +789,7 @@ function beginRun(n) {
   S.recording = true; S.rt = []; S.rv = []; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
   addRow('-- Recording started ' + fmtTS(S.started) + ' --');
   msg('Recording from ' + fmtTS(S.started) + '.');
-  acquireWake(); updateButtons();
+  acquireWake(); liveBegin(); updateButtons();
 }
 function flushPartial(force) {
   if (!S.recording) return;
@@ -735,7 +807,7 @@ function dropPartial(stamp) {
 function stopRun(why, auto, endedAt) {
   if (!S.recording) return;
   var ended = endedAt || new Date(), ts = S.rt, vs = S.rv, started = S.started, stamp = S.stamp;
-  S.recording = false; releaseWake();
+  S.recording = false; releaseWake(); liveFinish(why);
   S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0;
   addRow('-- Stopped ' + fmtTS(ended) + (why ? ': ' + why : '') + ' --');
   updateButtons();
@@ -823,7 +895,26 @@ $('calMeasure').onclick = function () {
 $('calSave').onclick = function () { S.scale = calNew; setPref('scale', S.scale); msg('Scale saved: ' + S.scale + ' counts per lumen.'); $('calDlg').close(); updateButtons(); };
 
 // ---- account -----------------------------------------------------------------------------------------------------------
+// What you are testing: typed here, shown on the live page and updated there within seconds.
+var liveInfoSaved = { title: '', details: '' };
+function loadLiveInfo() {
+  var box = $('liveInfoBox');
+  if (!sessionToken()) { box.hidden = true; return; }
+  call('GET', '/v1/live').then(function (i) {
+    box.hidden = !i.enabled;
+    if (!i.enabled) return;
+    liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
+    $('liveUrl').textContent = 'Watch at ' + i.url;
+  }).catch(function () { box.hidden = true; });
+}
+function saveLiveInfo() {
+  var t = $('liveTitle').value.trim(), d = $('liveDetails').value.trim();
+  if (t === liveInfoSaved.title && d === liveInfoSaved.details) return;
+  call('POST', '/v1/live', { action: 'info', title: t, details: d }).then(function (i) { liveInfoSaved = i.info; }).catch(function (e) { msg('Could not save the live note: ' + (e && e.message || e)); });
+}
+$('liveTitle').onchange = saveLiveInfo; $('liveDetails').onchange = saveLiveInfo;
 function showAccount() {
+  loadLiveInfo();
   if (sessionToken()) {
     $('acctBtn').textContent = 'Sign out';
     call('GET', '/auth/me').then(function (u) { $('acct').textContent = 'hCRI.io: ' + (u.name || u.email); }).catch(function () { $('acct').textContent = ''; });
