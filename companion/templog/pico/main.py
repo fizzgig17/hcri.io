@@ -9,8 +9,9 @@
 #
 # Wiring (see the build page): Pico GP4 = SDA, GP5 = SCL, 3V3 and GND to the TCA9548A; each GY-906 board on one
 # TCA9548A channel (SD0/SC0, SD1/SC1, SD2/SC2), all at the sensors' default address 0x5A.
+# With no TCA9548A connected, ONE sensor can go straight on GP4/GP5 (it is read as sensor 1).
 
-VERSION = "2026.11.01.1"
+VERSION = "2026.11.01.2"
 SENSORS = 3          # how many channels are read (0 to 7 on the multiplexer)
 MUX_ADDR = 0x70
 MLX_ADDR = 0x5A
@@ -66,6 +67,13 @@ def main():
 
     i2c = I2C(0, sda=Pin(4), scl=Pin(5), freq=100000)   # the sensors are SMBus parts: 100 kHz at most
     emis = [1.0] * SENSORS
+    mux = [False]   # is a TCA9548A answering? (checked at start and whenever you send ?)
+
+    def find_mux():
+        try:
+            mux[0] = MUX_ADDR in i2c.scan()
+        except OSError:
+            mux[0] = False
     try:
         with open("config.json") as f:
             saved = json.load(f).get("emis", [])
@@ -82,9 +90,12 @@ def main():
             pass
 
     def read(ch, reg):
+        if not mux[0] and ch != 0:
+            return None      # without the multiplexer only one sensor can be on the bus
         for _ in range(3):
             try:
-                i2c.writeto(MUX_ADDR, bytes([1 << ch]))
+                if mux[0]:
+                    i2c.writeto(MUX_ADDR, bytes([1 << ch]))
                 v = decode(reg, i2c.readfrom_mem(MLX_ADDR, reg, 3))
                 if v is not None:
                     return v
@@ -94,10 +105,11 @@ def main():
         return None
 
     def status():
+        find_mux()
         found = []
         for ch in range(SENSORS):
             found.append("1" if read(ch, REG_AMBIENT) is not None else "0")
-        print("# hCRI temp logger %s sensors=%s emis=%s" % (VERSION, "".join(found), ",".join("%.2f" % e for e in emis)))
+        print("# hCRI temp logger %s mux=%s sensors=%s emis=%s" % (VERSION, "1" if mux[0] else "0", "".join(found), ",".join("%.2f" % e for e in emis)))
 
     def command(text):
         p = text.split()
@@ -134,10 +146,11 @@ def main():
             o, a = read(ch, REG_OBJECT), read(ch, REG_AMBIENT)
             objs.append(correct(o, a, emis[ch]))
             ambs.append(a)
-        try:
-            i2c.writeto(MUX_ADDR, b"\x00")   # leave every channel off between reads
-        except OSError:
-            pass
+        if mux[0]:
+            try:
+                i2c.writeto(MUX_ADDR, b"\x00")   # leave every channel off between reads
+            except OSError:
+                pass
         print(line(time.ticks_diff(time.ticks_ms(), t0) / 1000, objs, ambs))
 
 

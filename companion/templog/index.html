@@ -215,6 +215,7 @@
         <tr><td>TCA9548A SD2 / SC2</td><td>Sensor 3 SDA / SCL</td></tr>
         <tr><td>TCA9548A A0, A1, A2, RST</td><td>Leave open (the multiplexer then answers at address 0x70).</td></tr>
       </table>
+      <p><strong>One sensor only?</strong> Skip the multiplexer for now: connect the sensor straight to the Pico (VIN to 3V3 OUT, GND to a GND pin, SDA to GP4, SCL to GP5). The firmware (2026.11.01.2 and later) notices there is no multiplexer and reads that sensor as sensor 1. When you add the multiplexer later, move the sensor to SD0/SC0; the firmware switches by itself and needs no change.</p>
       <p>Keep the sensor cables short (under about 50 cm) and use the 3.3 V supply, not 5 V, for the sensors and multiplexer. The sensors are SMBus parts: the firmware runs the bus at 100 kHz. The GY-906 and multiplexer boards usually carry their own pull-up resistors, so no extra ones are needed.</p>
     </section>
 
