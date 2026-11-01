@@ -71,7 +71,9 @@ function live_row(PDO $db, int $uid): array
 
 function live_url(string $token): string
 {
-    $base = defined('INBOUND_SITE_URL') ? INBOUND_SITE_URL : 'https://www.hcri.io';
+    // The host the request came to (so dev.hcri.io hands out dev links); cron runs have none, so they use the configured site.
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    $base = preg_match('/^[A-Za-z0-9.-]+(:\d+)?$/', $host) ? 'https://' . $host : (defined('INBOUND_SITE_URL') ? INBOUND_SITE_URL : 'https://www.hcri.io');
     return rtrim($base, '/') . '/?live=' . $token;
 }
 
