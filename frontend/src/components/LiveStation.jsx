@@ -157,6 +157,25 @@ export function LiveStationPanel({ T }) {
               <a style={{ ...btn('accent'), textDecoration: 'none' }} href={st.url} target="_blank" rel="noreferrer">Open</a>
             </div>
           )}
+          {st.enabled && (() => {
+            const online = run && run.status === 'running' && !run.stale && (run.ageSeconds == null || run.ageSeconds < 30);
+            const running = online && run.kind === 'run';
+            const pending = st.command ? ({ start: 'Start', stop: 'Stop', clear: 'Clear' })[st.command.action] : '';
+            const send = (c) => act({ action: 'command', command: c });
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>Control the run</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button style={{ ...btn('accent'), opacity: online && !running && !pending ? 1 : 0.4 }} disabled={!online || running || !!pending} onClick={() => send('start')}>Start run</button>
+                  <button style={{ ...btn('bad'), opacity: running && !pending ? 1 : 0.4 }} disabled={!running || !!pending} onClick={() => send('stop')}>Stop run</button>
+                  <button style={{ ...btn('dim'), opacity: !running && !pending ? 1 : 0.4 }} disabled={running || !!pending} onClick={() => send('clear')}>Clear</button>
+                  <span style={{ color: T.dim, fontSize: 12 }}>
+                    {pending ? `${pending} sent: waiting for the logger or app (up to 5 seconds)…` : online ? 'Carried out by the web logger or the app that is connected to the tester.' : 'Needs the web logger or the app connected to the tester, with Live on.'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
           {st.enabled && (
             <>
               <div style={{ fontSize: 12, color: T.dim, fontWeight: 800, textTransform: 'uppercase', margin: '4px 0 8px' }}>What you are testing (shown on the live page)</div>

@@ -11,6 +11,7 @@ declare(strict_types=1);
 //   POST /api/v1/live {"action":"settings","settings":{emailDone,emailLow,emailStale,emailError,lowLm,staleMin}}
 //   POST /api/v1/live {"action":"info","title":"...","details":"..."} -> what you are testing, shown on the live page (empty clears it)
 //   POST /api/v1/live {"action":"clear"}   -> forgets the current/last run
+//   POST /api/v1/live {"action":"command","command":"start|stop|clear"} -> asks the connected logger/app to do it; the answer to its next push carries {command:{id,action}}, and it sends "ack":id back
 //   POST /api/v1/live {"runId","kind":"run|monitor","label","unit","intervalSeconds","startIndex","values":[...],"status":"running|finished|error","message"}
 //        -> {"count":N}   Sends readings. startIndex is where "values" begin in the run; sending an empty list is a heartbeat.
 //        If startIndex is past what the server has, the answer is {"count":N,"resend":true}: send again from N.
@@ -60,6 +61,13 @@ if ($action !== '') {
         $db->prepare('UPDATE live_stations SET info_title = ?, info_text = ? WHERE user_id = ?')->execute([$title, $details === '' ? null : $details, $uid]);
     } elseif ($action === 'clear') {
         $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
+    } elseif ($action === 'command') {
+        // Remote control: a sender that is connected to the tester (the web logger or the app) carries it out with its next push.
+        $c = (string)($b['command'] ?? '');
+        if (!in_array($c, ['start', 'stop', 'clear'], true)) json_error('command must be start, stop or clear', 400);
+        $db->prepare('UPDATE live_stations SET cmd = ?, cmd_id = ?, cmd_at = ? WHERE user_id = ?')->execute([$c, bin2hex(random_bytes(6)), time(), $uid]);
+        // While a sender is live it clears the station itself (so its stream restarts clean); otherwise there is nobody to do it, so do it here.
+        if ($c === 'clear' && !($r['status'] === 'running' && !live_is_stale($r))) $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
     } else {
         json_error('Unknown action', 400);
     }
@@ -86,6 +94,8 @@ $label = mb_substr(trim((string)($b['label'] ?? '')), 0, 160);
 $unit = mb_substr(trim((string)($b['unit'] ?? 'lm')), 0, 16) ?: 'lm';
 $interval = max(0.05, min(3600, (float)($b['intervalSeconds'] ?? 1)));
 $kind = ($b['kind'] ?? 'run') === 'monitor' ? 'monitor' : 'run';
+$ack = preg_replace('/[^a-f0-9]/', '', (string)($b['ack'] ?? ''));
+if ($ack !== '' && $ack === $r['cmd_id']) $db->prepare("UPDATE live_stations SET cmd = '' WHERE user_id = ? AND cmd_id = ?")->execute([$uid, $ack]);
 
 $db->beginTransaction();
 try {
@@ -99,7 +109,7 @@ try {
     $count = $base + count($have);
     if ($start > $count) {
         $db->commit();
-        json_out(['count' => $count, 'resend' => true]);
+        json_out(['count' => $count, 'resend' => true] + live_cmd_reply($r, $ack));
     }
     if ($start < $base) { $values = array_slice($values, $base - $start); $start = $base; }   // the monitor already dropped those
     $merged = array_merge(array_slice($have, 0, $start - $base), $values);
@@ -122,4 +132,4 @@ try {
     error_log('live push: ' . $e->getMessage());
     json_error('Could not save the readings', 500);
 }
-json_out(['count' => $total]);
+json_out(['count' => $total] + live_cmd_reply($r, $ack));

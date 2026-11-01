@@ -748,16 +748,28 @@ function liveAddTo(L, tSec, lm) {
 function liveMon(tSec, lm) { if (!Mon) Mon = liveStart('monitor'); liveAddTo(Mon, tSec, lm); }
 function liveMonStop() { var L = Mon; Mon = null; if (L) liveEnd(L, ''); }
 function liveName(L) { return L.kind === 'monitor' ? 'Live reading' : (S.source && S.source.kind === 'sim' ? 'Simulated: ' : '') + 'TKLamp run ' + fmtTS(S.started).slice(0, 16); }
+// Remote control: Start / Stop / Clear asked for from the website or the app arrive in the answer to a send; each is carried out once and acknowledged with the next send.
+var cmdAck = '', cmdSeen = '';
+function liveCommand(c) {
+  if (!c || c.id === cmdSeen) return;
+  cmdSeen = c.id; cmdAck = c.id;
+  if (c.action === 'start') { if (S.recording) return; msg('Start asked for from the live page.'); startRun(); }
+  else if (c.action === 'stop') { if (!S.recording) return; msg('Stop asked for from the live page.'); stopRun('Stopped from the live page.', true); }
+  else if (c.action === 'clear') { if (S.recording) return; msg('Clear asked for from the live page.'); $('clearBtn').onclick(); }
+}
 function liveFlush(L, status, message) {
   if (L.off || L.busy) return Promise.resolve(false);
   L.busy = true;
   var guard = 0;
   function step() {
     var chunk = L.vals.slice(L.sent, L.sent + 1000), last = L.sent + chunk.length >= L.vals.length;
-    if (!chunk.length && status === 'running') { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
+    if (!chunk.length && status === 'running' && !cmdAck) { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
     var body = { runId: L.id, kind: L.kind, label: L.label || (L.label = liveName(L)), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
     if (last && message) body.message = message;
+    var sentAck = cmdAck; if (sentAck) body.ack = sentAck;
     return call('POST', '/v1/live', body).then(function (r) {
+      if (sentAck && cmdAck === sentAck) cmdAck = '';
+      if (r.command) liveCommand(r.command);
       if (r.enabled === false) { L.off = true; L.busy = false; return true; }
       if (r.resend) L.sent = Math.min(r.count, L.vals.length); else { L.sent = r.count; if (last) { L.busy = false; return true; } }
       if (++guard > 50) { L.busy = false; return true; }
