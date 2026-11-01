@@ -2018,8 +2018,10 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       allReports={[ee]}
       preview={!n}
       isGuest={!n || Number(ee.userId) !== Number(n.id)}
+      isAdmin={!!(n && n.isAdmin)}
       onMetaSave={async (patch) => {
         F((t) => ({ ...t, ...patch }));
+        if (!n || Number(ee.userId) !== Number(n.id)) return;   // an admin's rename of another user's report was already saved by the admin endpoint
         try {
           await fetch(`./index.php/api/reports/${ee.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` }, body: JSON.stringify(patch) });
         } catch (e) { console.error(e); }
