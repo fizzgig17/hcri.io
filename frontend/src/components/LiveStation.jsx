@@ -136,7 +136,11 @@ export function LiveStationPanel({ T }) {
     </label>
   );
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 14, fontFamily: 'monospace' }}>
+    <div className="ls-panel" style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 14, fontFamily: 'monospace' }}>
+      <style>{`.ls-panel button,.ls-panel a{transition:filter .12s,transform .06s}
+.ls-panel button:not(:disabled):hover,.ls-panel a:hover{filter:brightness(1.35)}
+.ls-panel button:not(:disabled):active,.ls-panel a:active{transform:translateY(1px);filter:brightness(1.7)}
+.ls-panel button:disabled{cursor:default}`}</style>
       <div onClick={() => setOpen((v) => !v)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer' }}>
         <span style={{ fontWeight: 800, flex: 1 }}>Live station <span style={{ color: T.dim, fontWeight: 400, fontSize: 12 }}>watch a TKLamp run from anywhere</span></span>
         <span style={{ color: st && st.enabled ? T.accent : T.dim, fontSize: 12, fontWeight: 700 }}>{status}</span>
