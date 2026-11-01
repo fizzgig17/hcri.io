@@ -52,7 +52,7 @@ import urllib.error
 import urllib.request
 
 DEFAULT_SITE = "https://hcri.io"
-SCRIPT_VERSION = "2026.11.01.2"    # bumped with each release; the start-up check compares it with the copy on the site
+SCRIPT_VERSION = "2026.11.01.3"    # bumped with each release; the start-up check compares it with the copy on the site
 DEFAULT_SCALE = 313.2            # counts per lumen
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".hcri_tklamp.json")
 MAX_POINTS = 100000              # hCRI.io's limit per curve
@@ -1151,6 +1151,8 @@ class TkApp:
         self.clear_btn.pack(side="left", padx=6)
         self.cal_btn = ttk.Button(bar, text="Calibrate...", command=self.calibrate_dialog)
         self.cal_btn.pack(side="left")
+        self.live_btn = ttk.Button(bar, text="Live station", command=self.live_toggle)
+        self.live_btn.pack(side="left", padx=(6, 0))
         ttk.Button(bar, text="Live note...", command=self.live_note).pack(side="left", padx=(6, 0))
         self.scale_lbl = ttk.Label(bar, text="")
         self.scale_lbl.pack(side="left", padx=8)
@@ -1368,6 +1370,21 @@ class TkApp:
             self.mon.finish("")
         self.mon, self.mon_tried = None, False
 
+    def live_toggle(self):
+        """Turn the Live station on or off for the hCRI.io account (the same switch as on the website and in the app)."""
+        if not self.need_token(self.live_toggle):
+            return
+        try:
+            info = api(self.site, self.token(), "GET", "/v1/live")
+            on = not info.get("enabled")
+            info = api(self.site, self.token(), "POST", "/v1/live", {"action": "enable" if on else "disable"})
+        except RuntimeError as e:
+            messagebox.showerror("Live station", str(e))
+            return
+        self.live_btn.config(text="Live: on" if info.get("enabled") else "Live: off")
+        self.stop_mon()   # so the live reading starts again (or stops) right away
+        self.msg("Live station is on: watch at " + str(info.get("url")) if info.get("enabled") else "Live station is off.")
+
     def live_note(self):
         """Live station: type what you are testing; it shows on the live page within seconds."""
         if not self.need_token(self.live_note):
@@ -1378,8 +1395,15 @@ class TkApp:
             messagebox.showerror("Live station", str(e))
             return
         if not info.get("enabled"):
-            messagebox.showinfo("Live station", "Live station is off. Turn it on at hCRI.io: Explore > Runtime > Live station.")
-            return
+            if not messagebox.askyesno("Live station", "Live station is off. Turn it on?"):
+                return
+            try:
+                info = api(self.site, self.token(), "POST", "/v1/live", {"action": "enable"})
+            except RuntimeError as e:
+                messagebox.showerror("Live station", str(e))
+                return
+            self.live_btn.config(text="Live: on")
+            self.stop_mon()
         cur = info.get("info", {})
         title = simpledialog.askstring("Live station", "What are you testing? (shown on the live page)", initialvalue=cur.get("title", ""), parent=self.root)
         if title is None:
@@ -2166,6 +2190,7 @@ def main():
     ap.add_argument("--upload", metavar="FILE.json", help="Upload a run saved earlier, then exit")
     ap.add_argument("--live-title", metavar="TEXT", help="Live station: what you are testing (shown on the live page; \"\" clears it)")
     ap.add_argument("--live-details", metavar="TEXT", help="Live station: details about it (cell, mode, notes)")
+    ap.add_argument("--live", choices=["on", "off"], help="Turn your Live station on or off (the same switch as on the website and in the app)")
     ap.add_argument("--no-update", action="store_true", help="Do not check for a newer version of this script at start-up")
     ap.add_argument("--simulate", action="store_true", help="No tester: a made-up fading light, to try the script")
     args = ap.parse_args()
@@ -2220,6 +2245,12 @@ def main():
         spool_written[0] = 0
         live_site = args.site or cfg.get("site") or DEFAULT_SITE
         live_token = args.token or os.environ.get("HCRI_TOKEN") or cfg.get("token")
+        if live_token and args.live:
+            try:
+                u = api(live_site, live_token, "POST", "/v1/live", {"action": "enable" if args.live == "on" else "disable"})
+                print("Live station is on: watch at " + str(u.get("url")) if u.get("enabled") else "Live station is off.")
+            except RuntimeError as e:
+                print("Could not change the Live station:", e)
         if live_token and (args.live_title is not None or args.live_details is not None):
             try:
                 cur = api(live_site, live_token, "GET", "/v1/live").get("info", {})

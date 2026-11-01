@@ -255,6 +255,7 @@
         <tr><td>Start at the peak</td><td>Drops everything before the highest reading, so the run starts at the peak (off by default; turning it on turns off Start at the first reading).</td></tr>
         <tr><td>Show readings</td><td>Shows a line of clock time, elapsed time and lumens every second under the chart, with REC marking the recorded ones. Untick it to hide the list; the setting is remembered. In the terminal the same line is turned off with <code>--no-readout</code>.</td></tr>
         <tr><td>Calibrate...</td><td>Put a lamp of known output in the sphere, enter its lumens and click Measure. It averages 8 seconds and shows the new counts-per-lumen scale; Save scale keeps it. See <a href="#scale">Calibrating the scale</a>.</td></tr>
+        <tr><td>Live station</td><td>Turns your Live station on or off (the same switch as on the website and in the app). The label shows Live: on or Live: off after you click it.</td></tr>
         <tr><td>Live note...</td><td>Type what you are testing and some details (for example &ldquo;Olight Warrior 3, turbo, fresh cell&rdquo;). They show on your live page and can be changed during a run.</td></tr>
         <tr><td>Sign in / Sign out</td><td>Creates or forgets the hCRI.io token (see above).</td></tr>
       </table>
@@ -263,7 +264,7 @@
 
     <section id="livestation">
       <h2>Live station: watch from anywhere</h2>
-      <p>Switch it on once on hCRI.io (<code>Explore &rarr; Runtime &rarr; Live station</code>) or in the Companion app (<code>Settings &rarr; Live station</code>). While the script is signed in to your hCRI.io account, it sends the reading to your personal link every 5 seconds. The link shows <b>Live</b> with the current lumens when no run is recording, and <b>Live run</b> at the top while one is. Anyone with the link can watch; the same screen is in the app under <code>Settings &rarr; Live station</code> (the eye button). Runs also trigger emails when they finish, have a problem, go silent or fall below a limit you set; a plain live reading never does. A simulated run is sent as &ldquo;Simulated: ...&rdquo;.</p>
+      <p>Switch it on or off from any of these (it is one switch on your hCRI.io account): the website (<code>Explore &rarr; Runtime &rarr; Live station</code>), the Companion app (<code>Settings &rarr; Live station</code>), the web logger (the Live station box, tick <em>Share live</em>), or this script (the <em>Live station</em> button in the window, or <code>--live on</code> / <code>--live off</code> in the terminal). While the script is signed in to your hCRI.io account, it sends the reading to your personal link every 5 seconds. The link shows <b>Live</b> with the current lumens when no run is recording, and <b>Live run</b> at the top while one is. Anyone with the link can watch; the same screen is in the app under <code>Settings &rarr; Live station</code> (the eye button). Runs also trigger emails when they finish, have a problem, go silent or fall below a limit you set; a plain live reading never does. A simulated run is sent as &ldquo;Simulated: ...&rdquo;.</p>
       <p>Type what you are testing with <em>Live note...</em> (window) or <code>--live-title</code> / <code>--live-details</code> (terminal). Chat and social sites show a snapshot of that name and the lumens when they fetched the link; only the page itself is live.</p>
     </section>
 
@@ -321,6 +322,7 @@
         <tr><td><code>--login</code></td><td>Sign in with your hCRI.io email/username and password, create a token and remember it.</td></tr>
         <tr><td><code>--token T</code>, <code>--save-token</code></td><td>Use an API token you made on the website, and remember it.</td></tr>
         <tr><td><code>--site URL</code></td><td>Another hCRI.io address (default https://hcri.io).</td></tr>
+        <tr><td><code>--live on|off</code></td><td>Turn your Live station on or off, then carry on.</td></tr>
         <tr><td><code>--live-title TEXT</code>, <code>--live-details TEXT</code></td><td>What you are testing, shown on your live page (see Live station). An empty title clears it.</td></tr>
         <tr><td><code>--no-update</code></td><td>Do not check for a newer version of the script at start-up.</td></tr>
         <tr><td><code>--upload FILE.json</code></td><td>Upload a run saved earlier, then exit.</td></tr>

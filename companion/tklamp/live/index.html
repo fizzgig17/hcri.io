@@ -248,11 +248,14 @@
       <label><input type="checkbox" id="trimPeak"> Start at the peak</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
     </div>
-    <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station: what you are testing (shown on the live page)</legend>
+    <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station</legend>
+      <label style="flex-basis:100%"><input type="checkbox" id="liveOn"> Share live (a link anyone can open to watch your tester and runs)</label>
+      <div id="liveFields" style="flex:1 1 100%;display:none;flex-wrap:wrap;gap:8px">
       <input type="text" id="liveTitle" maxlength="160" placeholder="Name, e.g. Olight Warrior 3, turbo" style="flex:1 1 100%">
       <textarea id="liveDetails" maxlength="2000" rows="2" placeholder="Details: cell, driver mode, notes (changes show on the live page within seconds)" style="flex:1 1 100%"></textarea>
       <button type="button" id="liveSave">Save note</button> <span class="note" id="liveSaved"></span>
       <div class="note" id="liveUrl" style="flex-basis:100%"></div>
+      </div>
     </fieldset>
     <fieldset class="limits"><legend>Run limits (blank = off; remembered on this browser)</legend>
       <label>Start at <input type="number" id="limStart" min="0" step="any" placeholder="off"> lm</label>
@@ -902,19 +905,33 @@ function loadLiveInfo() {
   var box = $('liveInfoBox');
   if (!sessionToken()) { box.hidden = true; return; }
   call('GET', '/v1/live').then(function (i) {
-    box.hidden = !i.enabled;
-    if (!i.enabled) return;
-    liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
-    $('liveUrl').textContent = 'Watch at ' + i.url;
+    box.hidden = false;
+    showLiveState(i);
   }).catch(function () { box.hidden = true; });
 }
+function showLiveState(i) {
+  $('liveOn').checked = !!i.enabled; $('liveFields').style.display = i.enabled ? 'flex' : 'none';
+  if (!i.enabled) { $('liveUrl').textContent = ''; return; }
+  liveInfoSaved = i.info; $('liveTitle').value = i.info.title; $('liveDetails').value = i.info.details;
+  $('liveUrl').textContent = 'Watch at ' + i.url;
+}
+$('liveOn').onchange = function () {
+  var on = $('liveOn').checked;
+  call('POST', '/v1/live', { action: on ? 'enable' : 'disable' }).then(function (i) {
+    showLiveState(i);
+    msg(on ? 'Live station is on: watch at ' + i.url : 'Live station is off.');
+    if (on && S.connected && !S.recording) { liveMonStop(); }   // starts the live reading again on the next reading
+  }).catch(function (e) { $('liveOn').checked = !on; msg('Could not change Live station: ' + (e && e.message || e)); });
+};
 // A note saved elsewhere (the website, the app, the script) shows up here within seconds, unless this box has unsaved typing.
 setInterval(function () {
   if ($('liveInfoBox').hidden || !sessionToken() || document.hidden) return;
   var t = $('liveTitle'), d = $('liveDetails');
+  if (document.activeElement === $('liveOn')) return;
   if (document.activeElement === t || document.activeElement === d || t.value.trim() !== liveInfoSaved.title || d.value.trim() !== liveInfoSaved.details) return;
   call('GET', '/v1/live').then(function (i) {
-    if (!i.enabled) { $('liveInfoBox').hidden = true; return; }
+    if (!i.enabled !== ($('liveFields').style.display === 'none')) { showLiveState(i); return; }
+    if (!i.enabled) return;
     if (i.info.title !== liveInfoSaved.title || i.info.details !== liveInfoSaved.details) { liveInfoSaved = i.info; t.value = i.info.title; d.value = i.info.details; }
   }).catch(function () {});
 }, 5000);
