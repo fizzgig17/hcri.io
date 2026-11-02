@@ -19,8 +19,13 @@ SENSOR_BARREL_D = 9.5     # measured can 9.0 mm + 0.5 clearance
 SENSOR_BARREL_LEN = 12.0  # how much of the barrel sits in the front bore
 BOARD_W, BOARD_H = 12.5 + 0.4, 19.0 + 0.4   # measured: board 12.5 wide, 19 tall, plus clearance
 LASER_D = 6.2             # 6 mm laser module plus clearance
-HOLE_SPACING = 15.0       # sensor centre to laser centre
-AIM_DISTANCE = 50.0       # mm in front of the pod where the laser dot should meet the sensor's line of sight (0 = straight)
+HOLE_SPACING = 17.5       # sensor centre to laser-plug centre
+AIM_DISTANCES = (30, 50, 100)   # one swappable laser plug per distance (mm in front of the pod where the dot meets the sensor's line of sight)
+PLUG_R = 8.5              # laser plug body radius
+PLUG_CLEAR = 0.15         # gap between plug and socket
+PLUG_LEN = 10.0           # plug body length (sits in the lug at the front)
+FLANGE_T, FLANGE_R = 2.0, 10.0   # plug head that stops against the front face
+FLAT_D = 6.5              # flat on the plug's bottom, this far below its axis: the plug only fits one way
 BACK_SPACE = 15.0         # room behind the barrel for the board and its plug
 STUD_HOLE_D = 6.8         # 1/4"-20 stud clearance
 NUT_AF = 11.1 + 0.4       # 1/4"-20 hex nut across flats plus clearance
@@ -31,9 +36,7 @@ ROOF = 2.2                # plastic between the nut pocket and the sensor cavity
 
 sx, lx = -HOLE_SPACING / 2, HOLE_SPACING / 2
 x_min = sx - BOARD_W / 2 - WALL
-PHI = math.degrees(math.atan(HOLE_SPACING / AIM_DISTANCE)) if AIM_DISTANCE else 0.0
-_t = math.tan(math.radians(PHI))
-x_max = max(lx + LASER_D / 2 / math.cos(math.radians(PHI)) + (SENSOR_BARREL_LEN + BACK_SPACE) * _t, sx + BOARD_W / 2) + WALL
+x_max = lx + PLUG_R + PLUG_CLEAR + WALL
 W = x_max - x_min
 D = SENSOR_BARREL_LEN + BACK_SPACE + 0.0       # front face at y = D, open back at y = 0
 cav_z0 = FLOOR + NUT_H + ROOF
@@ -54,7 +57,6 @@ body = box(x_min, 0, 0, W, D, H)
 cuts = [
     cyl_y(SENSOR_BARREL_D, SENSOR_BARREL_LEN + 0.5, sx, cz, D - SENSOR_BARREL_LEN),             # barrel bore through the front
     box(sx - BOARD_W / 2, -0.5, cz - BOARD_H / 2, BOARD_W, D - SENSOR_BARREL_LEN + 0.5, BOARD_H),  # board pocket, open at the back
-    Manifold.cylinder(D * 1.3 + 3, LASER_D / 2, LASER_D / 2, 48).rotate((-90, 0, 0)).translate((0, -(D * 1.3 + 2), 0)).rotate((0, 0, PHI)).translate((lx, D, cz)),  # laser bore, tilted in toward the sensor's line of sight; pivots at the front face
 ]
 # stud hole up through the floor, hex nut pocket above it, slot out the back to slide the nut in
 sy = D / 2
@@ -63,11 +65,41 @@ r = (NUT_AF / 2) / math.cos(math.radians(30))
 hexp = Manifold.cylinder(NUT_H, r, r, 6).rotate((0, 0, 90)).translate((cx_body, sy, FLOOR))
 cuts.append(hexp)
 cuts.append(box(cx_body - NUT_AF / 2, -0.5, FLOOR, NUT_AF, sy + 0.5, NUT_H))
+# laser plug socket: round bore through the front lug, with a flat of material at the bottom (the key)
+LUG = PLUG_LEN
+sock_r = PLUG_R + PLUG_CLEAR
+sock = cyl_y(2 * sock_r, LUG + 1, lx, cz, D - LUG) - box(lx - 20, D - LUG - 1, cz - 40 - (FLAT_D + PLUG_CLEAR), 40, LUG + 3, 40)
+cuts.append(sock)
+# relief behind the socket so the laser body can lean back at its angle (open at the back and to the +x side)
+rx0 = sx + BOARD_W / 2 + WALL
+cuts.append(box(rx0, -0.5, cz - sock_r, x_max - rx0 + 1, D - LUG + 0.5, 2 * sock_r))
 for c in cuts:
     body = body - c
 
-mesh = body.to_mesh()
-m = trimesh.Trimesh(vertices=np.asarray(mesh.vert_properties)[:, :3], faces=np.asarray(mesh.tri_verts))
+
+def to_trimesh(man):
+    ms = man.to_mesh()
+    return trimesh.Trimesh(vertices=np.asarray(ms.vert_properties)[:, :3], faces=np.asarray(ms.tri_verts))
+
+
+m = to_trimesh(body)
 m.export('sensor_pod.stl')
-print('laser tilt deg:', round(PHI, 1), ' aim distance mm:', AIM_DISTANCE)
-print('watertight:', m.is_watertight, ' size mm (x, y, z):', [round(v, 1) for v in m.extents], ' volume cm3:', round(m.volume / 1000, 2))
+print('pod  watertight:', m.is_watertight, ' size mm (x, y, z):', [round(v, 1) for v in m.extents], ' volume cm3:', round(m.volume / 1000, 2))
+
+
+def make_plug(dist):
+    """Plug built in pod coordinates (axis along y at x=lx, z=cz); the body sits in the lug, the flange outside the front face."""
+    y_mid = D + (FLANGE_T - PLUG_LEN) / 2
+    h = D - y_mid
+    phi = math.degrees(math.atan(HOLE_SPACING / (dist + h)))   # exact: the beam crosses the sensor axis at `dist` in front of the pod
+    body_ = cyl_y(2 * PLUG_R, PLUG_LEN, lx, cz, D - PLUG_LEN) - box(lx - 20, D - PLUG_LEN - 1, cz - 40 - FLAT_D, 40, PLUG_LEN + 2, 40)
+    flange = cyl_y(2 * FLANGE_R, FLANGE_T, lx, cz, D)
+    hole = (Manifold.cylinder(60, LASER_D / 2, LASER_D / 2, 48).rotate((-90, 0, 0)).translate((0, -30, 0))
+            .rotate((0, 0, phi)).translate((lx, y_mid, cz)))
+    return to_trimesh(body_ + flange - hole), phi
+
+
+for dist in AIM_DISTANCES:
+    pm, phi = make_plug(dist)
+    pm.export(f'laser_plug_{dist}mm.stl')
+    print(f'plug {dist:>3} mm: tilt {phi:4.1f} deg  watertight:', pm.is_watertight, ' size mm:', [round(v, 1) for v in pm.extents])
