@@ -722,7 +722,8 @@
       <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. Tap the
         <code>Add LED</code> button (a light bulb) beside the reading's title on Main (it reads <code>LED</code> or
         <code>2 LEDs</code> with a tick once set), <code>Edit</code> on the Data tab, or the light-bulb line on a History row (it shows
-        <code>Edit</code> once LEDs are set). The app may also suggest an LED from the shape of the spectrum (you can turn this off in Settings → LED suggestions); tap
+        <code>Edit</code> once LEDs are set). Those three set the LEDs only; to set LEDs and the other categories together, use <a href="#categorize">Categorize</a>.
+        If you turn on Settings → LED suggestions, the app may also suggest an LED from the shape of the spectrum; tap
         <code>Yes</code> to accept it or <code>Other</code> to choose yourself.</p>
       <ul>
         <li>Each LED has a <strong>brand</strong>, a <strong>model</strong> and a <strong>CCT</strong>. Start typing or tap a match from the
@@ -736,6 +737,22 @@
         <li>Values that aren't in the lists yet are sent to hCRI.io for review rather than added straight away.</li>
         <li>LED details are saved with the reading and sent to its hCRI.io report as soon as it has been uploaded. They also
           appear on the TM-30 report, one line per LED.</li>
+      </ul>
+      <h3 id="categorize">Categorize</h3>
+      <p>Categorize sets everything hCRI.io files a report under: the LEDs plus <strong>light brand</strong>, <strong>light model</strong>,
+        <strong>optic</strong>, <strong>lumens</strong> and <strong>current</strong>. It works on one reading or on many at once.</p>
+      <ul>
+        <li><strong>One reading:</strong> tap <code>Categorize</code> (or the tag line) on a History row, or the tag line at the top of a reading's
+          page. The window opens with the reading's own values.</li>
+        <li><strong>Several readings:</strong> in History, hold a reading to start selecting, check the readings, and tap <code>Categorize</code>.
+          Choose whether a reading that already has a value <em>keeps its value</em> (only gaps are filled) or <em>replaces it</em>.</li>
+        <li>Each field is a text box with matches from the hCRI.io lists underneath. Lumens and current are numbers you type. Blank fields are
+          left as they are; <code>Clear fields</code> empties the window. Values that aren't in the lists yet are sent to hCRI.io for review.</li>
+        <li><strong>Nothing is applied until you tap <code>Categorize</code>.</strong> The window remembers what you applied last time and opens with
+          those values filled in for any field the reading has nothing for, so repeating a category is quick, but new readings are never
+          categorized automatically.</li>
+        <li>Categories are saved on your phone straight away and sent to the report on hCRI.io when the reading has been uploaded (or at its next
+          upload). The category lists refresh each time the app starts, when you are online, and are kept for offline use.</li>
       </ul>
     </section>
 
@@ -774,7 +791,7 @@
           first tap creates its share link, which anyone holding the link can open.</li>
         <li><strong>Select</strong> multiple readings: hold a reading's title to start, with that reading checked. Tap
           more rows to add them, use <code>Select all</code> at the top, and tap the X to stop. Then upload them to
-          hCRI.io in one batch, share, compare or delete them.</li>
+          hCRI.io in one batch, <a href="#categorize">categorize</a>, share, compare or delete them.</li>
         <li><strong>Share</strong> a single reading, the readings you have selected, or your entire history, as CSV. Shared files end with a short summary of the computed values.</li>
         <li><strong>Add a saved flicker</strong> to a reading that has none: the lightning-bolt button lists your saved flickers that aren't attached to a reading yet. Pick one and it is copied into the reading, so it is saved and uploaded with it. If the reading was already uploaded, the flicker is also added to its report on hCRI.io. The button only appears when the reading has no flicker and a free saved flicker exists. A reading that has a flicker shows a small waveform icon next to its date; its hint says when the flicker went up with the report.</li>
         <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone (and from your cloud backup, if backup is on); a
@@ -831,7 +848,7 @@
       <h3>ColorMunki</h3>
       <p><code>Calibration limit (minutes)</code>: how old the ColorMunki's calibration may be before the app asks you to calibrate again. The default is 30 minutes; 0 turns the check off. The bridge itself still needs one calibration after it powers up.</p>
       <h3>Readings</h3>
-      <p><code>LED suggestions</code> (on by default): after a reading, hCRI.io suggests the LED from the shape of the spectrum and the reading's title, and you confirm it with one tap. See <a href="#led-details">LED details</a>.
+      <p><code>LED suggestions</code> (off by default): when on, hCRI.io suggests the LED after a reading, from the shape of the spectrum and the reading's title, and you confirm it with one tap. See <a href="#led-details">LED details</a>.
         <code>Capture flicker with each reading</code> (off by default) takes one flicker sample with every reading on meters that support it; see <a href="#livemodes">Live readings &amp; Flicker</a>.</p>
       <h3>Feedback</h3>
       <p>Two switches, both on by default: <code>Button taps</code> (a short tick when you press a button in the bottom bar) and <code>Reading and upload results</code> (a distinct vibration when a reading or upload finishes, and a different one when it fails). On iPhone these use the Taptic Engine.</p>

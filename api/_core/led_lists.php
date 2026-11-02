@@ -50,6 +50,11 @@ function led_lists_payload(PDO $db): array {
     foreach (LED_KINDS as $k) {
         $lists[$k] = array_values(array_map(fn($e) => (string)$e['value'], $all[$k] ?? []));
     }
+    // The other report categories (light brand / model, optic, lumens, current), for the app's Categorize screen.
+    foreach (category_kinds() as $k) {
+        if (in_array($k, LED_KINDS, true)) continue;
+        $lists[$k] = array_values(array_map(fn($e) => (string)$e['value'], $all[$k] ?? []));
+    }
     // CCT presets read best in numeric order.
     usort($lists['led_cct'], fn($a, $b) => ((int)preg_replace('/\D+/', '', $a)) <=> ((int)preg_replace('/\D+/', '', $b)) ?: strcmp($a, $b));
 
