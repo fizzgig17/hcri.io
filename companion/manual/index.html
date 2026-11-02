@@ -719,10 +719,10 @@
         reading attached on the first upload is left as it was.) A new reading always uploads as a new report of
         its own; it never replaces the one before it.</p>
       <h3 id="led-details">LED details</h3>
-      <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. Tap the
-        <code>Add LED</code> button (a light bulb) beside the reading's title on Main (it reads <code>LED</code> or
-        <code>2 LEDs</code> with a tick once set), <code>Edit</code> on the Data tab, or the light-bulb line on a History row (it shows
-        <code>Edit</code> once LEDs are set). Those three set the LEDs only; to set LEDs and the other categories together, use <a href="#categorize">Categorize</a>.
+      <p>Tell hCRI.io which LED(s) a light uses so the report can be found and compared. LEDs are set in the
+        <a href="#categorize">Categorize</a> window, together with the other categories: tap the <code>Categorize</code> pill (a tag) beside the
+        reading's title on Main (it reads <code>LED</code>, <code>2 LEDs</code> or <code>Categories</code> with a tick once set), <code>Categorize</code> on the
+        Data tab, or the tag line on a History row or at the top of a reading's page, then tap <code>Edit</code> beside LEDs.
         If you turn on Settings → LED suggestions, the app may also suggest an LED from the shape of the spectrum; tap
         <code>Yes</code> to accept it or <code>Other</code> to choose yourself.</p>
       <ul>
@@ -742,8 +742,8 @@
       <p>Categorize sets everything hCRI.io files a report under: the LEDs plus <strong>light brand</strong>, <strong>light model</strong>,
         <strong>optic</strong>, <strong>lumens</strong> and <strong>current</strong>. It works on one reading or on many at once.</p>
       <ul>
-        <li><strong>One reading:</strong> tap <code>Categorize</code> (or the tag line) on a History row, or the tag line at the top of a reading's
-          page. The window opens with the reading's own values.</li>
+        <li><strong>One reading:</strong> tap <code>Categorize</code> (or the tag line) on a History row, the tag line at the top of a reading's
+          page, or the <code>Categorize</code> pill on Main or the Categories block on the Data tab. The window opens with the reading's own values.</li>
         <li><strong>Several readings:</strong> in History, hold a reading to start selecting, check the readings, and tap <code>Categorize</code>.
           Choose whether a reading that already has a value <em>keeps its value</em> (only gaps are filled) or <em>replaces it</em>.</li>
         <li>Each field is a text box with matches from the hCRI.io lists underneath. Lumens and current are numbers you type. Blank fields are
@@ -762,8 +762,8 @@
       <ul>
         <li><strong>Upload Title</strong> — type a custom title, or leave it blank to use the
           auto-generated username + timestamp + device label.</li>
-        <li><strong>LED</strong> — the brand, model and CCT of each LED in this reading's light (one block per LED), with <code>Edit</code>
-          (or <code>Add LED details</code>) to set them. Available once the reading is saved to History. See <a href="#led-details">LED details</a>.</li>
+        <li><strong>Categories</strong> — the brand, model and CCT of each LED in this reading's light (one block per LED), plus its light, optic, lumens and current, with <code>Edit</code>
+          (or <code>Categorize</code>) to set them. Available once the reading is saved to History. See <a href="#led-details">LED details</a>.</li>
         <li><strong>Upload Preview</strong> — the exact wavelength/value payload about to be sent, so you
           can eyeball the range and point count before it goes anywhere.</li>
         <li><strong>R1–R15</strong>, <strong>Chromaticity</strong>, and <strong>Device Info</strong> —
