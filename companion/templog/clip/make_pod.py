@@ -55,9 +55,9 @@ def cyl_y(d, length, cx, cz_, y0):
 
 body = box(x_min, 0, 0, W, D, H)
 # cable tab: sticks out the back at the floor; two slots take a zip tie that wraps the sleeved cable lying in the groove between them
-TAB_W, TAB_L, TAB_T = 20.0, 14.0, FLOOR     # same thickness as the floor, so the nut still slides in over it
+TAB_W, TAB_L, TAB_T = 18.0, 10.0, FLOOR     # same thickness as the floor, so the nut still slides in over it
 TIE_SLOT_W, TIE_SLOT_T = 3.2, 1.6           # fits a 2.5 mm wide zip tie
-TIE_SLOT_X, TIE_SLOT_Y = 5.5, 7.0           # slot centre offset from the tab centre line, and distance behind the back face
+TIE_SLOT_X, TIE_SLOT_Y = 5.5, 5.0           # slot centre offset from the tab centre line, and distance behind the back face
 GROOVE_W, GROOVE_D = 6.4, 0.6               # shallow cradle for a 6 mm sleeve
 tab_cx = (sx + lx) / 2
 body = body + box(tab_cx - TAB_W / 2, -TAB_L, 0, TAB_W, TAB_L + 0.5, TAB_T)
