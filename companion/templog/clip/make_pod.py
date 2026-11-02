@@ -15,7 +15,7 @@ from manifold3d import Manifold
 
 # ---- sizes you can change -------------------------------------------------------------------------------------------
 WALL = 2.5
-SENSOR_BARREL_D = 11.6    # GY-906 DCI barrel diameter plus clearance
+SENSOR_BARREL_D = 9.5     # measured can 9.0 mm + 0.5 clearance
 SENSOR_BARREL_LEN = 12.0  # how much of the barrel sits in the front bore
 BOARD_W, BOARD_H = 17.4, 12.4   # the GY-906 PCB (width, height) plus clearance
 LASER_D = 6.2             # 6 mm laser module plus clearance
