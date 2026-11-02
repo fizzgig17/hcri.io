@@ -17,7 +17,7 @@ from manifold3d import Manifold
 WALL = 2.5
 SENSOR_BARREL_D = 9.5     # measured can 9.0 mm + 0.5 clearance
 SENSOR_BARREL_LEN = 12.0  # how much of the barrel sits in the front bore
-BOARD_W, BOARD_H = 12.5 + 0.4, 18.0 + 0.4   # measured: board 12.5 wide, 18 tall with the plug on, plus clearance
+BOARD_W, BOARD_H = 12.5 + 0.4, 19.0 + 0.4   # measured: board 12.5 wide, 19 tall, plus clearance
 LASER_D = 6.2             # 6 mm laser module plus clearance
 HOLE_SPACING = 15.0       # sensor centre to laser centre
 BACK_SPACE = 15.0         # room behind the barrel for the board and its plug
