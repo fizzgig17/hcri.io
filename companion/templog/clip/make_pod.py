@@ -20,6 +20,7 @@ SENSOR_BARREL_LEN = 12.0  # how much of the barrel sits in the front bore
 BOARD_W, BOARD_H = 12.5 + 0.4, 19.0 + 0.4   # measured: board 12.5 wide, 19 tall, plus clearance
 LASER_D = 6.2             # 6 mm laser module plus clearance
 HOLE_SPACING = 15.0       # sensor centre to laser centre
+AIM_DISTANCE = 50.0       # mm in front of the pod where the laser dot should meet the sensor's line of sight (0 = straight)
 BACK_SPACE = 15.0         # room behind the barrel for the board and its plug
 STUD_HOLE_D = 6.8         # 1/4"-20 stud clearance
 NUT_AF = 11.1 + 0.4       # 1/4"-20 hex nut across flats plus clearance
@@ -30,7 +31,9 @@ ROOF = 2.2                # plastic between the nut pocket and the sensor cavity
 
 sx, lx = -HOLE_SPACING / 2, HOLE_SPACING / 2
 x_min = sx - BOARD_W / 2 - WALL
-x_max = max(lx + LASER_D / 2, sx + BOARD_W / 2) + WALL
+PHI = math.degrees(math.atan(HOLE_SPACING / AIM_DISTANCE)) if AIM_DISTANCE else 0.0
+_t = math.tan(math.radians(PHI))
+x_max = max(lx + LASER_D / 2 / math.cos(math.radians(PHI)) + (SENSOR_BARREL_LEN + BACK_SPACE) * _t, sx + BOARD_W / 2) + WALL
 W = x_max - x_min
 D = SENSOR_BARREL_LEN + BACK_SPACE + 0.0       # front face at y = D, open back at y = 0
 cav_z0 = FLOOR + NUT_H + ROOF
@@ -51,7 +54,7 @@ body = box(x_min, 0, 0, W, D, H)
 cuts = [
     cyl_y(SENSOR_BARREL_D, SENSOR_BARREL_LEN + 0.5, sx, cz, D - SENSOR_BARREL_LEN),             # barrel bore through the front
     box(sx - BOARD_W / 2, -0.5, cz - BOARD_H / 2, BOARD_W, D - SENSOR_BARREL_LEN + 0.5, BOARD_H),  # board pocket, open at the back
-    cyl_y(LASER_D, D + 1, lx, cz, -0.5),                                                         # laser bore, through
+    Manifold.cylinder(D * 1.3 + 3, LASER_D / 2, LASER_D / 2, 48).rotate((-90, 0, 0)).translate((0, -(D * 1.3 + 2), 0)).rotate((0, 0, PHI)).translate((lx, D, cz)),  # laser bore, tilted in toward the sensor's line of sight; pivots at the front face
 ]
 # stud hole up through the floor, hex nut pocket above it, slot out the back to slide the nut in
 sy = D / 2
@@ -66,4 +69,5 @@ for c in cuts:
 mesh = body.to_mesh()
 m = trimesh.Trimesh(vertices=np.asarray(mesh.vert_properties)[:, :3], faces=np.asarray(mesh.tri_verts))
 m.export('sensor_pod.stl')
+print('laser tilt deg:', round(PHI, 1), ' aim distance mm:', AIM_DISTANCE)
 print('watertight:', m.is_watertight, ' size mm (x, y, z):', [round(v, 1) for v in m.extents], ' volume cm3:', round(m.volume / 1000, 2))
