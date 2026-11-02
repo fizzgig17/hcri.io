@@ -1,6 +1,6 @@
 """Sensor + laser pod for a camera-style spring clamp with a ball head (version 0: sizes are assumptions, print a fit test first).
 
-Run:  python3 make_pod.py   ->  sensor_pod.stl   (needs: pip install manifold3d trimesh numpy)
+Run:  python3 make_pod.py   ->  sensor_pod.stl + laser_plug_*mm.stl   (needs: pip install manifold3d trimesh numpy)
 Edit the numbers below (millimetres) to match your parts, then run again.
 
 The pod screws onto the 1/4"-20 stud of the ball head (a standard camera thread). The stud goes up through a 6.8 mm hole in the
@@ -54,6 +54,13 @@ def cyl_y(d, length, cx, cz_, y0):
 
 
 body = box(x_min, 0, 0, W, D, H)
+# cable tab: sticks out the back at the floor; two slots take a zip tie that wraps the sleeved cable lying in the groove between them
+TAB_W, TAB_L, TAB_T = 20.0, 14.0, FLOOR     # same thickness as the floor, so the nut still slides in over it
+TIE_SLOT_W, TIE_SLOT_T = 3.2, 1.6           # fits a 2.5 mm wide zip tie
+TIE_SLOT_X, TIE_SLOT_Y = 5.5, 7.0           # slot centre offset from the tab centre line, and distance behind the back face
+GROOVE_W, GROOVE_D = 6.4, 0.6               # shallow cradle for a 6 mm sleeve
+tab_cx = (sx + lx) / 2
+body = body + box(tab_cx - TAB_W / 2, -TAB_L, 0, TAB_W, TAB_L + 0.5, TAB_T)
 cuts = [
     cyl_y(SENSOR_BARREL_D, SENSOR_BARREL_LEN + 0.5, sx, cz, D - SENSOR_BARREL_LEN),             # barrel bore through the front
     box(sx - BOARD_W / 2, -0.5, cz - BOARD_H / 2, BOARD_W, D - SENSOR_BARREL_LEN + 0.5, BOARD_H),  # board pocket, open at the back
@@ -73,6 +80,9 @@ cuts.append(sock)
 # relief behind the socket so the laser body can lean back at its angle (open at the back and to the +x side)
 rx0 = sx + BOARD_W / 2 + WALL
 cuts.append(box(rx0, -0.5, cz - sock_r, x_max - rx0 + 1, D - LUG + 0.5, 2 * sock_r))
+for sgn in (-1, 1):
+    cuts.append(box(tab_cx + sgn * TIE_SLOT_X - TIE_SLOT_W / 2, -TIE_SLOT_Y - TIE_SLOT_T / 2, -0.5, TIE_SLOT_W, TIE_SLOT_T, TAB_T + 1))
+cuts.append(box(tab_cx - GROOVE_W / 2, -TAB_L - 0.5, TAB_T - GROOVE_D, GROOVE_W, TAB_L + 0.5, GROOVE_D + 0.5))
 for c in cuts:
     body = body - c
 
