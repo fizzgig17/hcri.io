@@ -83,9 +83,10 @@ function hcri_rate_limit(string $group, string $uri = ''): void
             $get->execute([$key, $kind, $slot]);
             if ((int)$get->fetchColumn() > $max) $over = max($over, $wait);
         }
-        if ($userId > 0) hcri_account_activity($db, $userId, $minute, $hour);
+        if ($userId > 0) hcri_account_activity($db, $userId, $minute, $hour, $uri);
         if (random_int(1, 200) === 1) {   // tidy old counters now and then
             $db->prepare("DELETE FROM rate_limits WHERE (kind IN ('m','u') AND slot < ?) OR (kind IN ('h','a') AND slot < ?)")->execute([$minute - 2, $hour - 2]);
+            try { $db->prepare('DELETE FROM account_request_log WHERE ts < ?')->execute([$now - HCRI_REQUEST_LOG_KEEP]); } catch (\Throwable $e) {}
         }
         if ($over > 0) {
             http_response_code(429);
@@ -101,8 +102,33 @@ function hcri_rate_limit(string $group, string $uri = ''): void
 // A signed-in account making more than this many limited requests in a minute gets reported by email (at most once an hour per account).
 const HCRI_ACCOUNT_ALERT_PER_MIN = 30;
 
-function hcri_account_activity(PDO $db, int $userId, int $minute, int $hour): void
+// Short-term request log, so an alert can say what the requests were. Signed-in accounts and the limited endpoints only.
+// Privacy: path only (no query string), share tokens replaced, no IP address, rows deleted after two days.
+const HCRI_REQUEST_LOG_KEEP = 172800;   // seconds
+const HCRI_REQUEST_LOG_IN_ALERT = 30;   // how many of the latest requests the alert email lists
+
+/** The URL path in a form safe to keep: no query string, and share tokens (they open private shared reports) replaced. */
+function hcri_loggable_path(string $uri): string
 {
+    $path = (string)strtok($uri, '?#');
+    $path = preg_replace('#^(/api/shared/)[^/]+#', '$1[token]', $path);
+    $path = preg_replace('#^(/api/og/)(?!(?:live|runtime|compare)\.png$)[^/]+\.png$#', '$1[token].png', $path);
+    return substr((string)$path, 0, 200);
+}
+
+function hcri_log_account_request(PDO $db, int $userId, string $uri): void
+{
+    try {
+        $db->exec('CREATE TABLE IF NOT EXISTS account_request_log (
+            user_id INT NOT NULL, ts INT NOT NULL, path VARCHAR(200) NOT NULL,
+            KEY by_user (user_id, ts), KEY by_ts (ts)) ENGINE=InnoDB');
+        $db->prepare('INSERT INTO account_request_log (user_id, ts, path) VALUES (?, ?, ?)')->execute([$userId, time(), hcri_loggable_path($uri)]);
+    } catch (\Throwable $e) { /* logging must never break a request */ }
+}
+
+function hcri_account_activity(PDO $db, int $userId, int $minute, int $hour, string $uri = ''): void
+{
+    if ($uri !== '') hcri_log_account_request($db, $userId, $uri);
     try {
         $k = 'u' . str_pad((string)$userId, 31, '0', STR_PAD_LEFT);
         $db->prepare("INSERT INTO rate_limits (k, kind, slot, hits) VALUES (?, 'u', ?, 1) ON DUPLICATE KEY UPDATE hits = hits + 1")->execute([$k, $minute]);
@@ -119,10 +145,18 @@ function hcri_account_activity(PDO $db, int $userId, int $minute, int $hour): vo
         $user = $u->fetch();
         if (!$user) return;
         require_once __DIR__ . '/mailer.php';
+        $recent = '';
+        try {
+            $l = $db->prepare('SELECT ts, path FROM account_request_log WHERE user_id = ? ORDER BY ts DESC LIMIT ' . HCRI_REQUEST_LOG_IN_ALERT);
+            $l->execute([$userId]);
+            foreach ($l->fetchAll() as $row) $recent .= gmdate('H:i:s', (int)$row['ts']) . '  ' . $row['path'] . "\n";
+        } catch (\Throwable $e) {}
         $to = getenv('HCRI_ALERT_EMAIL') ?: (defined('HCRI_ALERT_EMAIL') ? HCRI_ALERT_EMAIL : 'fizzgig@hcri.io');
         send_email($to, 'hCRI.io admin', 'hCRI.io: heavy activity from ' . $user['name'],
             "Account \"" . $user['name'] . "\" (" . $user['email'] . ", user id $userId) made $hits requests in one minute"
             . " (alert threshold " . HCRI_ACCOUNT_ALERT_PER_MIN . ").\n\nHost: " . ($_SERVER['HTTP_HOST'] ?? '') . "\nIP: " . hcri_client_ip()
-            . "\nTime: " . gmdate('Y-m-d H:i:s') . " UTC\n\nYou get at most one of these per account per hour.");
+            . "\nTime: " . gmdate('Y-m-d H:i:s') . " UTC\n\n"
+            . ($recent !== '' ? "Latest requests (UTC, newest first; share tokens hidden):\n$recent\n" : '')
+            . "You get at most one of these per account per hour.");
     } catch (\Throwable $e) { error_log('hCRI activity alert failed: ' . $e->getMessage()); }
 }
