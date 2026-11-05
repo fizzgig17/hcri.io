@@ -104,6 +104,7 @@ $out = [
 ];
 if (!empty($r['spd_data'])) {
     $pairs2 = json_decode($r['spd_data'], true);
+    $out += spd_ler_fields($pairs2); // LER, from the full spectrum (before any 5 nm reduction below)
     // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
     // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
     $fullRes = $isSuper
@@ -232,6 +233,7 @@ $out = [
 ];
 if (!empty($r['spd_data'])) {
     $pairs2 = json_decode($r['spd_data'], true);
+    $out += spd_ler_fields($pairs2); // LER, from the full spectrum (before any 5 nm reduction below)
     // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
     // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
     $fullRes = $isSuper
@@ -250,4 +252,4 @@ if (!empty($r['spd_data'])) {
     $out['reduced'] = !$fullRes;
 }
 $out['categories'] = report_categories_map($db, (int)$r['id']);
-json_out($out);
+json_out($out);

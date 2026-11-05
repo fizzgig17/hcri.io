@@ -369,6 +369,8 @@ function fmt(array $r, bool $spd): array {
 
     ];
 
+    if (!empty($r['spd_data'])) $out += spd_ler_fields(json_decode($r['spd_data'], true)); // LER, from the full stored spectrum
+
     if ($spd && !empty($r['spd_data'])) {
 
         $pairs       = json_decode($r['spd_data'], true);

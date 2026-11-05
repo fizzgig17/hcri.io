@@ -1620,6 +1620,42 @@ function calc_cri_hires(array $wls, array $vals, float $cct): array {
 
 }
 
+/**
+ * Luminous efficacy of radiation: LER = 683.002 * ∫V(λ)S(λ)dλ / ∫S(λ)dλ, in lm per optical watt, over the part of the
+ * SPD inside 380-780 nm (1 nm steps, linear interpolation, trapezoid rule). Wavelengths the instrument did not measure
+ * are left out (not extended), so a spectrometer that stops at 700 nm gives a partial value: 'lerPartial' is true when the
+ * data does not reach within 5 nm of both 380 and 780. Returns null when there is nothing to integrate.
+ */
+function calc_ler(array $wls, array $vals): ?array {
+    [$wls, $vals] = strip_trailing_blocks(array_values($wls), array_values($vals));
+    $n = count($wls);
+    if ($n < 2 || count($vals) !== $n) return null;
+    $lo = (int)max(380, ceil($wls[0]));
+    $hi = (int)min(780, floor($wls[$n - 1]));
+    if ($hi <= $lo) return null;
+    $Y = _cmf1nm()['Y']; // CIE 1931 y-bar = V(λ), 380..780 nm in 1 nm steps
+    $num = 0.0; $den = 0.0;
+    for ($w = $lo; $w <= $hi; $w++) {
+        $f = ($w === $lo || $w === $hi) ? 0.5 : 1.0;
+        $sv = (float)_spd_interp_at($wls, $vals, (float)$w);
+        $num += $f * $sv * $Y[$w - 380];
+        $den += $f * $sv;
+    }
+    if ($den <= 0) return null;
+    return [
+        'ler'        => round(683.002 * $num / $den, 1),
+        'lerLo'      => $lo,
+        'lerHi'      => $hi,
+        'lerPartial' => ($wls[0] > 385 || $wls[$n - 1] < 775),
+    ];
+}
+
+/** calc_ler() from the stored [[wl, value], ...] pairs, as fields to merge into a report payload (empty when there is no usable SPD). */
+function spd_ler_fields($pairs): array {
+    if (!is_array($pairs) || count($pairs) < 2) return [];
+    try { return calc_ler(array_column($pairs, 0), array_column($pairs, 1)) ?? []; } catch (\Throwable $e) { return []; }
+}
+
 function analyze_spd(array $wls, array $vals, array $instrumentMeta = [], bool $preferInstrument = false): array {
 
     // Normalize SPD to 0-1 range before any computation

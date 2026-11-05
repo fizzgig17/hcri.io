@@ -311,6 +311,7 @@ export default function ReportView({ report, allReports = [], isGuest = false, o
                 <Metric label="Duv" value={report.duv != null ? (report.duv >= 0 ? '+' : '') + report.duv.toFixed(4) : null} color={Math.abs(report.duv ?? 1) < 0.006 ? C.good : Math.abs(report.duv ?? 1) < 0.012 ? C.warn : C.bad} />
                 <Metric label="Ra (CRI)" value={report.ra != null ? Math.round(report.ra) : null} />
                 <Metric label="R9" value={report.r9 != null ? Math.round(report.r9) : null} />
+                {report.ler != null && <Metric label="LER lm/W" value={`${Math.round(report.ler)}${report.lerPartial ? '*' : ''}`} />}
               </div>
               {report.ri && Object.keys(report.ri).length > 0 && <CRIBars ri={report.ri} C={C} />}
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: '10px 14px' }}>

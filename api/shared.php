@@ -148,6 +148,8 @@ if (!empty($r['spd_data'])) {
 
     $pairs     = json_decode($r['spd_data'], true);
 
+    $out += spd_ler_fields($pairs); // LER, from the full stored spectrum
+
     $out['wls']  = is_array($pairs) ? array_column($pairs, 0) : null;
 
     $out['vals'] = is_array($pairs) ? array_column($pairs, 1) : null;
