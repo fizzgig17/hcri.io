@@ -1,6 +1,6 @@
 # Sensor + laser pod: plan (saved Nov 2, 2026)
 
-Parts (measured): MLX90614 can 9 mm; board 12.5 mm wide, 19 mm tall (18 mm with plug); laser 6 mm; clamp stud 1/4"-20.
+Parts (measured): sensor tube 9 mm across and 19 mm long (board to tip); board 12.5 mm wide, 18 mm tall with the plug on; laser 6 mm across, about 13 to 14 mm long with its solder tabs (from a photo); clamp stud 1/4"-20.
 Mount: ball-head spring clamp on the side of the TKLamp, sensor pointing sideways. Sensor-to-target distance not known yet.
 
 Laser aiming: the laser sits beside the sensor (spacing S), so it is tilted in toward the sensor's line of sight.

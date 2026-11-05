@@ -16,12 +16,12 @@ from manifold3d import Manifold
 # ---- sizes you can change -------------------------------------------------------------------------------------------
 WALL = 2.5
 SENSOR_BARREL_D = 9.5     # measured can 9.0 mm + 0.5 clearance
-SENSOR_BARREL_LEN = 12.0  # how much of the barrel sits in the front bore
-BOARD_W, BOARD_H = 12.5 + 0.4, 19.0 + 0.4   # measured: board 12.5 wide, 19 tall, plus clearance
+SENSOR_BARREL_LEN = 19.5  # the black tube is 19 mm long (board to tip); the board stops against the step at its base
+BOARD_W, BOARD_H = 12.5 + 0.4, 18.0 + 0.4   # measured: board 12.5 wide, 18 tall with the plug on, plus clearance
 LASER_D = 6.2             # 6 mm laser module plus clearance
 LASER_WALL = -0.1         # no wall: the two bores overlap slightly, so the laser and the sensor can sit almost touching (about 0.25 mm apart)
 LASER_LUG = 12.0          # depth of the laser's bore, at the front (the laser is short; its wires leave into the open space behind)
-BACK_SPACE = 15.0         # room behind the barrel for the board and its plug
+BACK_SPACE = 10.5         # room behind the tube for the board (1.6) and the plug and pins that stand up behind it (about 8)
 STUD_HOLE_D = 6.8         # 1/4"-20 stud clearance
 NUT_AF = 11.1 + 0.4       # 1/4"-20 hex nut across flats plus clearance
 NUT_H = 5.8               # nut thickness plus clearance
