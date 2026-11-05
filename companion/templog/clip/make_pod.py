@@ -83,6 +83,8 @@ def make_pod():
     cuts.append(box(cx_body - GROOVE_W / 2, y_b0 - 0.5, -GROOVE_D, GROOVE_W, -y_b0 + 0.5, GROOVE_D + 0.01))
     for sgn in (-1, 1):
         cuts.append(box(cx_body + sgn * TIE_SLOT_X - TIE_SLOT_T / 2, -TIE_SLOT_Y - TIE_SLOT_W / 2, -MOUNT_H - 0.5, TIE_SLOT_T, TIE_SLOT_W, MOUNT_H + 1.0))
+    # shallow groove across the underside joining the two slots, so the tie lies flush (hidden) and also crosses the nut slot, which holds the nut in
+    cuts.append(box(cx_body - TIE_SLOT_X - TIE_SLOT_T / 2, -TIE_SLOT_Y - TIE_SLOT_W / 2, -MOUNT_H - 0.5, 2 * TIE_SLOT_X + TIE_SLOT_T, TIE_SLOT_W, 0.5 + 1.4))
     for c in cuts:
         body = body - c
     return to_trimesh(body)
