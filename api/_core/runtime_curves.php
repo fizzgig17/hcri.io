@@ -13,6 +13,7 @@ const RUNTIME_MAX_POINTS     = 100000;  // samples per curve (24 hours at one re
 const RUNTIME_MAX_TOTAL_POINTS = 6000000; // samples across all of one account's curves (about 40 MB of JSON)
 const RUNTIME_LIST_POINTS    = 5000;    // longest curve the website list and shared pages draw; longer ones are averaged down to this
 const RUNTIME_MIN_POINTS     = 2;
+const RUNTIME_MAX_TEMPS      = 4;       // temperature sensors kept beside a curve (Temp 1 to Temp 4)
 
 function runtime_curves_ensure(PDO $db): void {
     static $done = false;
@@ -41,6 +42,10 @@ function runtime_curves_ensure(PDO $db): void {
             $db->exec('ALTER TABLE runtime_curves ADD UNIQUE KEY uq_rc_share (share_token)');
         }
     } catch (\Throwable $e) { /* run sql/runtime_curves.sql */ }
+    // Temperatures recorded beside the output (Temp Logger sensors): [{ch,name,values}], one value per sample of the curve, null where there is none.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM runtime_curves LIKE 'temps'")->fetch()) $db->exec('ALTER TABLE runtime_curves ADD COLUMN temps MEDIUMTEXT NULL');
+    } catch (\Throwable $e) { /* run sql/runtime_curves.sql */ }
     // Older installs: add the optional meter-reading column.
     try {
         if (!$db->query("SHOW COLUMNS FROM runtime_curves LIKE 'meta'")->fetch()) $db->exec('ALTER TABLE runtime_curves ADD COLUMN meta TEXT NULL');
@@ -59,6 +64,54 @@ function runtime_meta_clean(mixed $m): array {
     return $out;
 }
 
+/**
+ * Temperatures sent with a curve: a list of {ch (0-3), name, values}. Each series is made exactly $n long (cut, or padded with null) so it
+ * lines up with the curve sample for sample; series with no number in them are dropped.
+ * @return array<int,array{ch:int,name:string,values:array<int,float|null>}>
+ */
+function runtime_temps_clean(mixed $t, int $n): array {
+    $out = [];
+    if (!is_array($t)) return $out;
+    foreach (array_slice(array_values($t), 0, RUNTIME_MAX_TEMPS) as $i => $x) {
+        if (!is_array($x)) continue;
+        $ch = (int)($x['ch'] ?? $i);
+        $v = $x['values'] ?? null;
+        if ($ch < 0 || $ch >= RUNTIME_MAX_TEMPS || !is_array($v) || !array_is_list($v) || isset($out[$ch])) continue;
+        $vals = []; $any = false;
+        foreach ($v as $y) {
+            if ($y === null || $y === '' || !is_numeric($y) || !is_finite((float)$y)) { $vals[] = null; continue; }
+            $vals[] = round((float)$y, 2); $any = true;
+        }
+        if (!$any) continue;
+        $c = count($vals);
+        if ($c > $n) $vals = array_slice($vals, 0, $n);
+        elseif ($c < $n) $vals = array_merge($vals, array_fill(0, $n - $c, null));
+        $name = mb_substr(trim((string)($x['name'] ?? '')), 0, 24, 'UTF-8');
+        $out[$ch] = ['ch' => $ch, 'name' => $name !== '' ? $name : 'Temp ' . ($ch + 1), 'values' => $vals];
+    }
+    ksort($out);
+    return array_values($out);
+}
+
+/**
+ * The same averaging runtime_downsample() applies to the curve (so the lines still line up), skipping blanks.
+ * @param array<int,array{ch:int,name:string,values:array}> $temps
+ */
+function runtime_downsample_temps(array $temps, int $n, int $max = RUNTIME_LIST_POINTS): array {
+    if ($n <= $max) return $temps;
+    $k = (int)ceil($n / $max);
+    foreach ($temps as &$t) {
+        $avg = [];
+        for ($i = 0; $i < count($t['values']); $i += $k) {
+            $chunk = array_filter(array_slice($t['values'], $i, $k), fn($x) => $x !== null);
+            $avg[] = $chunk ? round(array_sum($chunk) / count($chunk), 2) : null;
+        }
+        $t['values'] = $avg;
+    }
+    unset($t);
+    return $temps;
+}
+
 /** Stable id for a label: a short readable slug plus a hash, so the same label always maps to the same row. */
 function runtime_curve_id(string $label): string {
     $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9]+/', '-', $label) ?? '', '-'));
@@ -71,7 +124,7 @@ function runtime_curve_valid_id(mixed $id): bool {
 
 /**
  * Checks one curve from a request and returns it in storage form, or a string describing what is wrong.
- * Input keys: label, group (optional), unit (optional), intervalSeconds, values (list of numbers).
+ * Input keys: label, group (optional), unit (optional), intervalSeconds, values (list of numbers), temps (optional: [{ch,name,values}], up to 4 sensors).
  * @return array{label:string,group:string,unit:string,interval:float,values:array<int,int|float>}|string
  */
 function runtime_curve_normalize(mixed $it): array|string {
@@ -100,6 +153,7 @@ function runtime_curve_normalize(mixed $it): array|string {
         'interval' => (float)$interval,
         'values'   => $out,
         'meta'     => runtime_meta_clean($it['meta'] ?? null),
+        'temps'    => runtime_temps_clean($it['temps'] ?? null, count($out)),
     ];
 }
 

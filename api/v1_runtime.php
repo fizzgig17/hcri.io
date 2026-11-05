@@ -14,6 +14,7 @@ declare(strict_types=1);
 //          Optional query: ?group=<name>&unit=<lumens>&interval=<seconds between readings>&name=<label prefix>
 //          interval: use it when the first column is just a row number (a TKLamp Output*.csv); the readings are that many seconds apart.
 //   POST   /api/v1/runtime?duration=<id>&minutes=<n>  -> {"intervalSeconds":s}  (fixes the spacing of a curve so it lasts n minutes)
+//          Optional per item: "temps":[{"ch":0,"name":"Temp 1","values":[...]}] (up to 4 sensors, one value per sample, null for none); returned by ?id= and ?full=1.
 //          Optional per item: "meta":{"cct","duv","cri","r9","r12","rf","rg","tempF"}. An item with only label + meta updates the readings of an existing curve.
 //   POST   /api/v1/runtime?share=<id>           -> {"shareToken":"..."}  (makes or reuses the curve's share link token)
 //   POST   /api/v1/runtime?unshare=<id>         -> {"shareToken":null}   (stops sharing; old links stop working)
@@ -57,26 +58,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (isset($_GET['id'])) {
         $id = $_GET['id'];
         if (!runtime_curve_valid_id($id)) json_error('Bad id', 400);
-        $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, payload, meta, share_token FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+        $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, payload, meta, temps, share_token FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
         $s->execute([$uid, $id]);
         $r = $s->fetch();
         if (!$r) json_error('Not found', 404);
         $vals = json_decode((string)$r['payload'], true);
         json_out(['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
                   'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'shareToken' => $r['share_token'] ?? null,
-                  'values' => is_array($vals) ? $vals : []]);
+                  'temps' => json_decode((string)($r['temps'] ?? ''), true) ?: [], 'values' => is_array($vals) ? $vals : []]);
     }
     $full = !empty($_GET['full']); // ?full=1 also returns every curve's values (the website uses this)
-    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, meta, share_token, updated_at' . ($full ? ', payload' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
+    $s = $db->prepare('SELECT curve_id, label, group_name, unit, interval_s, points, meta, share_token, updated_at, (temps IS NOT NULL) AS has_temps' . ($full ? ', payload, temps' : '') . ' FROM runtime_curves WHERE user_id = ? ORDER BY group_name, label');
     $s->execute([$uid]);
     $items = [];
     foreach ($s->fetchAll() as $r) {
         $row = ['id' => $r['curve_id'], 'label' => $r['label'], 'group' => $r['group_name'], 'unit' => $r['unit'],
-                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'shareToken' => $r['share_token'] ?? null, 'updatedAt' => $r['updated_at']];
+                'intervalSeconds' => (float)$r['interval_s'], 'points' => (int)$r['points'], 'meta' => json_decode((string)$r['meta'], true) ?: new stdClass(), 'shareToken' => $r['share_token'] ?? null, 'updatedAt' => $r['updated_at'], 'hasTemps' => (bool)$r['has_temps']];
         if ($full) {
             $v = json_decode((string)$r['payload'], true);
             [$dv, $di] = runtime_downsample(is_array($v) ? $v : [], (float)$r['interval_s']);
             $row['values'] = $dv;
+            $row['temps'] = runtime_downsample_temps(json_decode((string)($r['temps'] ?? ''), true) ?: [], is_array($v) ? count($v) : 0);
             if ($di !== (float)$r['interval_s']) { $row['intervalSeconds'] = $di; $row['downsampled'] = true; $row['sourceIntervalSeconds'] = (float)$r['interval_s']; }
         }
         $items[] = $row;
@@ -119,7 +121,7 @@ if (isset($_GET['duration'])) {
 if (isset($_GET['trim'])) {
     $tid = $_GET['trim'];
     if (!runtime_curve_valid_id($tid)) json_error('Bad id', 400);
-    $q = $db->prepare('SELECT interval_s, payload FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
+    $q = $db->prepare('SELECT interval_s, payload, temps FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
     $q->execute([$uid, $tid]);
     $row = $q->fetch();
     if (!$row) json_error('Not found', 404);
@@ -128,7 +130,10 @@ if (isset($_GET['trim'])) {
     $new = runtime_trim_leading($vals, (float)$row['interval_s']);
     $n = count($vals) - count($new);
     if ($n > 0) {
-        $db->prepare('UPDATE runtime_curves SET payload = ?, points = ? WHERE user_id = ? AND curve_id = ?')->execute([json_encode($new), count($new), $uid, $tid]);
+        $tt = json_decode((string)($row['temps'] ?? ''), true) ?: [];
+        foreach ($tt as &$t) $t['values'] = array_slice($t['values'], $n);   // the temperatures lose the same readings
+        unset($t);
+        $db->prepare('UPDATE runtime_curves SET payload = ?, points = ?, temps = ? WHERE user_id = ? AND curve_id = ?')->execute([json_encode($new), count($new), $tt ? json_encode($tt) : null, $uid, $tid]);
     }
     json_out(['trimmed' => $n, 'points' => count($new)]);
 }
@@ -182,10 +187,10 @@ $have = (int)$count->fetchColumn();
 
 $exists = $db->prepare('SELECT 1 FROM runtime_curves WHERE user_id = ? AND curve_id = ?');
 $ins = $db->prepare(
-    'INSERT INTO runtime_curves (user_id, curve_id, label, group_name, unit, interval_s, points, payload, meta) VALUES (?,?,?,?,?,?,?,?,?)
+    'INSERT INTO runtime_curves (user_id, curve_id, label, group_name, unit, interval_s, points, payload, meta, temps) VALUES (?,?,?,?,?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE label = VALUES(label), group_name = VALUES(group_name), unit = VALUES(unit),
                              interval_s = VALUES(interval_s), points = VALUES(points), payload = VALUES(payload),
-                             meta = COALESCE(VALUES(meta), meta)'
+                             meta = COALESCE(VALUES(meta), meta), temps = VALUES(temps)'
 );
 $setMeta = $db->prepare('UPDATE runtime_curves SET meta = ? WHERE user_id = ? AND curve_id = ?');
 
@@ -215,7 +220,7 @@ foreach ($items as $it) {
     if ((int)$tot->fetchColumn() + count($c['values']) > RUNTIME_MAX_TOTAL_POINTS) { $skipped[] = ['label' => $c['label'], 'reason' => 'account storage limit reached (' . number_format(RUNTIME_MAX_TOTAL_POINTS) . ' points in total); delete some curves first']; continue; }
     $json = json_encode($c['values']);
     if ($json === false) { $skipped[] = ['label' => $c['label'], 'reason' => 'values could not be stored']; continue; }
-    $ins->execute([$uid, $id, $c['label'], $c['group'], $c['unit'], $c['interval'], count($c['values']), $json, $c['meta'] ? json_encode($c['meta']) : null]);
+    $ins->execute([$uid, $id, $c['label'], $c['group'], $c['unit'], $c['interval'], count($c['values']), $json, $c['meta'] ? json_encode($c['meta']) : null, $c['temps'] ? json_encode($c['temps']) : null]);
     $saved++;
     if ($isNew) $have++;
 }

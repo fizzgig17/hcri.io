@@ -113,7 +113,7 @@ export function LiveView({ T, token, embedded = false }) {
           {temps.map((t) => {
             let lastT = null; for (let i = t.values.length - 1; i >= 0; i--) if (t.values[i] != null) { lastT = t.values[i]; break; }
             return <div key={t.ch} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 5, background: TEMP_COLORS[t.ch % 3], display: 'inline-block' }} />
+              <span style={{ width: 10, height: 10, borderRadius: 5, background: TEMP_COLORS[t.ch % 4], display: 'inline-block' }} />
               <span style={{ color: T.dim, fontSize: 13 }}>{t.name}</span>
               <span style={{ fontSize: 24, fontWeight: 800 }}>{lastT == null ? '–' : lastT.toFixed(1)}</span><span style={{ color: T.dim, fontSize: 13 }}>°C</span>
             </div>;

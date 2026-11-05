@@ -339,9 +339,11 @@
 'use strict';
 var API = '/index.php/api';
 var DEFAULT_SCALE = 313.2, MAX_POINTS = 100000;
-var PICO_VID = 0x2e8a, NT = 3;   // Raspberry Pi Pico USB vendor id; the Temp Logger firmware reports up to 3 sensors
-var TC_DARK = ['#ff8a4c', '#ffd23f', '#c58bff'], TC_LIGHT = ['#d9631f', '#a87b00', '#8b4fd1'];   // not blue: the lumen line is blue
-function tempColor(i) { return (document.documentElement.getAttribute('data-theme') === 'light' ? TC_LIGHT : TC_DARK)[i % 3]; }
+var PICO_VID = 0x2e8a, NT = 4;   // Raspberry Pi Pico USB vendor id; room for up to 4 temperature sensors (Temp 1 to Temp 4)
+function mkArr(f) { var a = []; for (var i = 0; i < NT; i++) a.push(f()); return a; }   // one entry per temperature sensor
+function emptyList() { return []; }
+var TC_DARK = ['#ff8a4c', '#ffd23f', '#c58bff', '#3dd68c'], TC_LIGHT = ['#d9631f', '#a87b00', '#8b4fd1', '#1f9d5a'];   // not blue: the lumen line is blue
+function tempColor(i) { return (document.documentElement.getAttribute('data-theme') === 'light' ? TC_LIGHT : TC_DARK)[i % 4]; }
 var HEAD = [0xA5, 0x0A, 0xAF, 0xA5, 0x09, 0xAE, 0x5A, 0x5A, 0x09, 0x04, 0x00], FRAME_LEN = 15;
 function $(id) { return document.getElementById(id); }
 function pref(k, d) { try { var v = localStorage.getItem('tkl_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -707,7 +709,9 @@ function remoteId(label) {
 }
 function makeShare(id) { return call('POST', '/v1/runtime?share=' + encodeURIComponent(id), {}).then(function (r) { return location.origin + '/?runtime=' + r.shareToken; }); }
 function uploadRun(run) {
-  return call('POST', '/v1/runtime', { items: [{ label: run.label, group: 'TKLamp', unit: 'lm', intervalSeconds: run.intervalSeconds, values: run.values }] }).then(function (r) {
+  var item = { label: run.label, group: 'TKLamp', unit: 'lm', intervalSeconds: run.intervalSeconds, values: run.values };
+  if (run.temps && run.temps.length) item.temps = run.temps.map(function (x) { return { ch: x.ch, name: x.name, values: x.values }; });   // the temperatures, one per lumen reading
+  return call('POST', '/v1/runtime', { items: [item] }).then(function (r) {
     if (r.skipped && r.skipped.length) throw new Error('hCRI.io skipped it: ' + r.skipped.map(function (s) { return s.reason || '?'; }).join('; '));
     return remoteId(run.label);
   });
@@ -720,13 +724,13 @@ var S = {
   recent: [], lastRx: 0, secVals: [], lastRow: 0, ymax: 0, calib: null,
   runs: [], sel: null, saved: 0, wake: null,
   armed: false, seenAbove: false, belowSince: null, pendingStop: null, lastRxWall: new Date(),
-  mt: [], mv: [[], [], []], rtT: [], rtV: [[], [], []], savedT: 0, trange: { lo: null, hi: null }
+  mt: [], mv: mkArr(emptyList), rtT: [], rtV: mkArr(emptyList), savedT: 0, trange: { lo: null, hi: null }
 };
 // The temperature sensor (a Raspberry Pi Pico running the Temp Logger firmware), a second USB serial device beside the lumen tester.
-var Tm = { on: false, busy: false, port: null, reader: null, stopping: false, seen: [false, false, false], last: [null, null, null], lastRx: 0, sim: false, sig: '',
-  names: pref('tnames', ['Temp 1', 'Temp 2', 'Temp 3']) };
+var Tm = { on: false, busy: false, port: null, reader: null, stopping: false, seen: mkArr(function () { return false; }), last: mkArr(function () { return null; }), lastRx: 0, sim: false, sig: '',
+  names: pref('tnames', ['Temp 1', 'Temp 2', 'Temp 3', 'Temp 4']) };
 function tName(i) { var n = Tm.names && Tm.names[i]; return !n || n === 'Sensor ' + (i + 1) ? 'Temp ' + (i + 1) : n; }
-function tNames() { return [0, 1, 2].map(tName); }
+function tNames() { var a = []; for (var i = 0; i < NT; i++) a.push(tName(i)); return a; }
 var cv = $('cv'), hcv = $('hcv');
 function msg(t) { $('status').textContent = t || ''; }
 
@@ -775,7 +779,7 @@ function onTemp(tSec, objs) {
     if (S.mt.length > 8000) { S.mt.splice(0, 2000); for (i = 0; i < NT; i++) S.mv[i].splice(0, 2000); }
   }
 }
-function clearTemps() { S.mt = []; S.mv = [[], [], []]; S.trange = { lo: null, hi: null }; }
+function clearTemps() { S.mt = []; S.mv = mkArr(emptyList); S.trange = { lo: null, hi: null }; }
 
 // ---- sources ------------------------------------------------------------------------------------------------------------
 function resetLive() { S.recent = []; S.lastRx = 0; S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; clearTemps(); }
@@ -856,8 +860,9 @@ function onTempLine(line) {
   line = line.trim();
   if (!line || line[0] !== 'T') return;
   var p = line.split(',');
-  if (p.length < 2 + NT) return;
-  var objs = []; for (var i = 0; i < NT; i++) objs.push(numOrNull(p[2 + i]));
+  var n = Math.floor((p.length - 2) / 2);   // the Pico sends T,seconds, then one object temperature and one chip temperature per sensor
+  if (n < 1) return;
+  var objs = []; for (var i = 0; i < NT; i++) objs.push(i < n ? numOrNull(p[2 + i]) : null);
   onTemp(now(), objs);
 }
 function openTemp(port) {
@@ -938,7 +943,7 @@ var Live = null, Mon = null;   // the run being recorded, and the plain live rea
 function liveStart(kind) {
   if (!sessionToken()) return null;
   var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null,
-    tvals: [[], [], []], tsum: [0, 0, 0], tn: [0, 0, 0], tlast: [null, null, null], tlastAt: [0, 0, 0], tseen: [false, false, false] };
+    tvals: mkArr(emptyList), tsum: mkArr(function () { return 0; }), tn: mkArr(function () { return 0; }), tlast: mkArr(function () { return null; }), tlastAt: mkArr(function () { return 0; }), tseen: mkArr(function () { return false; }) };
   call('GET', '/v1/live').then(function (info) {
     if (!info.enabled) { L.off = true; return; }
     if (kind === 'run') msg('Live station is on: this run can be watched at ' + info.url);
@@ -1040,7 +1045,7 @@ function startRun() {
 }
 function beginRun(n) {
   S.armed = false; S.seenAbove = false; S.belowSince = null; S.pendingStop = null;
-  S.recording = true; S.rt = []; S.rv = []; S.rtT = []; S.rtV = [[], [], []]; S.savedT = 0; S.trange = { lo: null, hi: null }; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
+  S.recording = true; S.rt = []; S.rv = []; S.rtT = []; S.rtV = mkArr(emptyList); S.savedT = 0; S.trange = { lo: null, hi: null }; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
   addRow('-- Recording started ' + fmtTS(S.started) + ' --');
   msg('Recording from ' + fmtTS(S.started) + '.');
   acquireWake(); liveBegin(); updateButtons();
@@ -1312,7 +1317,7 @@ function doUpload(r, share) {
     return share ? makeShare(id).then(function (u) { r.meta.remote.shareUrl = u; return u; }) : null;
   }).then(function (u) {
     saveRun(r); renderRuns();
-    if (u) { copy(u); msg('Uploaded to Runtime on hCRI.io. Share link copied: ' + u + (r.temps && r.temps.length ? ' (Only the lumens are uploaded; the temperatures stay here.)' : '')); } else msg('Uploaded to Runtime on hCRI.io (Explore, then Runtime).' + (r.temps && r.temps.length ? ' The lumens were uploaded; the temperatures stay here (use CSV with temperatures).' : ''));
+    if (u) { copy(u); msg('Uploaded to Runtime on hCRI.io. Share link copied: ' + u + (r.temps && r.temps.length ? ' (Temperatures included.)' : '')); } else msg('Uploaded to Runtime on hCRI.io (Explore, then Runtime).' + (r.temps && r.temps.length ? ' Temperatures included.' : ''));
   }).catch(function (e) { msg('Upload failed: ' + e.message + ' The run is still saved in this browser.'); });
 }
 function copy(text) { try { navigator.clipboard.writeText(text).catch(function () {}); } catch (e) {} }
@@ -1372,7 +1377,7 @@ function checkRecover() {
     $('recoverText').textContent = 'A run started ' + parts[0].started + ' was not saved (' + n + ' readings, last at ' + parts[parts.length - 1].at + '). The page may have been closed or crashed while recording.';
     $('recover').hidden = false;
     $('recoverBtn').onclick = function () {
-      var ts = [], vs = [], td = { t: [], v: [[], [], []], names: parts[0].tn };
+      var ts = [], vs = [], td = { t: [], v: mkArr(emptyList), names: parts[0].tn };
       parts.forEach(function (p) {
         ts = ts.concat(p.t); vs = vs.concat(p.v);
         td.t = td.t.concat(p.tt || []);

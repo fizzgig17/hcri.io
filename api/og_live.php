@@ -42,7 +42,7 @@ $isRun = $sum['kind'] === 'run';
 $tj = json_decode((string)($r['temps'] ?? ''), true);
 $tj = is_array($tj) ? $tj : [];
 $tser = [];
-foreach ([0, 1, 2] as $ch) {
+foreach ([0, 1, 2, 3] as $ch) {
     $tv = $tj[$ch]['values'] ?? null;
     if (!is_array($tv)) continue;
     $lastT = null;
@@ -70,7 +70,7 @@ $num = $last === null ? '–' : (abs($last) >= 100 ? (string)round($last) : numb
 imagettftext($im, 150, 0, 60, 340, $fg, $M, $num);
 $bb = imagettfbbox(150, 0, $M, $num);
 imagettftext($im, 44, 0, 60 + ($bb[2] - $bb[0]) + 24, 340, $dim, $R, $sum['unit'] ?: 'lm');
-$tcol = [imagecolorallocate($im, 255, 138, 76), imagecolorallocate($im, 255, 210, 63), imagecolorallocate($im, 197, 139, 255)];
+$tcol = [imagecolorallocate($im, 255, 138, 76), imagecolorallocate($im, 255, 210, 63), imagecolorallocate($im, 197, 139, 255), imagecolorallocate($im, 61, 214, 140)];
 // current temperatures down the right side, level with the big number
 $ty = 200;
 foreach ($tser as $t) {

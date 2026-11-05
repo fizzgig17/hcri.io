@@ -56,9 +56,9 @@ if ($incremental) {
     $out['values'] = $dv;
     $run['intervalSeconds'] = $di;
 }
-// Temperatures (Temp 1..3), lined up with "values": the same slice or the same averaging.
+// Temperatures (Temp 1..4), lined up with "values": the same slice or the same averaging.
 $out['temps'] = [];
-foreach ([0, 1, 2] as $ch) {
+foreach ([0, 1, 2, 3] as $ch) {
     $tv = $tj[$ch]['values'] ?? null;
     if (!is_array($tv) || !array_filter($tv, fn($x) => $x !== null)) continue;
     if ($incremental) $tv = array_slice($tv, $since);

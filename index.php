@@ -1146,7 +1146,7 @@ if (preg_match('/^[a-f0-9]{24}$/', $liveRaw) === 1 && $shareTok === '' && $repor
             // latest temperatures (Temp 1..3) sent with the readings, for the preview text
             $lvTemps = [];
             $lvTj = json_decode((string)($lvr['temps'] ?? ''), true);
-            if (is_array($lvTj)) foreach ([0, 1, 2] as $lvCh) {
+            if (is_array($lvTj)) foreach ([0, 1, 2, 3] as $lvCh) {
                 $lvTv = $lvTj[$lvCh]['values'] ?? null;
                 if (!is_array($lvTv)) continue;
                 for ($lvI = count($lvTv) - 1; $lvI >= 0; $lvI--) if ($lvTv[$lvI] !== null) {

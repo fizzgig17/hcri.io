@@ -59,7 +59,7 @@ function Spark({ c, T, w = 110, h = 30 }) {
 }
 
 /** One or more curves on a shared minutes axis. mode 'abs' = real values, 'pct' = % of each curve's starting value. */
-export const TEMP_COLORS = ['#f0782c', '#d9a400', '#a566f0'];
+export const TEMP_COLORS = ['#f0782c', '#d9a400', '#a566f0', '#1fa86a'];
 /** temps (optional): [{ ch, name, values }] drawn as lines on a second scale (degrees C) on the right, on the same minutes axis as the first curve (null = no reading). */
 export function RuntimeChart({ curves, T, mode, height = 300, temps = null }) {
   const hasT = !!(temps && temps.length);
@@ -71,7 +71,7 @@ export function RuntimeChart({ curves, T, mode, height = 300, temps = null }) {
     return { c, color: PALETTE[k % PALETTE.length], pts: v.map((y, i) => ({ x: (i * c.intervalSeconds) / 60, y: y / base })) };
   }), [curves, mode]);
   const tIv = curves[0] ? curves[0].intervalSeconds : 1;
-  const tSeries = hasT ? temps.map((t) => ({ t, color: TEMP_COLORS[t.ch % 3], pts: (t.values || []).map((y, i) => (y == null ? null : { x: (i * tIv) / 60, y })) })) : [];
+  const tSeries = hasT ? temps.map((t) => ({ t, color: TEMP_COLORS[t.ch % 4], pts: (t.values || []).map((y, i) => (y == null ? null : { x: (i * tIv) / 60, y })) })) : [];
   let tLo = 0, tHi = 1, tStep = 1;
   if (hasT) {
     let lo = Infinity, hi = -Infinity;
@@ -190,7 +190,20 @@ export function RuntimeLight({ c, T }) {
     <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>{c.label}</h2>
     <div style={{ color: T.dim, fontSize: 12, marginBottom: 12 }}>{c.group || 'Ungrouped'} · {c.points} samples every {+c.intervalSeconds.toFixed(2)} s · {fmtMin(st && st.durationMin)}</div>
     <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', c.unit ? `Absolute (${c.unit})` : 'Absolute')}</div>
-    <RuntimeChart curves={[c]} T={T} mode={mode} />
+    <RuntimeChart curves={[c]} T={T} mode={mode} temps={c.temps && c.temps.length ? c.temps : null} />
+    {c.temps && c.temps.length > 0 && (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', margin: '8px 0 0', fontSize: 12 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: T.dim }}>Temperature (°C, right scale):</span>
+        {c.temps.map((t) => {
+          const v = (t.values || []).filter((x) => x != null);
+          return (
+            <span key={t.ch} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: T.text }}>
+              <span style={{ width: 12, height: 3, background: TEMP_COLORS[t.ch % 4], display: 'inline-block' }} />{t.name}{v.length ? ` ${v[0].toFixed(1)} → ${v[v.length - 1].toFixed(1)}, max ${Math.max(...v).toFixed(1)}` : ''}
+            </span>
+          );
+        })}
+      </div>
+    )}
     {st && (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, margin: '14px 0' }}>
         {[['Start', fmtVal(st.start)], ...MARKS.map((m) => [`@ ${m} min`, st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} (${fmtPctV(st.at[m].pct)})`]),

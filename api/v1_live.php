@@ -90,11 +90,11 @@ $values = array_map(fn($v) => round((float)$v, 3), array_values($values));
 $start = max(0, (int)($b['startIndex'] ?? 0));
 // Temperatures: [{"ch":0,"name":"Temp 1","values":[..]}], the same readings (one per second) as "values", null where a sensor gave nothing.
 $temps = [];
-if (is_array($b['temps'] ?? null)) foreach (array_slice($b['temps'], 0, 3) as $t) {
+if (is_array($b['temps'] ?? null)) foreach (array_slice($b['temps'], 0, 4) as $t) {
     if (!is_array($t)) continue;
     $ch = (int)($t['ch'] ?? -1);
     $tv = $t['values'] ?? [];
-    if ($ch < 0 || $ch > 2 || !is_array($tv) || count($tv) > 5000) continue;
+    if ($ch < 0 || $ch > 3 || !is_array($tv) || count($tv) > 5000) continue;
     $temps[$ch] = ['name' => mb_substr(trim((string)($t['name'] ?? '')), 0, 24), 'values' => array_map(fn($v) => $v === null ? null : round((float)$v, 2), array_values($tv))];
 }
 $status = (string)($b['status'] ?? 'running');
@@ -136,7 +136,7 @@ try {
     $haveT = $fresh ? [] : (json_decode((string)($r['temps'] ?? ''), true) ?: []);
     $n = count($merged);
     $tstore = [];
-    foreach ([0, 1, 2] as $ch) {
+    foreach ([0, 1, 2, 3] as $ch) {
         if (!isset($temps[$ch]) && !isset($haveT[$ch])) continue;
         $old = array_slice($haveT[$ch]['values'] ?? [], 0, $keep);
         if (count($old) < $keep) $old = array_merge($old, array_fill(0, $keep - count($old), null));
