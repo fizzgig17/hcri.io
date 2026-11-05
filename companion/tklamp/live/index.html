@@ -427,7 +427,7 @@ function alignTemps(td, step, bins) {
     }
     var vals = [], last = null;
     for (i = 0; i < bins; i++) { if (cnts[i]) last = Math.round(sums[i] / cnts[i] * 100) / 100; vals.push(last); }
-    out.push({ ch: c, name: (td.names && td.names[c]) || ('Sensor ' + (c + 1)), values: vals });
+    out.push({ ch: c, name: (td.names && td.names[c]) || ('Temp ' + (c + 1)), values: vals });
   }
   return out;
 }
@@ -546,6 +546,7 @@ function drawChart(cv, ts, vs, windowS, ymax, extra, temps) {
     if (rg.lo !== null && rg.lo !== undefined) { if (rg.lo < lo) lo = rg.lo; if (rg.hi > hi) hi = rg.hi; }
     if (!isFinite(lo)) { lo = 20; hi = 30; }
     if (hi - lo < 10) { var mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+    if (lo < 0) { lo = 0; if (hi < 10) hi = 10; }   // the scale never goes below zero
     tstep = niceTempStep(hi - lo);
     tlo = Math.floor(lo / tstep) * tstep; thi = Math.ceil(hi / tstep) * tstep;
     if (temps.range) { temps.range.lo = tlo; temps.range.hi = thi; }
@@ -723,8 +724,8 @@ var S = {
 };
 // The temperature sensor (a Raspberry Pi Pico running the Temp Logger firmware), a second USB serial device beside the lumen tester.
 var Tm = { on: false, busy: false, port: null, reader: null, stopping: false, seen: [false, false, false], last: [null, null, null], lastRx: 0, sim: false, sig: '',
-  names: pref('tnames', ['Sensor 1', 'Sensor 2', 'Sensor 3']) };
-function tName(i) { return (Tm.names && Tm.names[i]) || ('Sensor ' + (i + 1)); }
+  names: pref('tnames', ['Temp 1', 'Temp 2', 'Temp 3']) };
+function tName(i) { var n = Tm.names && Tm.names[i]; return !n || n === 'Sensor ' + (i + 1) ? 'Temp ' + (i + 1) : n; }
 function tNames() { return [0, 1, 2].map(tName); }
 var cv = $('cv'), hcv = $('hcv');
 function msg(t) { $('status').textContent = t || ''; }
@@ -765,6 +766,8 @@ function onReading(tSec, raw) {
 function now() { return performance.now() / 1000; }
 function onTemp(tSec, objs) {
   Tm.lastRx = tSec;
+  var LS = S.recording ? Live : Mon;
+  if (LS) for (var q = 0; q < NT; q++) if (objs[q] !== null && objs[q] !== undefined) liveTempAdd(LS, q, objs[q], tSec);
   for (var i = 0; i < NT; i++) if (objs[i] !== null && objs[i] !== undefined) { Tm.seen[i] = true; Tm.last[i] = objs[i]; }
   if (S.recording) { S.rtT.push(tSec - S.t0); for (i = 0; i < NT; i++) S.rtV[i].push(objs[i]); }
   else {
@@ -915,7 +918,7 @@ function tempRowUpdate() {
       var c = document.createElement('span'); c.className = 't';
       var dot = document.createElement('i'); dot.style.background = tempColor(i); dot.setAttribute('data-ch', i);
       var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 24; inp.value = tName(i); inp.setAttribute('aria-label', 'Name of temperature sensor ' + (i + 1));
-      inp.onchange = function () { Tm.names[i] = inp.value.trim() || ('Sensor ' + (i + 1)); inp.value = Tm.names[i]; setPref('tnames', Tm.names); redraw(); };
+      inp.onchange = function () { Tm.names[i] = inp.value.trim() || ('Temp ' + (i + 1)); inp.value = Tm.names[i]; setPref('tnames', Tm.names); redraw(); };
       var val = document.createElement('b'); val.id = 'tv' + i;
       var unit = document.createElement('span'); unit.className = 'note'; unit.textContent = '°C';
       c.appendChild(dot); c.appendChild(inp); c.appendChild(val); c.appendChild(unit); row.appendChild(c);
@@ -934,7 +937,8 @@ function tempRowUpdate() {
 var Live = null, Mon = null;   // the run being recorded, and the plain live reading while no run is going
 function liveStart(kind) {
   if (!sessionToken()) return null;
-  var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null };
+  var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null,
+    tvals: [[], [], []], tsum: [0, 0, 0], tn: [0, 0, 0], tlast: [null, null, null], tlastAt: [0, 0, 0], tseen: [false, false, false] };
   call('GET', '/v1/live').then(function (info) {
     if (!info.enabled) { L.off = true; return; }
     if (kind === 'run') msg('Live station is on: this run can be watched at ' + info.url);
@@ -953,9 +957,22 @@ function liveAddTo(L, tSec, lm) {
     var mean = L.n > 0 ? L.sum / L.n : (L.vals.length ? L.vals[L.vals.length - 1] : 0);
     L.vals.push(mean);
     for (var k = L.idx + 1; k < i; k++) L.vals.push(mean);
+    liveTempPush(L, i - L.idx, tSec);
     L.idx = i; L.sum = 0; L.n = 0;
   }
   L.sum += lm; L.n++;
+}
+// Temperatures ride along with the lumens: one value per second, in step with L.vals (the same index is the same second).
+function liveTempAdd(L, c, v, tSec) {
+  if (!L || L.off || L.origin === null) return;
+  L.tsum[c] += v; L.tn[c]++; L.tlast[c] = v; L.tlastAt[c] = tSec; L.tseen[c] = true;
+}
+function liveTempPush(L, count, tSec) {
+  for (var c = 0; c < NT; c++) {
+    var m = L.tn[c] > 0 ? Math.round(L.tsum[c] / L.tn[c] * 100) / 100 : (L.tlast[c] !== null && tSec - L.tlastAt[c] <= 5 ? L.tlast[c] : null);
+    for (var k = 0; k < count; k++) L.tvals[c].push(m);
+    L.tsum[c] = 0; L.tn[c] = 0;
+  }
 }
 // While no run is recording, the tester's live number is sent too, so the Live station shows "Live" instead of nothing.
 function liveMon(tSec, lm) { if (!Mon) Mon = liveStart('monitor'); liveAddTo(Mon, tSec, lm); }
@@ -978,6 +995,9 @@ function liveFlush(L, status, message) {
     var chunk = L.vals.slice(L.sent, L.sent + 1000), last = L.sent + chunk.length >= L.vals.length;
     if (!chunk.length && status === 'running' && !cmdAck) { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
     var body = { runId: L.id, kind: L.kind, label: L.label || (L.label = liveName(L)), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
+    var tl = [];
+    for (var c = 0; c < NT; c++) if (L.tseen[c]) tl.push({ ch: c, name: tName(c), values: L.tvals[c].slice(L.sent, L.sent + chunk.length) });
+    if (tl.length) body.temps = tl;
     if (last && message) body.message = message;
     var sentAck = cmdAck; if (sentAck) body.ack = sentAck;
     return call('POST', '/v1/live', body).then(function (r) {
@@ -995,7 +1015,7 @@ function liveFinish(why) { var L = Live; Live = null; if (L) liveEnd(L, why); }
 function liveEnd(L, why) {
   clearTimeout(L.first); clearInterval(L.timer);
   if (L.off) return;
-  if (L.n > 0) { L.vals.push(L.sum / L.n); L.n = 0; }
+  if (L.n > 0) { L.vals.push(L.sum / L.n); L.n = 0; liveTempPush(L, 1, now()); }
   var bad = L.kind === 'run' && why && /stopped sending|no readings|lost/i.test(why);
   var tries = 0;
   (function go() {

@@ -38,6 +38,19 @@ $sum  = live_run_summary($r);
 $vals = json_decode((string)$r['payload'], true) ?: [];
 $last = $vals ? (float)end($vals) : null;
 $isRun = $sum['kind'] === 'run';
+// Temperatures (Temp 1..3) that were sent with the readings: the latest value of each, and the line for the chart.
+$tj = json_decode((string)($r['temps'] ?? ''), true);
+$tj = is_array($tj) ? $tj : [];
+$tser = [];
+foreach ([0, 1, 2] as $ch) {
+    $tv = $tj[$ch]['values'] ?? null;
+    if (!is_array($tv)) continue;
+    $lastT = null;
+    for ($i = count($tv) - 1; $i >= 0; $i--) if ($tv[$i] !== null) { $lastT = (float)$tv[$i]; break; }
+    if ($lastT === null) continue;
+    $nm = trim((string)($tj[$ch]['name'] ?? ''));
+    $tser[] = ['ch' => $ch, 'name' => $nm !== '' ? $nm : 'Temp ' . ($ch + 1), 'vals' => $tv, 'last' => $lastT];
+}
 $W = 1200; $H = 630;
 $im = imagecreatetruecolor($W, $H);
 imageantialias($im, true);
@@ -57,6 +70,16 @@ $num = $last === null ? '–' : (abs($last) >= 100 ? (string)round($last) : numb
 imagettftext($im, 150, 0, 60, 340, $fg, $M, $num);
 $bb = imagettfbbox(150, 0, $M, $num);
 imagettftext($im, 44, 0, 60 + ($bb[2] - $bb[0]) + 24, 340, $dim, $R, $sum['unit'] ?: 'lm');
+$tcol = [imagecolorallocate($im, 255, 138, 76), imagecolorallocate($im, 255, 210, 63), imagecolorallocate($im, 197, 139, 255)];
+// current temperatures down the right side, level with the big number
+$ty = 200;
+foreach ($tser as $t) {
+    $line = $t['name'] . '  ' . number_format($t['last'], 1) . ' °C';
+    if (mb_strlen($line) > 26) $line = mb_substr($line, 0, 25) . '…';
+    $tb = imagettfbbox(32, 0, $B, $line);
+    imagettftext($im, 32, 0, $W - 60 - ($tb[2] - $tb[0]), $ty, $tcol[$t['ch']], $B, $line);
+    $ty += 52;
+}
 
 // last readings, scaled from zero
 $n = count($vals);
@@ -72,6 +95,24 @@ if ($n >= 2) {
         $y = $y1 - ($y1 - $y0) * (float)$vals[$i] / $max;
         if ($px !== null) imageline($im, (int)$px, (int)$py, (int)$x, (int)$y, $acc);
         $px = $x; $py = $y;
+    }
+    // temperatures on their own scale (fitted to their range), same time axis
+    foreach ($tser as $t) {
+        $tv = array_slice($t['vals'], -$n);
+        $nn = count($tv);
+        $known = array_filter($tv, fn($x) => $x !== null);
+        if ($nn < 2 || !$known) continue;
+        $lo = min($known); $hi = max($known);
+        if ($hi - $lo < 10) { $mid = ($hi + $lo) / 2; $lo = $mid - 5; $hi = $mid + 5; }
+        if ($lo < 0) { $lo = 0; if ($hi < 10) $hi = 10; }   // never below zero
+        $px = null; $py = null;
+        for ($i = 0; $i < $nn; $i += $step) {
+            if ($tv[$i] === null) { $px = null; continue; }
+            $x = $x0 + ($x1 - $x0) * $i / ($nn - 1);
+            $y = $y1 - ($y1 - $y0) * ((float)$tv[$i] - $lo) / ($hi - $lo);
+            if ($px !== null) imageline($im, (int)$px, (int)$py, (int)$x, (int)$y, $tcol[$t['ch']]);
+            $px = $x; $py = $y;
+        }
     }
     imagesetthickness($im, 1);
 }

@@ -101,7 +101,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     var lo = Infinity, hi = -Infinity;
     for (var s = 0; s < N; s++) for (var k = i0; k < n; k++) { var v = S.v[s][k]; if (v !== null) { if (v < lo) lo = v; if (v > hi) hi = v; } }
     if (!isFinite(lo)) { g.fillStyle = cssVar('var(--dim)'); g.fillText('No sensor is answering.', L + 10, H / 2); return; }
-    var pad = Math.max(1, (hi - lo) * 0.1); lo = Math.floor(lo - pad); hi = Math.ceil(hi + pad);
+    var pad = Math.max(1, (hi - lo) * 0.1); lo = Math.max(0, Math.floor(lo - pad)); hi = Math.max(lo + 5, Math.ceil(hi + pad));   // the scale never goes below zero
     var span = Math.max(tEnd - tStart, 10);
     function X(t) { return L + (t - tStart) / span * (W - L - R); } function Y(v) { return T + (hi - v) / (hi - lo) * (H - T - B); }
     g.strokeStyle = cssVar('var(--border)'); g.fillStyle = cssVar('var(--dim)'); g.lineWidth = 1;

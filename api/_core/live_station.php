@@ -47,6 +47,11 @@ function live_ensure(PDO $db): void
         if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'info_title'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN info_title VARCHAR(160) NOT NULL DEFAULT '', ADD COLUMN info_text TEXT NULL");
     } catch (\Throwable $e) { error_log('live_stations info: ' . $e->getMessage()); }
 
+    // Temperatures recorded beside the lumens (Temp Logger sensors): {"0":{"name":"Temp 1","values":[..]},..}, one value per payload reading, null where there is none.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'temps'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN temps MEDIUMTEXT NULL");
+    } catch (\Throwable $e) { error_log('live_stations temps: ' . $e->getMessage()); }
+
     // Remote control: the owner (website or app) leaves a command; whichever sender is connected to the tester picks it up with its next push.
     try {
         if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'cmd'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN cmd VARCHAR(8) NOT NULL DEFAULT '', ADD COLUMN cmd_id VARCHAR(16) NOT NULL DEFAULT '', ADD COLUMN cmd_at BIGINT NULL DEFAULT NULL");
