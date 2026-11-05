@@ -14,6 +14,16 @@ const CURVES = [
   { id: 'V', label: 'V(λ)', full: 'Photopic V(λ)', color: '#e3b341', at: (w) => vLambda(w) },
   ...ALPHA_OPIC.map((a, i) => ({ id: a.id, label: a.label, full: a.label + ' (CIE S 026)', color: ['#8c7bff', '#3fb96b', '#ef5b52', '#97a3b6', '#22b8d8'][i], at: (w) => alphaAt(a.values, w) })),
 ];
+// What each toggle means (title, then text; shown on hover, focus or tap).
+const TIPS = {
+  V: 'V(λ): HOW BRIGHT LIGHT LOOKS\n\nThe eye\'s brightness sensitivity in normal light, peaking at 555 nm (green-yellow). This is the curve LER uses: the filled part of the spectrum is the part that makes brightness.',
+  S: 'S CONE (CYANOPIC)\n\nThe short-wavelength cones, peaking at 448 nm (blue). Shows how much of the light the blue-sensing cones can use.',
+  M: 'M CONE (CHLOROPIC)\n\nThe medium-wavelength cones, peaking at 541 nm (green).',
+  L: 'L CONE (ERYTHROPIC)\n\nThe long-wavelength cones, peaking at 569 nm (yellow-red).',
+  Rod: 'RODS (RHODOPIC)\n\nThe night-vision cells, peaking at 506 nm (blue-green). Related to how bright a light looks in dim conditions.',
+  Mel: 'MELANOPIC (ipRGC)\n\nLight-sensitive cells in the eye that help set the body clock and alertness, peaking at 490 nm (cyan). The standard way to judge how circadian-active a light is.',
+  all: 'SHOW ALL CURVES\n\nDraws all six sensitivity curves over the spectrum so you can see how each lines up with the light. Every curve peaks at 1. The curve you picked is the thick one and sets the filled area and the number.',
+};
 const loadPref = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
 const savePref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
 
@@ -51,6 +61,13 @@ export default function LERChart({ wls, vals, ler, lerLo, lerHi, lerPartial, the
   const [main, setMain] = useState(() => { const v = loadPref('hcri_ler_curve', 'V'); return CURVES.some((c) => c.id === v) ? v : 'V'; });
   const [all, setAll] = useState(() => loadPref('hcri_ler_all', '0') === '1');
   const cur = CURVES.find((c) => c.id === main) || CURVES[0];
+  const [tip, setTip] = useState(null); // {text, x, y} for the toggle being hovered
+  const showTip = (id) => (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const up = r.bottom + 200 > window.innerHeight && r.top > 200; // no room below: open above the toggle
+    setTip({ text: TIPS[id], x: Math.max(8, Math.min(r.left, window.innerWidth - 256)), y: up ? r.top - 6 : r.bottom + 6, up });
+  };
+  const hideTip = () => setTip(null);
   // the share of the spectrum's power the chosen curve counts (for V(λ) this is LER / 683.002)
   const share = useMemo(() => {
     if (!d) return null;
@@ -107,16 +124,21 @@ export default function LERChart({ wls, vals, ler, lerLo, lerHi, lerPartial, the
         {CURVES.map((c) => {
           const on = c.id === cur.id;
           return (
-            <button key={c.id} type="button" title={c.full} onClick={() => { setMain(c.id); savePref('hcri_ler_curve', c.id); }}
+            <button key={c.id} type="button" aria-label={c.full} onMouseEnter={showTip(c.id)} onMouseLeave={hideTip} onFocus={showTip(c.id)} onBlur={hideTip} onClick={() => { setMain(c.id); savePref('hcri_ler_curve', c.id); }}
               style={{ cursor: 'pointer', fontFamily: 'monospace', fontSize: 11, padding: '3px 9px', borderRadius: 12, border: `1px solid ${on ? curveColor(c) : border}`, background: on ? `${curveColor(c)}33` : 'transparent', color: on ? text : dim, fontWeight: on ? 700 : 400 }}>
               <span style={{ color: curveColor(c) }}>●</span> {c.label}
             </button>
           );
         })}
-        <label style={{ fontSize: 11, color: dim, marginLeft: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <label onMouseEnter={showTip('all')} onMouseLeave={hideTip} style={{ fontSize: 11, color: dim, marginLeft: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <input type="checkbox" checked={all} onChange={(e) => { setAll(e.target.checked); savePref('hcri_ler_all', e.target.checked ? '1' : '0'); }} /> Show all curves
         </label>
       </div>
+      {tip && (
+        <div role="tooltip" style={{ position: 'fixed', left: tip.x, top: tip.y, transform: tip.up ? 'translateY(-100%)' : undefined, maxWidth: 240, zIndex: 9999, pointerEvents: 'none', whiteSpace: 'pre-line', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.7, padding: '10px 12px', borderRadius: 7, color: text, background: C.name === 'dark' ? '#1a3050' : '#f8faff', border: `1px solid ${border}`, boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+          {tip.text}
+        </div>
+      )}
       <div style={{ fontSize: 11, color: C.dim, lineHeight: 1.5, marginTop: 2 }}>
         <span style={{ color: fillColor }}>■</span> counted by {cur.id === 'V' ? 'the eye (spectrum × V(λ))' : `${cur.label} (spectrum × curve)`} &nbsp; <span style={{ opacity: 0.8 }}>■</span> the rest of the spectrum &nbsp; <span style={{ color: fillColor }}>{cur.id === 'V' ? '┄' : '─'}</span> {cur.id === 'V' ? 'V(λ)' : cur.full + ', peak = 1'}
         {lerPartial && <div style={{ color: C.warn || '#d29922' }}>Partial: only {lerLo}–{lerHi} nm was measured, so this reads higher than a full 380–780 nm value would.</div>}
