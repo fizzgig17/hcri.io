@@ -1,6 +1,6 @@
 # Sensor + laser pod: plan (saved Nov 2, 2026)
 
-Parts (measured): sensor tube 9 mm across its whole length and 19 mm long (board to tip); board with pins and plug 12 mm thick; board 12.5 mm wide, 18 mm tall with the plug on; laser 6 mm across, about 13 to 14 mm long with its solder tabs (from a photo); clamp stud 1/4"-20, 5.83 mm of thread sticking out (assuming that is its length).
+Parts (measured): sensor tube 9 mm across its whole length and 19 mm long (board to tip); board with pins and plug 12 mm thick; board 12.5 mm wide, 18 mm tall with the plug on; laser body 5.93 mm across and 7 mm long, then a small board 6.13 mm wide; 13.36 mm long in all, without wires; clamp stud 1/4"-20, 5.83 mm of thread sticking out (assuming that is its length).
 Mount: ball-head spring clamp on the side of the TKLamp, sensor pointing sideways. Sensor-to-target distance not known yet.
 
 Laser aiming: the laser sits beside the sensor (spacing S), so it is tilted in toward the sensor's line of sight.

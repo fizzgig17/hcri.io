@@ -18,7 +18,9 @@ WALL = 2.5
 SENSOR_BARREL_D = 9.5     # measured can 9.0 mm + 0.5 clearance
 SENSOR_BARREL_LEN = 19.5  # the black tube is 19 mm long (board to tip); the board stops against the step at its base
 BOARD_W, BOARD_H = 12.5 + 0.4, 18.0 + 0.4   # measured: board 12.5 wide, 18 tall with the plug on, plus clearance
-LASER_D = 6.2             # 6 mm laser module plus clearance
+LASER_D = 6.2             # laser body measured 5.93 mm, plus clearance (the front part of the bore)
+LASER_REAR_D = 6.5        # the little board 7 mm back from the tip is 6.13 mm wide, so the bore opens up behind the body
+LASER_FRONT_LEN = 7.5     # length of the snug front part of the bore (the body is 7 mm long)
 LASER_WALL = -0.1         # no wall: the two bores overlap slightly, so the laser and the sensor can sit almost touching (about 0.25 mm apart)
 LASER_LUG = 12.0          # depth of the laser's bore, at the front (the laser is short; its wires leave into the open space behind)
 BACK_SPACE = 12.5         # measured: board with its pins and plug is 12 mm thick, plus 0.5 clearance
@@ -57,7 +59,7 @@ def to_trimesh(man):
 def make_pod():
     """The laser bore is straight, parallel to the sensor (the dot lands HOLE_SPACING mm to the side of the sensor's spot)."""
     x_min = sx - BOARD_W / 2 - WALL
-    x_max = lx + LASER_D / 2 + WALL
+    x_max = lx + LASER_REAR_D / 2 + WALL
     W = x_max - x_min
     cx_body = (x_min + x_max) / 2
     body = box(x_min, 0, 0, W, D, H)
@@ -68,7 +70,8 @@ def make_pod():
         box(sx - BOARD_W / 2, -0.5, cz - BOARD_H / 2, BOARD_W, D - SENSOR_BARREL_LEN + 0.5, BOARD_H),  # board pocket, open at the back
     ]
     # laser bore: straight, through the front lug and on out the back
-    cuts.append(cyl_y(LASER_D, D + 1, lx, cz, -0.5))
+    cuts.append(cyl_y(LASER_D, LASER_FRONT_LEN + 0.5, lx, cz, D - LASER_FRONT_LEN))
+    cuts.append(cyl_y(LASER_REAR_D, D - LASER_FRONT_LEN + 0.6, lx, cz, -0.5))
     # relief behind the lug so the laser body and its wires have room (open at the back and to the +x side)
     rx0 = sx + BOARD_W / 2 + WALL
     cuts.append(box(rx0, -0.5, cz - 6.0, x_max - rx0 + 1, D - LASER_LUG + 0.5, 12.0))
