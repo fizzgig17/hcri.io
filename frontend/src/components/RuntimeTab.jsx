@@ -59,19 +59,37 @@ function Spark({ c, T, w = 110, h = 30 }) {
 }
 
 /** One or more curves on a shared minutes axis. mode 'abs' = real values, 'pct' = % of each curve's starting value. */
-export function RuntimeChart({ curves, T, mode, height = 300 }) {
-  const W = 720, L = 52, R = 14, Tp = 14, B = 38;
+export const TEMP_COLORS = ['#f0782c', '#d9a400', '#a566f0', '#1fa86a'];
+/** temps (optional): [{ ch, name, values }] drawn as lines on a second scale (degrees C) on the right, on the same minutes axis as the first curve (null = no reading). */
+export function RuntimeChart({ curves, T, mode, height = 300, temps = null }) {
+  const hasT = !!(temps && temps.length);
+  const W = 720, L = 52, R = hasT ? 54 : 14, Tp = 14, B = 38;
   const [hover, setHover] = useState(null);
   const series = useMemo(() => curves.map((c, k) => {
     const v = c.values || [];
     const base = mode === 'pct' ? (v[0] || 1) / 100 : 1;
     return { c, color: PALETTE[k % PALETTE.length], pts: v.map((y, i) => ({ x: (i * c.intervalSeconds) / 60, y: y / base })) };
   }), [curves, mode]);
-  const xMax = Math.max(1e-6, ...series.map((s) => (s.pts.length ? s.pts[s.pts.length - 1].x : 0)));
+  const tIv = curves[0] ? curves[0].intervalSeconds : 1;
+  const tSeries = hasT ? temps.map((t) => ({ t, color: TEMP_COLORS[t.ch % 4], pts: (t.values || []).map((y, i) => (y == null ? null : { x: (i * tIv) / 60, y })) })) : [];
+  let tLo = 0, tHi = 1, tStep = 1;
+  if (hasT) {
+    let lo = Infinity, hi = -Infinity;
+    tSeries.forEach((s) => s.pts.forEach((p) => { if (p) { if (p.y < lo) lo = p.y; if (p.y > hi) hi = p.y; } }));
+    if (!isFinite(lo)) { lo = 20; hi = 30; }
+    if (hi - lo < 10) { const mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+    if (lo < 0) { lo = 0; if (hi < 10) hi = 10; }   // the scale never goes below zero
+    tStep = [1, 2, 5, 10, 20, 50, 100].find((s) => (hi - lo) / s <= 6) || 200;
+    tLo = Math.floor(lo / tStep) * tStep; tHi = Math.ceil(hi / tStep) * tStep;
+  }
+  const xMax = Math.max(1e-6, ...series.map((s) => (s.pts.length ? s.pts[s.pts.length - 1].x : 0)), ...tSeries.map((s) => (s.pts.length ? s.pts[s.pts.length - 1].x : 0)));
   const yMaxRaw = Math.max(1e-6, ...series.flatMap((s) => s.pts.map((p) => p.y)));
   const yMax = mode === 'pct' ? Math.max(100, yMaxRaw) * 1.04 : yMaxRaw * 1.06;
   const px = (x) => L + (x / xMax) * (W - L - R);
   const py = (y) => Tp + (1 - y / yMax) * (height - Tp - B);
+  const pt = (y) => Tp + (1 - (y - tLo) / (tHi - tLo)) * (height - Tp - B);
+  const tTicks = []; if (hasT) for (let v = tLo; v <= tHi + 1e-9; v += tStep) tTicks.push(+v.toFixed(6));
+  const tAt = (s, x) => { const i = Math.round((x * 60) / tIv); const p = s.pts[Math.min(i, s.pts.length - 1)]; return p || null; };
   const xT = ticks(0, xMax, 6);
   // Output in absolute units: faint dots every 50, dotted every 100, solid every 500 (see gridStep / gridLevel). Percent charts keep their round steps.
   let yT, yEvery = 1, gMinor = 0;
@@ -114,12 +132,25 @@ export function RuntimeChart({ curves, T, mode, height = 300 }) {
         <path key={s.c.id} fill="none" stroke={s.color} strokeWidth="1.8" strokeLinejoin="round"
           d={s.pts.map((p, i) => `${i ? 'L' : 'M'}${px(p.x).toFixed(1)} ${py(p.y).toFixed(1)}`).join('')} />
       ))}
+      {hasT && tTicks.map((v) => (
+        <g key={'t' + v}>
+          <line x1={W - R} x2={W - R + 4} y1={pt(v)} y2={pt(v)} stroke={T.axisLabel} />
+          <text x={W - R + 7} y={pt(v) + 4} fontSize="11" fill={T.axisLabel} fontFamily="monospace">{v}</text>
+        </g>
+      ))}
+      {hasT && <text x={W - R + 7} y={Tp - 6} fontSize="11" fill={T.axisLabel} fontFamily="monospace">°C</text>}
+      {tSeries.map((s) => {
+        let d = '', pen = false;
+        s.pts.forEach((p) => { if (!p) { pen = false; return; } d += `${pen ? 'L' : 'M'}${px(p.x).toFixed(1)} ${pt(p.y).toFixed(1)}`; pen = true; });
+        return <path key={'tp' + s.t.ch} fill="none" stroke={s.color} strokeWidth="1.8" strokeLinejoin="round" d={d} />;
+      })}
       {hover != null && (
         <g>
           <line x1={px(hover)} x2={px(hover)} y1={Tp} y2={height - B} stroke={T.dim} strokeDasharray="3 3" />
           {series.map((s) => { const p = at(s, hover); return p ? <circle key={s.c.id} cx={px(p.x)} cy={py(p.y)} r="3.5" fill={s.color} /> : null; })}
+          {tSeries.map((s) => { const p = tAt(s, hover); return p ? <circle key={'tc' + s.t.ch} cx={px(p.x)} cy={pt(p.y)} r="3.5" fill={s.color} /> : null; })}
           <text x={px(hover) > W / 2 ? px(hover) - 6 : px(hover) + 6} y={Tp + 12} textAnchor={px(hover) > W / 2 ? 'end' : 'start'} fontSize="11" fill={T.text} fontFamily="monospace">
-            {fmtMin(hover)}{series.length <= 4 ? '  ' + series.map((s) => { const p = at(s, hover); return p ? (mode === 'pct' ? fmtPctV(p.y) : fmtVal(p.y)) : '–'; }).join(' / ') : ''}
+            {fmtMin(hover)}{series.length <= 4 ? '  ' + series.map((s) => { const p = at(s, hover); return p ? (mode === 'pct' ? fmtPctV(p.y) : fmtVal(p.y)) : '–'; }).join(' / ') : ''}{tSeries.map((s) => { const p = tAt(s, hover); return `  ${s.t.name} ${p ? p.y.toFixed(1) : '–'}°`; }).join('')}
           </text>
         </g>
       )}
@@ -159,7 +190,20 @@ export function RuntimeLight({ c, T }) {
     <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>{c.label}</h2>
     <div style={{ color: T.dim, fontSize: 12, marginBottom: 12 }}>{c.group || 'Ungrouped'} · {c.points} samples every {+c.intervalSeconds.toFixed(2)} s · {fmtMin(st && st.durationMin)}</div>
     <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>{pill('pct', '% of start')}{pill('abs', c.unit ? `Absolute (${c.unit})` : 'Absolute')}</div>
-    <RuntimeChart curves={[c]} T={T} mode={mode} />
+    <RuntimeChart curves={[c]} T={T} mode={mode} temps={c.temps && c.temps.length ? c.temps : null} />
+    {c.temps && c.temps.length > 0 && (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', margin: '8px 0 0', fontSize: 12 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: T.dim }}>Temperature (°C, right scale):</span>
+        {c.temps.map((t) => {
+          const v = (t.values || []).filter((x) => x != null);
+          return (
+            <span key={t.ch} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: T.text }}>
+              <span style={{ width: 12, height: 3, background: TEMP_COLORS[t.ch % 4], display: 'inline-block' }} />{t.name}{v.length ? ` ${v[0].toFixed(1)} → ${v[v.length - 1].toFixed(1)}, max ${Math.max(...v).toFixed(1)}` : ''}
+            </span>
+          );
+        })}
+      </div>
+    )}
     {st && (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, margin: '14px 0' }}>
         {[['Start', fmtVal(st.start)], ...MARKS.map((m) => [`@ ${m} min`, st.at[m].v == null ? '–' : `${fmtVal(st.at[m].v)} (${fmtPctV(st.at[m].pct)})`]),

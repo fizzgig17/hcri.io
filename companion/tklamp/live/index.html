@@ -208,6 +208,11 @@
   #viewDlg{max-width:min(980px,96vw);width:96vw}
   #viewDlg canvas{height:380px}
   .note{font-size:12px;color:var(--dim)}
+  .temps{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:2px 0 8px}
+  .temps .t{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+  .temps .t i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .temps .t b{font-size:20px}
+  .temps .t input{width:112px;padding:3px 6px;font-size:12px}
   fieldset.limits{border:1px solid var(--border);border-radius:10px;margin:10px 0;padding:8px 12px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
   fieldset.limits legend{font-size:12px;color:var(--dim);padding:0 6px}
   fieldset.limits label{font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
@@ -226,6 +231,8 @@
     <button class="btn" id="connectBtn">Connect tester</button>
     <button class="link" id="otherBtn" title="Pick a different USB serial device">choose another device</button>
     <button class="btn plain" id="simBtn">Try without a tester</button>
+    <button class="btn plain" id="tempBtn" title="Reads the infrared temperature sensors on a Raspberry Pi Pico (Temp Logger)">Connect temp sensor</button>
+    <span class="note" id="tempState"></span>
     <span class="grow"></span>
     <span id="acct" class="note"></span>
     <button class="btn plain" id="acctBtn">Sign in</button>
@@ -235,6 +242,7 @@
 
   <div class="pane" id="pane-live">
     <div class="head"><div class="big-num"><span id="big">--</span><small>lm</small></div><div class="recstat" id="recstat"></div></div>
+    <div class="temps" id="tempRow" hidden></div>
     <canvas class="chart" id="cv"></canvas>
     <div class="row">
       <button class="btn big" id="mainBtn" disabled>Start run</button>
@@ -248,6 +256,7 @@
       <label><input type="checkbox" id="trim" checked> Start at the first reading</label>
       <label><input type="checkbox" id="trimPeak"> Start at the peak</label>
       <label><input type="checkbox" id="showLog" checked> Show readings</label>
+      <label><input type="checkbox" id="showTemp" checked> Show temperature on the chart</label>
     </div>
     <fieldset class="limits" id="liveInfoBox" hidden><legend>Live station</legend>
       <label style="flex-basis:100%"><input type="checkbox" id="liveOn"> Share live (a link anyone can open to watch your tester and runs)</label>
@@ -284,6 +293,7 @@
       <button class="btn plain" data-act="unshare">Stop sharing</button>
       <button class="btn plain" data-act="open">Open on hCRI.io</button>
       <button class="btn plain" data-act="csv">Download CSV</button>
+      <button class="btn plain" data-act="tcsv">CSV with temperatures</button>
       <button class="btn plain" data-act="json">Download JSON</button>
       <button class="btn plain" data-act="delete">Delete</button>
     </div>
@@ -329,6 +339,11 @@
 'use strict';
 var API = '/index.php/api';
 var DEFAULT_SCALE = 313.2, MAX_POINTS = 100000;
+var PICO_VID = 0x2e8a, NT = 4;   // Raspberry Pi Pico USB vendor id; room for up to 4 temperature sensors (Temp 1 to Temp 4)
+function mkArr(f) { var a = []; for (var i = 0; i < NT; i++) a.push(f()); return a; }   // one entry per temperature sensor
+function emptyList() { return []; }
+var TC_DARK = ['#ff8a4c', '#ffd23f', '#c58bff', '#3dd68c'], TC_LIGHT = ['#d9631f', '#a87b00', '#8b4fd1', '#1f9d5a'];   // not blue: the lumen line is blue
+function tempColor(i) { return (document.documentElement.getAttribute('data-theme') === 'light' ? TC_LIGHT : TC_DARK)[i % 4]; }
 var HEAD = [0xA5, 0x0A, 0xAF, 0xA5, 0x09, 0xAE, 0x5A, 0x5A, 0x09, 0x04, 0x00], FRAME_LEN = 15;
 function $(id) { return document.getElementById(id); }
 function pref(k, d) { try { var v = localStorage.getItem('tkl_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -398,18 +413,52 @@ function trimToPeak(vals) {
   if (best <= 0 || vals.length - best < 2) return { vals: vals, trimmed: 0 };
   return { vals: vals.slice(best), trimmed: best };
 }
-function buildRun(ts, vs, started, ended, scale, trim, trimPeak) {
+// Temperatures recorded beside the lumens, lined up bin for bin with the lumen values (same step, same length).
+// td = { t: [seconds from the start of the run], v: [[sensor 1 readings or null], ...], names: [...] }
+function alignTemps(td, step, bins) {
+  var out = [];
+  if (!td || !td.t || !td.t.length) return out;
+  for (var c = 0; c < NT; c++) {
+    var src = td.v[c] || [], any = false, i;
+    for (i = 0; i < src.length; i++) if (src[i] !== null && src[i] !== undefined) { any = true; break; }
+    if (!any) continue;
+    var sums = new Float64Array(bins), cnts = new Uint32Array(bins);
+    for (i = 0; i < td.t.length; i++) {
+      var v = src[i]; if (v === null || v === undefined || td.t[i] < 0) continue;
+      var b = Math.min(bins - 1, Math.floor(td.t[i] / step)); sums[b] += v; cnts[b]++;
+    }
+    var vals = [], last = null;
+    for (i = 0; i < bins; i++) { if (cnts[i]) last = Math.round(sums[i] / cnts[i] * 100) / 100; vals.push(last); }
+    out.push({ ch: c, name: (td.names && td.names[c]) || ('Temp ' + (c + 1)), values: vals });
+  }
+  return out;
+}
+function buildRun(ts, vs, started, ended, scale, trim, trimPeak, td) {
   var out = resample(ts, vs);
   if (!out) return null;
   var step = out.step, vals = out.vals, trimmed = 0;
+  var temps = alignTemps(td, step, vals.length);
   if (trimPeak) { var tp = trimToPeak(vals); vals = tp.vals; trimmed = tp.trimmed; }
   else if (trim) { var t = trimLeading(vals, step); vals = t.vals; trimmed = t.trimmed; }
+  if (trimmed) temps = temps.map(function (x) { return { ch: x.ch, name: x.name, values: x.values.slice(trimmed) }; });
   if (trimmed) started = new Date(started.getTime() + trimmed * step * 1000);
   var dur = (vals.length - 1) * step;
   var label = 'TKLamp run ' + fmtTS(started).slice(0, 16);
-  return { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
+  var run = { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
     meta: { started: fmtTS(started), ended: fmtTS(ended), durationSeconds: dur, readings: ts.length, countsPerLumen: scale,
       trimmedLeadingSeconds: trimmed * step, source: 'tklamp web logger', label: label } };
+  if (temps.length) run.temps = temps;
+  return run;
+}
+function csvWithTemps(run) {
+  var T = run.temps || [], h = ['minutes', run.label.replace(/,/g, ' ')].concat(T.map(function (x) { return (x.name + ' C').replace(/,/g, ' '); }));
+  var lines = [h.join(',')];
+  for (var i = 0; i < run.values.length; i++) {
+    var row = [Math.round(i * run.intervalSeconds / 60 * 10000) / 10000, run.values[i]];
+    T.forEach(function (x) { var v = x.values[i]; row.push(v === null || v === undefined ? '' : v); });
+    lines.push(row.join(','));
+  }
+  return lines.join('\n') + '\n';
 }
 function csvOf(run) {
   var lines = ['minutes,' + run.label.replace(/,/g, ' ')];
@@ -451,7 +500,14 @@ function gridLabelEvery(px) {
   for (var i = 0; i < a.length; i++) if (a[i] >= need) return a[i];
   return 20;
 }
-function drawChart(cv, ts, vs, windowS, ymax, extra) {
+function niceTempStep(span) {
+  var c = [1, 2, 5, 10, 20, 50, 100];
+  for (var i = 0; i < c.length; i++) if (span / c[i] <= 6) return c[i];
+  return 200;
+}
+// temps = { series: [{ ts, vs, color, name }], range: {lo, hi} } draws the temperatures as lines on a second scale (deg C) on the right.
+// range remembers the scale so the lines do not jump about; it only grows (like the lumen scale).
+function drawChart(cv, ts, vs, windowS, ymax, extra, temps) {
   var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   if (!w || !h) return 0;
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
@@ -459,9 +515,13 @@ function drawChart(cv, ts, vs, windowS, ymax, extra) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
   var grid = css('--border'), dim = css('--dim'), line = css('--accent');
-  var L = 54, R = 14, T = 24, B = 28, pw = w - L - R, ph = h - T - B;
+  var tser = [];
+  if (temps) temps.series.forEach(function (sr) { for (var q = 0; q < sr.vs.length; q++) if (sr.vs[q] !== null && sr.vs[q] !== undefined) { tser.push(sr); break; } });
+  var hasT = tser.length > 0;
+  var L = 54, R = hasT ? 48 : 14, T = 24, B = 28, pw = w - L - R, ph = h - T - B;
   if (pw < 40 || ph < 30) return 0;
   var tmax = ts.length ? ts[ts.length - 1] : 0, t0, t1;
+  tser.forEach(function (sr) { if (sr.ts.length) tmax = Math.max(tmax, sr.ts[sr.ts.length - 1]); });
   if (windowS > 0) { t1 = Math.max(tmax, windowS); t0 = t1 - windowS; } else { t0 = 0; t1 = Math.max(tmax, 10); }
   var i0 = ts.length ? Math.max(0, lowerBound(ts, t0) - 1) : 0;
   var step = Math.max(1, Math.floor((ts.length - i0) / (pw * 2)));
@@ -470,6 +530,30 @@ function drawChart(cv, ts, vs, windowS, ymax, extra) {
   var topV = Math.max(ymax || 0, niceCeil(peak * 1.05));
   function X(t) { return L + (t - t0) / (t1 - t0) * pw; }
   function Y(v) { return T + ph - (v / topV) * ph; }
+  // the temperature scale (right side)
+  var tlo = 0, thi = 1, tstep = 1, tpts = [];
+  if (hasT) {
+    var lo = Infinity, hi = -Infinity;
+    tser.forEach(function (sr) {
+      var a0 = Math.max(0, lowerBound(sr.ts, t0) - 1), sk = Math.max(1, Math.floor((sr.ts.length - a0) / (pw * 2))), pts = [];
+      for (var q = a0; q < sr.ts.length; q += sk) {
+        if (sr.ts[q] > t1) break;
+        var tv = sr.vs[q];
+        if (tv === null || tv === undefined) { pts.push(null); continue; }
+        pts.push([sr.ts[q], tv]); if (tv < lo) lo = tv; if (tv > hi) hi = tv;
+      }
+      tpts.push({ color: sr.color, pts: pts });
+    });
+    var rg = temps.range || {};
+    if (rg.lo !== null && rg.lo !== undefined) { if (rg.lo < lo) lo = rg.lo; if (rg.hi > hi) hi = rg.hi; }
+    if (!isFinite(lo)) { lo = 20; hi = 30; }
+    if (hi - lo < 10) { var mid = (hi + lo) / 2; lo = mid - 5; hi = mid + 5; }
+    if (lo < 0) { lo = 0; if (hi < 10) hi = 10; }   // the scale never goes below zero
+    tstep = niceTempStep(hi - lo);
+    tlo = Math.floor(lo / tstep) * tstep; thi = Math.ceil(hi / tstep) * tstep;
+    if (temps.range) { temps.range.lo = tlo; temps.range.hi = thi; }
+  }
+  function Y2(v) { return T + ph - ((v - tlo) / (thi - tlo)) * ph; }
   g.font = '10px sans-serif'; g.lineWidth = 1; g.strokeStyle = grid; g.fillStyle = dim;
   g.strokeRect(L + .5, T + .5, pw, ph);
   g.textAlign = 'right'; g.textBaseline = 'middle';
@@ -490,7 +574,27 @@ function drawChart(cv, ts, vs, windowS, ymax, extra) {
   var any = false;
   for (var n = 0; n < st.length; n++) { if (st[n] > t1) break; var px = X(st[n]), py = Y(sv[n]); if (!any) { g.moveTo(px, py); any = true; } else g.lineTo(px, py); }
   if (any) { if (st.length === 1) { g.fillStyle = line; g.fillRect(X(st[0]) - 2, Y(sv[0]) - 2, 4, 4); } else g.stroke(); }
+  tpts.forEach(function (sr) {
+    g.strokeStyle = sr.color; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+    var pen = false, one = null, cnt = 0;
+    sr.pts.forEach(function (p) {
+      if (!p) { pen = false; return; }
+      var qx = X(p[0]), qy = Y2(p[1]); cnt++; one = [qx, qy];
+      if (!pen) { g.moveTo(qx, qy); pen = true; } else g.lineTo(qx, qy);
+    });
+    if (cnt > 1) g.stroke(); else if (cnt === 1) { g.fillStyle = sr.color; g.fillRect(one[0] - 2, one[1] - 2, 4, 4); }
+  });
   g.restore();
+  if (hasT) {   // right axis: degrees C, with the legend along the top
+    g.strokeStyle = dim; g.fillStyle = dim; g.lineWidth = 1; g.textAlign = 'left'; g.textBaseline = 'middle';
+    for (var tv2 = tlo; tv2 <= thi + 1e-9; tv2 += tstep) { var ty = Math.round(Y2(tv2)) + .5; g.beginPath(); g.moveTo(L + pw, ty); g.lineTo(L + pw + 4, ty); g.stroke(); g.fillText(String(+tv2.toPrecision(6)), L + pw + 7, ty); }
+    g.fillText('°C', L + pw + 7, 7);
+    var lx = L + 4, items = [{ c: line, n: 'Lumens' }].concat(tser.map(function (sr) { return { c: sr.color, n: sr.name }; }));
+    items.forEach(function (it) {
+      g.strokeStyle = it.c; g.lineWidth = 2; g.beginPath(); g.moveTo(lx, 10); g.lineTo(lx + 12, 10); g.stroke();
+      g.fillStyle = dim; g.fillText(it.n, lx + 16, 10); lx += 22 + g.measureText(it.n).width + 8;
+    });
+  }
   cv._geo = { L: L, pw: pw, t0: t0, t1: t1 };
   if (extra && extra.t != null) {   // the draggable start line (see Trimmer)
     var cx = X(extra.t);
@@ -545,9 +649,11 @@ Trimmer.prototype.draw = function () {
 function cutRun(full, idx) {
   var step = full.intervalSeconds, vals = full.values.slice(idx), started = new Date(full._started.getTime() + idx * step * 1000), m = full.meta;
   var label = 'TKLamp run ' + fmtTS(started).slice(0, 16);
-  return { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
+  var nr = { id: stampOf(started), label: label, intervalSeconds: step, unit: 'lm', values: vals,
     meta: { started: fmtTS(started), ended: m.ended, durationSeconds: (vals.length - 1) * step, readings: m.readings, countsPerLumen: m.countsPerLumen,
       trimmedLeadingSeconds: idx * step, source: m.source, label: label } };
+  if (full.temps && full.temps.length) nr.temps = full.temps.map(function (x) { return { ch: x.ch, name: x.name, values: x.values.slice(idx) }; });
+  return nr;
 }
 
 var saveTrimmer = new Trimmer($('scv'), null);
@@ -603,7 +709,9 @@ function remoteId(label) {
 }
 function makeShare(id) { return call('POST', '/v1/runtime?share=' + encodeURIComponent(id), {}).then(function (r) { return location.origin + '/?runtime=' + r.shareToken; }); }
 function uploadRun(run) {
-  return call('POST', '/v1/runtime', { items: [{ label: run.label, group: 'TKLamp', unit: 'lm', intervalSeconds: run.intervalSeconds, values: run.values }] }).then(function (r) {
+  var item = { label: run.label, group: 'TKLamp', unit: 'lm', intervalSeconds: run.intervalSeconds, values: run.values };
+  if (run.temps && run.temps.length) item.temps = run.temps.map(function (x) { return { ch: x.ch, name: x.name, values: x.values }; });   // the temperatures, one per lumen reading
+  return call('POST', '/v1/runtime', { items: [item] }).then(function (r) {
     if (r.skipped && r.skipped.length) throw new Error('hCRI.io skipped it: ' + r.skipped.map(function (s) { return s.reason || '?'; }).join('; '));
     return remoteId(run.label);
   });
@@ -615,8 +723,14 @@ var S = {
   rt: [], rv: [], t0: 0, started: null, stamp: '', lt: [], lv: [], lt0: performance.now() / 1000,
   recent: [], lastRx: 0, secVals: [], lastRow: 0, ymax: 0, calib: null,
   runs: [], sel: null, saved: 0, wake: null,
-  armed: false, seenAbove: false, belowSince: null, pendingStop: null, lastRxWall: new Date()
+  armed: false, seenAbove: false, belowSince: null, pendingStop: null, lastRxWall: new Date(),
+  mt: [], mv: mkArr(emptyList), rtT: [], rtV: mkArr(emptyList), savedT: 0, trange: { lo: null, hi: null }
 };
+// The temperature sensor (a Raspberry Pi Pico running the Temp Logger firmware), a second USB serial device beside the lumen tester.
+var Tm = { on: false, busy: false, port: null, reader: null, stopping: false, seen: mkArr(function () { return false; }), last: mkArr(function () { return null; }), lastRx: 0, sim: false, sig: '',
+  names: pref('tnames', ['Temp 1', 'Temp 2', 'Temp 3', 'Temp 4']) };
+function tName(i) { var n = Tm.names && Tm.names[i]; return !n || n === 'Sensor ' + (i + 1) ? 'Temp ' + (i + 1) : n; }
+function tNames() { var a = []; for (var i = 0; i < NT; i++) a.push(tName(i)); return a; }
 var cv = $('cv'), hcv = $('hcv');
 function msg(t) { $('status').textContent = t || ''; }
 
@@ -654,9 +768,21 @@ function onReading(tSec, raw) {
   else { liveMon(tSec, lm); S.lt.push(tSec - S.lt0); S.lv.push(lm); if (S.lt.length > 8000) { S.lt.splice(0, 2000); S.lv.splice(0, 2000); } }
 }
 function now() { return performance.now() / 1000; }
+function onTemp(tSec, objs) {
+  Tm.lastRx = tSec;
+  var LS = S.recording ? Live : Mon;
+  if (LS) for (var q = 0; q < NT; q++) if (objs[q] !== null && objs[q] !== undefined) liveTempAdd(LS, q, objs[q], tSec);
+  for (var i = 0; i < NT; i++) if (objs[i] !== null && objs[i] !== undefined) { Tm.seen[i] = true; Tm.last[i] = objs[i]; }
+  if (S.recording) { S.rtT.push(tSec - S.t0); for (i = 0; i < NT; i++) S.rtV[i].push(objs[i]); }
+  else {
+    S.mt.push(tSec); for (i = 0; i < NT; i++) S.mv[i].push(objs[i]);
+    if (S.mt.length > 8000) { S.mt.splice(0, 2000); for (i = 0; i < NT; i++) S.mv[i].splice(0, 2000); }
+  }
+}
+function clearTemps() { S.mt = []; S.mv = mkArr(emptyList); S.trange = { lo: null, hi: null }; }
 
 // ---- sources ------------------------------------------------------------------------------------------------------------
-function resetLive() { S.recent = []; S.lastRx = 0; S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; }
+function resetLive() { S.recent = []; S.lastRx = 0; S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; clearTemps(); }
 
 function connectSerial(forcePicker, anyDevice) {
   if (!navigator.serial) { msg('This browser cannot open USB serial devices. Use Chrome or Edge.'); return Promise.resolve(); }
@@ -669,7 +795,7 @@ function connectSerial(forcePicker, anyDevice) {
     return port.open({ baudRate: 9600 }).then(function () {
       try { port.setSignals({ dataTerminalReady: true }); } catch (e) {}
       var fr = new FrameReader(), reader = port.readable.getReader(), stopping = false;
-      S.source = { kind: 'serial', close: function () { stopping = true; return reader.cancel().catch(function () {}).then(function () { return port.close().catch(function () {}); }); } };
+      S.source = { kind: 'serial', port: port, close: function () { stopping = true; return reader.cancel().catch(function () {}).then(function () { return port.close().catch(function () {}); }); } };
       S.connected = true; resetLive();
       msg('Reading the tester.');
       (function loop() {
@@ -695,7 +821,12 @@ function startSim() {
       onReading(now(), Math.round(lm * S.scale / 60) * 60); sent++;
     }
   }, 100);
-  S.source = { kind: 'sim', close: function () { clearInterval(iv); return Promise.resolve(); } };
+  var tiv = null;
+  if (!Tm.on) {
+    var ts0 = now();
+    tiv = setInterval(function () { var t = now() - ts0, r2 = function (v) { return Math.round(v * 100) / 100; }; onTemp(now(), [r2(24 + 31 * (1 - Math.exp(-t / 150)) + Math.sin(t / 9) * 0.2), r2(23 + 12 * (1 - Math.exp(-t / 240))), null]); }, 1000);
+  }
+  S.source = { kind: 'sim', close: function () { clearInterval(iv); if (tiv) clearInterval(tiv); return Promise.resolve(); } };
   S.connected = true; resetLive();
   msg('Simulation: a made-up fading light.');
   updateButtons();
@@ -714,7 +845,96 @@ function lost(text) {
   updateButtons();
   msg('Lost the tester: ' + text + (S.recording ? ' The run so far is kept; press Stop run to save it.' : ''));
 }
-if (navigator.serial) navigator.serial.addEventListener('disconnect', function () { if (S.source && S.source.kind === 'serial') lost('the USB cable was unplugged.'); });
+if (navigator.serial) navigator.serial.addEventListener('disconnect', function (e) {
+  if (Tm.port && e.target === Tm.port) { tempLost('the USB cable was unplugged.'); return; }
+  if (S.source && S.source.kind === 'serial' && (!S.source.port || e.target === S.source.port)) lost('the USB cable was unplugged.');
+});
+
+// ---- temperature sensor (Raspberry Pi Pico, Temp Logger firmware) -----------------------------------------------------------
+// The Pico prints one line a second: T,<seconds>,<obj1>,<obj2>,<obj3>,<amb1>,<amb2>,<amb3> (blank = no sensor there).
+// Finding it: a Pico always has the USB vendor id 0x2e8a, so the chooser only lists Picos, and once the browser has been given
+// permission for it once, it is found and opened on its own on later visits and whenever it is plugged in.
+function isPico(p) { try { return p.getInfo().usbVendorId === PICO_VID; } catch (e) { return false; } }
+function numOrNull(x) { if (x === undefined || x === '') return null; var v = parseFloat(x); return isFinite(v) ? v : null; }
+function onTempLine(line) {
+  line = line.trim();
+  if (!line || line[0] !== 'T') return;
+  var p = line.split(',');
+  var n = Math.floor((p.length - 2) / 2);   // the Pico sends T,seconds, then one object temperature and one chip temperature per sensor
+  if (n < 1) return;
+  var objs = []; for (var i = 0; i < NT; i++) objs.push(i < n ? numOrNull(p[2 + i]) : null);
+  onTemp(now(), objs);
+}
+function openTemp(port) {
+  return port.open({ baudRate: 115200 }).then(function () {
+    var reader = port.readable.getReader(), dec = new TextDecoder(), buf = '';
+    Tm.port = port; Tm.reader = reader; Tm.on = true; Tm.stopping = false; Tm.lastRx = 0;
+    setPref('tempAuto', true);
+    msg('Temperature sensor connected.');
+    (function loop() {
+      reader.read().then(function (r) {
+        if (r.done) { if (!Tm.stopping) tempLost('the Pico stopped sending.'); return; }
+        if (r.value) { buf += dec.decode(r.value, { stream: true }); var ls = buf.split('\n'); buf = ls.pop(); ls.forEach(onTempLine); if (buf.length > 4000) buf = ''; }
+        loop();
+      }).catch(function (e) { if (!Tm.stopping) tempLost(e && e.message || 'the connection was lost.'); });
+    })();
+  });
+}
+function connectTemp(quiet) {
+  if (!navigator.serial || Tm.on || Tm.busy) return Promise.resolve();
+  Tm.busy = true; updateButtons();
+  return navigator.serial.getPorts().then(function (ps) {
+    var port = ps.filter(isPico)[0];
+    if (port) return port;
+    if (quiet) return null;
+    return navigator.serial.requestPort({ filters: [{ usbVendorId: PICO_VID }] });
+  }).then(function (port) { return port ? openTemp(port) : null; }).catch(function (e) {
+    if (e && e.name === 'NotFoundError') { if (!quiet) msg('No Pico was chosen. Plug the Pico in with a data USB cable and try again.'); return; }
+    if (!quiet) msg('Could not open the temperature sensor: ' + (e && e.message || e) + ' Close Thonny or any other program that is using the Pico, then try again.');
+    else msg('Found the Pico but could not open it (is Thonny or another tab using it?).');
+  }).then(function () { Tm.busy = false; updateButtons(); });
+}
+function closeTemp() {
+  var r = Tm.reader, p = Tm.port;
+  Tm.stopping = true; Tm.on = false; Tm.reader = null; Tm.port = null;
+  return (r ? r.cancel().catch(function () {}).then(function () { try { r.releaseLock(); } catch (e) {} }) : Promise.resolve())
+    .then(function () { return p ? p.close().catch(function () {}) : null; });
+}
+function tempLost(text) {
+  closeTemp(); updateButtons();
+  msg('Lost the temperature sensor: ' + text + ' It reconnects by itself when it is plugged back in.');
+}
+function disconnectTemp() { setPref('tempAuto', false); closeTemp().then(function () { msg('Temperature sensor disconnected.'); updateButtons(); }); }
+if (navigator.serial) navigator.serial.addEventListener('connect', function (e) {
+  if (isPico(e.target) && !Tm.on && !Tm.busy && pref('tempAuto', true)) setTimeout(function () { connectTemp(true); }, 800);
+});
+function tempWriteState() {
+  var el = $('tempState'), n = now();
+  if (Tm.on) el.textContent = Tm.lastRx && n - Tm.lastRx <= 5 ? 'Temp sensor: reading' : (Tm.lastRx ? 'Temp sensor: no readings for ' + Math.floor(n - Tm.lastRx) + ' s' : 'Temp sensor: waiting for the first reading');
+  else el.textContent = '';
+}
+// The row of current temperatures under the big number: one chip per sensor that has answered, with a name you can change.
+function tempRowUpdate() {
+  var row = $('tempRow'), n = now(), fresh = Tm.lastRx && n - Tm.lastRx <= 5;
+  var sig = Tm.seen.join(',');
+  if (sig !== Tm.sig) {
+    Tm.sig = sig; row.textContent = '';
+    for (var i = 0; i < NT; i++) if (Tm.seen[i]) (function (i) {
+      var c = document.createElement('span'); c.className = 't';
+      var dot = document.createElement('i'); dot.style.background = tempColor(i); dot.setAttribute('data-ch', i);
+      var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 24; inp.value = tName(i); inp.setAttribute('aria-label', 'Name of temperature sensor ' + (i + 1));
+      inp.onchange = function () { Tm.names[i] = inp.value.trim() || ('Temp ' + (i + 1)); inp.value = Tm.names[i]; setPref('tnames', Tm.names); redraw(); };
+      var val = document.createElement('b'); val.id = 'tv' + i;
+      var unit = document.createElement('span'); unit.className = 'note'; unit.textContent = '°C';
+      c.appendChild(dot); c.appendChild(inp); c.appendChild(val); c.appendChild(unit); row.appendChild(c);
+    })(i);
+    row.hidden = !Tm.seen.some(function (x) { return x; });
+  }
+  for (var j = 0; j < NT; j++) if (Tm.seen[j]) {
+    var el = $('tv' + j); if (el) el.textContent = fresh && Tm.last[j] !== null ? Tm.last[j].toFixed(1) : '--';
+    var d = row.querySelector('i[data-ch="' + j + '"]'); if (d) d.style.background = tempColor(j);
+  }
+}
 
 // ---- live station -------------------------------------------------------------------------------------------------------
 // While a run records, send it to hCRI.io (api/v1_live.php) so it can be watched at hcri.io/?live=... and so hCRI.io can email
@@ -722,7 +942,8 @@ if (navigator.serial) navigator.serial.addEventListener('disconnect', function (
 var Live = null, Mon = null;   // the run being recorded, and the plain live reading while no run is going
 function liveStart(kind) {
   if (!sessionToken()) return null;
-  var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null };
+  var L = { kind: kind, id: (kind === 'run' ? 'w' : 'm') + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), vals: [], sent: 0, busy: false, off: false, origin: null, idx: 0, sum: 0, n: 0, timer: null, first: null,
+    tvals: mkArr(emptyList), tsum: mkArr(function () { return 0; }), tn: mkArr(function () { return 0; }), tlast: mkArr(function () { return null; }), tlastAt: mkArr(function () { return 0; }), tseen: mkArr(function () { return false; }) };
   call('GET', '/v1/live').then(function (info) {
     if (!info.enabled) { L.off = true; return; }
     if (kind === 'run') msg('Live station is on: this run can be watched at ' + info.url);
@@ -741,9 +962,22 @@ function liveAddTo(L, tSec, lm) {
     var mean = L.n > 0 ? L.sum / L.n : (L.vals.length ? L.vals[L.vals.length - 1] : 0);
     L.vals.push(mean);
     for (var k = L.idx + 1; k < i; k++) L.vals.push(mean);
+    liveTempPush(L, i - L.idx, tSec);
     L.idx = i; L.sum = 0; L.n = 0;
   }
   L.sum += lm; L.n++;
+}
+// Temperatures ride along with the lumens: one value per second, in step with L.vals (the same index is the same second).
+function liveTempAdd(L, c, v, tSec) {
+  if (!L || L.off || L.origin === null) return;
+  L.tsum[c] += v; L.tn[c]++; L.tlast[c] = v; L.tlastAt[c] = tSec; L.tseen[c] = true;
+}
+function liveTempPush(L, count, tSec) {
+  for (var c = 0; c < NT; c++) {
+    var m = L.tn[c] > 0 ? Math.round(L.tsum[c] / L.tn[c] * 100) / 100 : (L.tlast[c] !== null && tSec - L.tlastAt[c] <= 5 ? L.tlast[c] : null);
+    for (var k = 0; k < count; k++) L.tvals[c].push(m);
+    L.tsum[c] = 0; L.tn[c] = 0;
+  }
 }
 // While no run is recording, the tester's live number is sent too, so the Live station shows "Live" instead of nothing.
 function liveMon(tSec, lm) { if (!Mon) Mon = liveStart('monitor'); liveAddTo(Mon, tSec, lm); }
@@ -766,6 +1000,9 @@ function liveFlush(L, status, message) {
     var chunk = L.vals.slice(L.sent, L.sent + 1000), last = L.sent + chunk.length >= L.vals.length;
     if (!chunk.length && status === 'running' && !cmdAck) { L.busy = false; return Promise.resolve(true); }   // nothing new: stay quiet so the server can notice a silent run
     var body = { runId: L.id, kind: L.kind, label: L.label || (L.label = liveName(L)), unit: 'lm', intervalSeconds: 1, startIndex: L.sent, values: chunk, status: last ? status : 'running' };
+    var tl = [];
+    for (var c = 0; c < NT; c++) if (L.tseen[c]) tl.push({ ch: c, name: tName(c), values: L.tvals[c].slice(L.sent, L.sent + chunk.length) });
+    if (tl.length) body.temps = tl;
     if (last && message) body.message = message;
     var sentAck = cmdAck; if (sentAck) body.ack = sentAck;
     return call('POST', '/v1/live', body).then(function (r) {
@@ -783,7 +1020,7 @@ function liveFinish(why) { var L = Live; Live = null; if (L) liveEnd(L, why); }
 function liveEnd(L, why) {
   clearTimeout(L.first); clearInterval(L.timer);
   if (L.off) return;
-  if (L.n > 0) { L.vals.push(L.sum / L.n); L.n = 0; }
+  if (L.n > 0) { L.vals.push(L.sum / L.n); L.n = 0; liveTempPush(L, 1, now()); }
   var bad = L.kind === 'run' && why && /stopped sending|no readings|lost/i.test(why);
   var tries = 0;
   (function go() {
@@ -808,18 +1045,19 @@ function startRun() {
 }
 function beginRun(n) {
   S.armed = false; S.seenAbove = false; S.belowSince = null; S.pendingStop = null;
-  S.recording = true; S.rt = []; S.rv = []; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
+  S.recording = true; S.rt = []; S.rv = []; S.rtT = []; S.rtV = mkArr(emptyList); S.savedT = 0; S.trange = { lo: null, hi: null }; S.t0 = n; S.started = new Date(); S.stamp = stampOf(S.started); S.saved = 0; S.chunk = 0; S.lastFlush = n; S.ymax = 0;
   addRow('-- Recording started ' + fmtTS(S.started) + ' --');
   msg('Recording from ' + fmtTS(S.started) + '.');
   acquireWake(); liveBegin(); updateButtons();
 }
 function flushPartial(force) {
   if (!S.recording) return;
-  var n = S.rt.length - S.saved;
-  if (n <= 0 || (!force && now() - S.lastFlush < 5)) return;
+  var n = S.rt.length - S.saved, nT = S.rtT.length - S.savedT;
+  if ((n <= 0 && nT <= 0) || (!force && now() - S.lastFlush < 5)) return;
   S.lastFlush = now();
-  var rec = { key: S.stamp + '#' + pad3(S.chunk++), stamp: S.stamp, started: fmtTS(S.started), scale: S.scale, t: S.rt.slice(S.saved), v: S.rv.slice(S.saved), at: fmtTS(new Date()) };
-  S.saved = S.rt.length;
+  var rec = { key: S.stamp + '#' + pad3(S.chunk++), stamp: S.stamp, started: fmtTS(S.started), scale: S.scale, t: S.rt.slice(S.saved), v: S.rv.slice(S.saved), at: fmtTS(new Date()),
+    tt: S.rtT.slice(S.savedT), tv: S.rtV.map(function (a) { return a.slice(S.savedT); }), tn: tNames() };
+  S.saved = S.rt.length; S.savedT = S.rtT.length;
   idbPut('partial', rec).catch(function () {});
 }
 function pad3(n) { return ('000' + n).slice(-4); }
@@ -828,15 +1066,15 @@ function dropPartial(stamp) {
 }
 function stopRun(why, auto, endedAt) {
   if (!S.recording) return;
-  var ended = endedAt || new Date(), ts = S.rt, vs = S.rv, started = S.started, stamp = S.stamp;
+  var ended = endedAt || new Date(), ts = S.rt, vs = S.rv, started = S.started, stamp = S.stamp, td = { t: S.rtT, v: S.rtV, names: tNames() };
   S.recording = false; releaseWake(); liveFinish(why);
-  S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0;
+  S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; clearTemps();
   addRow('-- Stopped ' + fmtTS(ended) + (why ? ': ' + why : '') + ' --');
   updateButtons();
-  var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked, $('trimPeak').checked);
+  var run = buildRun(ts, vs, started, ended, S.scale, $('trim').checked, $('trimPeak').checked, td);
   if (!run) { msg((auto ? why + ' ' : '') + 'The recording was too short to keep (it needs at least 2 seconds of readings).'); dropPartial(stamp); return; }
   run._stamp = stamp;
-  if (!auto) { var fullRun = buildRun(ts, vs, started, ended, S.scale, false, false); if (fullRun) { fullRun._started = started; run._full = fullRun; } }
+  if (!auto) { var fullRun = buildRun(ts, vs, started, ended, S.scale, false, false, td); if (fullRun) { fullRun._started = started; run._full = fullRun; } }
   if (auto) {
     // Nobody may be at the computer: keep the run now under its suggested name; rename or upload it from History.
     dropPartial(stamp); delete run._stamp;
@@ -853,14 +1091,14 @@ function stopRun(why, auto, endedAt) {
 function saveDialog(run, why) {
   var m = run.meta;
   $('saveInfo').textContent = (why ? why + '\n' : '') + 'Length ' + clock(m.durationSeconds) + ', ' + m.readings + ' readings, ' + fixed(run.values[0], 0) + ' to ' +
-    fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nStart trimmed: ' + m.trimmedLeadingSeconds + ' s' : '');
+    fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nStart trimmed: ' + m.trimmedLeadingSeconds + ' s' : '') + tempSummary(run);
   $('saveName').value = run.label;
   $('saveUp').checked = !!sessionToken(); $('saveShare').checked = false;
   var d = $('saveDlg');
   // Start line: shown where the checkboxes put the start; "Choose where the run starts" lets the person drag it.
   var full = run._full, stamp0 = run._stamp, tr = saveTrimmer;
   $('scv').hidden = $('scRow').hidden = !full; $('scHint').hidden = true; $('scChoose').hidden = false; $('scDef').hidden = $('scDone').hidden = true;
-  function refreshInfo() { m = run.meta; $('saveInfo').textContent = (why ? why + '\n' : '') + 'Length ' + clock(m.durationSeconds) + ', ' + m.readings + ' readings, ' + fixed(run.values[0], 0) + ' to ' + fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nStart trimmed: ' + m.trimmedLeadingSeconds + ' s' : ''); }
+  function refreshInfo() { m = run.meta; $('saveInfo').textContent = (why ? why + '\n' : '') + 'Length ' + clock(m.durationSeconds) + ', ' + m.readings + ' readings, ' + fixed(run.values[0], 0) + ' to ' + fixed(run.values[run.values.length - 1], 0) + ' lm\nStarted ' + m.started + '\nEnded   ' + m.ended + (m.trimmedLeadingSeconds ? '\nStart trimmed: ' + m.trimmedLeadingSeconds + ' s' : '') + tempSummary(run); }
   function useIdx(i) {
     var oldLabel = run.label, nr = cutRun(full, i);
     nr._stamp = stamp0; nr._full = full; run = nr;
@@ -1024,16 +1262,25 @@ function renderRuns() {
   $('detail').textContent = r ? describe(r) : (S.runs.length ? 'Select a run to see it.' : 'Runs you record appear here (they are kept in this browser).');
   drawRun(hcv, r);
 }
+function tempSummary(r) {
+  if (!r.temps || !r.temps.length) return '';
+  return r.temps.map(function (x) {
+    var f = null, l = null, mx = -Infinity;
+    x.values.forEach(function (v) { if (v === null || v === undefined) return; if (f === null) f = v; l = v; if (v > mx) mx = v; });
+    return f === null ? '' : '\n' + x.name + ': ' + fixed(f, 1) + ' \u00b0C at the start, ' + fixed(l, 1) + ' \u00b0C at the end, highest ' + fixed(mx, 1) + ' \u00b0C';
+  }).join('');
+}
 function describe(r) {
   var m = r.meta, v = r.values, rem = m.remote || {};
   return r.label + '\nStarted ' + (m.started || '?') + '   Ended ' + (m.ended || '?') + '   Length ' + clock((v.length - 1) * r.intervalSeconds) + '   ' + v.length + ' points at ' + r.intervalSeconds + ' s\n' +
     fixed(v[0], 0) + ' lm at the start, ' + fixed(v[v.length - 1], 0) + ' lm at the end (' + (v[0] ? Math.round(100 * v[v.length - 1] / v[0]) : 0) + '% left)   Scale ' + (m.countsPerLumen || '?') + ' counts per lumen\n' +
-    statusOf(r) + (rem.shareUrl ? '   ' + rem.shareUrl : '');
+    statusOf(r) + (rem.shareUrl ? '   ' + rem.shareUrl : '') + tempSummary(r);
 }
 function drawRun(canvas, r) {
   if (!r) { var g = canvas.getContext('2d'); g.clearRect(0, 0, canvas.width, canvas.height); return; }
   var ts = r.values.map(function (_, i) { return i * r.intervalSeconds; });
-  drawChart(canvas, ts, r.values, 0, 0);
+  var temps = r.temps && r.temps.length ? { series: r.temps.map(function (x) { return { ts: ts, vs: x.values, color: tempColor(x.ch), name: x.name }; }), range: { lo: null, hi: null } } : null;
+  drawChart(canvas, ts, r.values, 0, 0, null, temps);
 }
 function saveRun(r) { return idbPut('runs', r).catch(function (e) { msg('Could not update the saved copy: ' + (e && e.message || e)); }); }
 function trimRun(r) {
@@ -1050,6 +1297,7 @@ function trimRun(r) {
     if (i <= 0) { msg('The run already starts there.'); return; }
     var st = parseTS(r.meta.started);
     r.values = r.values.slice(i);
+    if (r.temps) r.temps = r.temps.map(function (x) { return { ch: x.ch, name: x.name, values: x.values.slice(i) }; });
     if (st) r.meta.started = fmtTS(new Date(st.getTime() + i * step * 1000));
     r.meta.durationSeconds = (r.values.length - 1) * step;
     r.meta.trimmedLeadingSeconds = (r.meta.trimmedLeadingSeconds || 0) + i * step;
@@ -1069,7 +1317,7 @@ function doUpload(r, share) {
     return share ? makeShare(id).then(function (u) { r.meta.remote.shareUrl = u; return u; }) : null;
   }).then(function (u) {
     saveRun(r); renderRuns();
-    if (u) { copy(u); msg('Uploaded to Runtime on hCRI.io. Share link copied: ' + u); } else msg('Uploaded to Runtime on hCRI.io (Explore, then Runtime).');
+    if (u) { copy(u); msg('Uploaded to Runtime on hCRI.io. Share link copied: ' + u + (r.temps && r.temps.length ? ' (Temperatures included.)' : '')); } else msg('Uploaded to Runtime on hCRI.io (Explore, then Runtime).' + (r.temps && r.temps.length ? ' Temperatures included.' : ''));
   }).catch(function (e) { msg('Upload failed: ' + e.message + ' The run is still saved in this browser.'); });
 }
 function copy(text) { try { navigator.clipboard.writeText(text).catch(function () {}); } catch (e) {} }
@@ -1081,7 +1329,8 @@ document.querySelectorAll('[data-act]').forEach(function (b) {
     if (act === 'view') viewRun();
     else if (act === 'trim') trimRun(r);
     else if (act === 'csv') download(fileBase(r) + '.csv', 'text/csv', csvOf(r));
-    else if (act === 'json') download(fileBase(r) + '.json', 'application/json', JSON.stringify({ label: r.label, intervalSeconds: r.intervalSeconds, unit: r.unit, values: r.values, meta: r.meta }));
+    else if (act === 'tcsv') { if (!r.temps || !r.temps.length) { msg('That run has no temperature readings.'); return; } download(fileBase(r) + '_temps.csv', 'text/csv', csvWithTemps(r)); }
+    else if (act === 'json') download(fileBase(r) + '.json', 'application/json', JSON.stringify({ label: r.label, intervalSeconds: r.intervalSeconds, unit: r.unit, values: r.values, temps: r.temps || [], meta: r.meta }));
     else if (act === 'upload') doUpload(r, false);
     else if (act === 'open') window.open(rem.shareUrl || location.origin + '/', '_blank', 'noopener');
     else if (act === 'rename') {
@@ -1128,10 +1377,14 @@ function checkRecover() {
     $('recoverText').textContent = 'A run started ' + parts[0].started + ' was not saved (' + n + ' readings, last at ' + parts[parts.length - 1].at + '). The page may have been closed or crashed while recording.';
     $('recover').hidden = false;
     $('recoverBtn').onclick = function () {
-      var ts = [], vs = [];
-      parts.forEach(function (p) { ts = ts.concat(p.t); vs = vs.concat(p.v); });
+      var ts = [], vs = [], td = { t: [], v: mkArr(emptyList), names: parts[0].tn };
+      parts.forEach(function (p) {
+        ts = ts.concat(p.t); vs = vs.concat(p.v);
+        td.t = td.t.concat(p.tt || []);
+        for (var c = 0; c < NT; c++) td.v[c] = td.v[c].concat((p.tv && p.tv[c]) || []);
+      });
       var started = parseTS(parts[0].started) || new Date(), ended = parseTS(parts[parts.length - 1].at) || new Date();
-      var run = buildRun(ts, vs, started, ended, parts[0].scale || S.scale, $('trim').checked, $('trimPeak').checked);
+      var run = buildRun(ts, vs, started, ended, parts[0].scale || S.scale, $('trim').checked, $('trimPeak').checked, td);
       $('recover').hidden = true;
       if (!run) { msg('That run was too short to recover.'); dropPartial(stamp); return; }
       run._stamp = stamp; saveDialog(run, 'Recovered run.');
@@ -1156,6 +1409,8 @@ function updateButtons() {
   $('connectBtn').textContent = con ? 'Disconnect' : 'Connect tester';
   $('connectBtn').disabled = rec;
   $('simBtn').disabled = con || rec; $('otherBtn').disabled = con || rec;
+  $('tempBtn').textContent = Tm.on ? 'Disconnect temp sensor' : 'Connect temp sensor';
+  $('tempBtn').disabled = !navigator.serial || Tm.busy;
   $('scaleNote').textContent = 'Scale: ' + S.scale + ' counts per lumen';
 }
 function showTab(t) {
@@ -1167,9 +1422,11 @@ document.querySelectorAll('.tabs button').forEach(function (b) { b.onclick = fun
 $('connectBtn').onclick = function () { if (S.connected) disconnect(); else connectSerial(false, false); };
 $('otherBtn').onclick = function () { connectSerial(true, true); };
 $('simBtn').onclick = startSim;
+$('tempBtn').onclick = function () { if (Tm.on) disconnectTemp(); else connectTemp(false); };
+$('showTemp').onchange = function () { setPref('showTemp', $('showTemp').checked); redraw(); };
 $('mainBtn').onclick = function () { if (S.recording) stopRun(); else startRun(); };
 ['limStart', 'limStop', 'dur', 'limIdle'].forEach(function (id) { $(id).addEventListener('change', function () { setPref(id, $(id).value); }); });
-$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; redraw(); liveClear(); };
+$('clearBtn').onclick = function () { S.lt = []; S.lv = []; S.lt0 = now(); S.ymax = 0; clearTemps(); redraw(); liveClear(); };
 // Clearing the chart clears the live page too; it starts again with the next reading.
 function liveClear() {
   var L = Mon; Mon = null;
@@ -1182,9 +1439,18 @@ $('trim').onchange = function () { setPref('trim', $('trim').checked); if ($('tr
 $('trimPeak').onchange = function () { setPref('trimPeak', $('trimPeak').checked); if ($('trimPeak').checked) { $('trim').checked = false; setPref('trim', false); } };
 $('showLog').onchange = function () { setPref('showLog', $('showLog').checked); $('logWrap').hidden = !$('showLog').checked; };
 
+function liveTemps() {
+  if (!$('showTemp').checked) return null;
+  var ts, vv;
+  if (S.recording) { ts = S.rtT; vv = S.rtV; }
+  else { var o = S.lt0; ts = S.mt.map(function (t) { return t - o; }); vv = S.mv; }
+  var series = [];
+  for (var i = 0; i < NT; i++) if (Tm.seen[i]) series.push({ ts: ts, vs: vv[i], color: tempColor(i), name: tName(i) });
+  return series.length ? { series: series, range: S.trange } : null;
+}
 function redraw() {
   var ts = S.recording ? S.rt : S.lt, vs = S.recording ? S.rv : S.lv;
-  var top = drawChart(cv, ts, vs, windowS(), S.ymax);
+  var top = drawChart(cv, ts, vs, windowS(), S.ymax, null, liveTemps());
   if (top > S.ymax) S.ymax = top;   // the vertical scale starts at zero and only grows, so the line does not jump about
 }
 function tick() {
@@ -1208,6 +1474,7 @@ function tick() {
     }
     if (S.pendingStop) { var ps = S.pendingStop; S.pendingStop = null; stopRun('Stopped automatically: ' + ps.why + '.', true, ps.ended); }
   }
+  tempWriteState(); tempRowUpdate();
   redraw();
 }
 
@@ -1215,9 +1482,10 @@ window.addEventListener('resize', function () { redraw(); drawRun(hcv, selRun())
 (function init() {
   $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('trimPeak').checked = pref('trimPeak', false);
   $('limStart').value = pref('limStart', ''); $('limStop').value = pref('limStop', ''); $('dur').value = pref('dur', ''); $('limIdle').value = pref('limIdle', '5');
-  $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked;
+  $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked; $('showTemp').checked = pref('showTemp', true);
   if (!navigator.serial) { $('unsupported').hidden = false; $('connectBtn').disabled = true; $('otherBtn').hidden = true; }
   updateButtons(); showAccount();
+  if (navigator.serial && pref('tempAuto', true)) connectTemp(true);   // a Pico the browser already has permission for is opened by itself
   idbAll('runs').then(function (all) { S.runs = all.sort(byStart); S.sel = S.runs[0] ? S.runs[0].id : null; renderRuns(); }).catch(function () { msg('This browser would not open its storage, so runs will not be kept here. Use Download after each run.'); });
   checkRecover();
   setInterval(tick, 100);

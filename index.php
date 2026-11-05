@@ -1143,10 +1143,22 @@ if (preg_match('/^[a-f0-9]{24}$/', $liveRaw) === 1 && $shareTok === '' && $repor
             $lvIsRun = $lvs['kind'] === 'run';
             $lvNum = $lvs['last'] === null ? null : (abs($lvs['last']) >= 100 ? (string)round($lvs['last']) : number_format($lvs['last'], 1)) . ' ' . ($lvs['unit'] ?: 'lm');
             $lvState = $lvs['status'] === 'finished' ? ($lvIsRun ? 'finished' : 'stopped') : ($lvs['status'] === 'error' ? 'problem' : ($lvs['stale'] ? 'no data' : ($lvIsRun ? 'live run' : 'live')));
+            // latest temperatures (Temp 1..3) sent with the readings, for the preview text
+            $lvTemps = [];
+            $lvTj = json_decode((string)($lvr['temps'] ?? ''), true);
+            if (is_array($lvTj)) foreach ([0, 1, 2, 3] as $lvCh) {
+                $lvTv = $lvTj[$lvCh]['values'] ?? null;
+                if (!is_array($lvTv)) continue;
+                for ($lvI = count($lvTv) - 1; $lvI >= 0; $lvI--) if ($lvTv[$lvI] !== null) {
+                    $lvNm = trim((string)($lvTj[$lvCh]['name'] ?? ''));
+                    $lvTemps[] = ($lvNm !== '' ? $lvNm : 'Temp ' . ($lvCh + 1)) . ' ' . number_format((float)$lvTv[$lvI], 1) . ' °C';
+                    break;
+                }
+            }
             $lvInfo = live_info($lvr);
             $lvWhat = $lvInfo['title'] !== '' ? $lvInfo['title'] : ($lvIsRun ? ($lvs['label'] !== '' ? $lvs['label'] : 'TKLamp run') : 'Live reading');
-            $ogTitle = ($lvs['status'] === 'running' && !$lvs['stale'] ? ($lvIsRun ? 'Live run: ' : 'Live: ') : '') . $lvWhat . ($lvNum ? ' — ' . $lvNum : '') . ' — hCRI.io';
-            $ogDesc  = 'A TKLamp tester' . ($lvIsRun ? ' recording a run' : ' reading') . ' on hCRI.io: ' . ($lvNum ? 'last reading ' . $lvNum . ', ' : '') . $lvState . ' when this preview was made.' . ($lvInfo['details'] !== '' ? ' ' . mb_substr(preg_replace('/\s+/', ' ', $lvInfo['details']), 0, 160) : '') . ' Open the link to watch it live.';
+            $ogTitle = ($lvs['status'] === 'running' && !$lvs['stale'] ? ($lvIsRun ? 'Live run: ' : 'Live: ') : '') . $lvWhat . ($lvNum ? ' — ' . $lvNum : '') . ($lvTemps ? ($lvNum ? ', ' : ' — ') . $lvTemps[0] : '') . ' — hCRI.io';
+            $ogDesc  = 'A TKLamp tester' . ($lvIsRun ? ' recording a run' : ' reading') . ' on hCRI.io: ' . ($lvNum ? 'last reading ' . $lvNum . ', ' : '') . ($lvTemps ? implode(', ', $lvTemps) . ', ' : '') . $lvState . ' when this preview was made.' . ($lvInfo['details'] !== '' ? ' ' . mb_substr(preg_replace('/\s+/', ' ', $lvInfo['details']), 0, 160) : '') . ' Open the link to watch it live.';
             $ogUrl   = $ogBase . '?live=' . $liveRaw;
             $ogType  = 'article';
             if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/live.png?t=' . $liveRaw . '&v=' . substr(md5((string)$lvs['lastAt'] . (string)$lvs['status'] . $lvInfo['title']), 0, 8);

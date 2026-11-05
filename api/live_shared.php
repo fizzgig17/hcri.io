@@ -42,7 +42,11 @@ $vals = json_decode((string)$r['payload'], true);
 $vals = is_array($vals) ? $vals : [];
 $interval = (float)$r['interval_s'];
 $since = isset($_GET['since']) ? (int)$_GET['since'] : -1;
-if ($run['kind'] === 'run' && $since >= 0 && $since <= count($vals) && count($vals) <= 4000) {
+$tj = json_decode((string)($r['temps'] ?? ''), true);
+$tj = is_array($tj) ? $tj : [];
+$incremental = $run['kind'] === 'run' && $since >= 0 && $since <= count($vals) && count($vals) <= 4000;
+$k = count($vals) > RUNTIME_LIST_POINTS ? (int)ceil(count($vals) / RUNTIME_LIST_POINTS) : 1;   // the same averaging factor runtime_downsample() uses
+if ($incremental) {
     $out['from'] = $since;
     $out['values'] = array_slice($vals, $since);
     $run['intervalSeconds'] = $interval;
@@ -51,6 +55,23 @@ if ($run['kind'] === 'run' && $since >= 0 && $since <= count($vals) && count($va
     $out['from'] = 0;
     $out['values'] = $dv;
     $run['intervalSeconds'] = $di;
+}
+// Temperatures (Temp 1..4), lined up with "values": the same slice or the same averaging.
+$out['temps'] = [];
+foreach ([0, 1, 2, 3] as $ch) {
+    $tv = $tj[$ch]['values'] ?? null;
+    if (!is_array($tv) || !array_filter($tv, fn($x) => $x !== null)) continue;
+    if ($incremental) $tv = array_slice($tv, $since);
+    elseif ($k > 1) {
+        $avg = [];
+        for ($i = 0; $i < count($tv); $i += $k) {
+            $chunk = array_filter(array_slice($tv, $i, $k), fn($x) => $x !== null);
+            $avg[] = $chunk ? round(array_sum($chunk) / count($chunk), 2) : null;
+        }
+        $tv = $avg;
+    }
+    $nm = trim((string)($tj[$ch]['name'] ?? ''));
+    $out['temps'][] = ['ch' => $ch, 'name' => $nm !== '' ? $nm : 'Temp ' . ($ch + 1), 'values' => $tv];
 }
 $out['run'] = $run;
 $out['info'] = live_info($r);

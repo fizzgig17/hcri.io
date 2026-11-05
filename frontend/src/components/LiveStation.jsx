@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { api } from '../lib/api';
-import { RuntimeChart } from './RuntimeTab';
+import { RuntimeChart, TEMP_COLORS } from './RuntimeTab';
 
 const POLL_MS = 5000;
 
@@ -27,8 +27,9 @@ const num = (v) => (v == null ? '–' : Math.abs(v) >= 100 ? String(Math.round(v
 
 /** Polls a station and keeps its readings. */
 function useLiveRun(token, pollMs = POLL_MS) {
-  const [state, setState] = useState({ loading: true, err: '', live: true, run: null, values: [], info: null });
+  const [state, setState] = useState({ loading: true, err: '', live: true, run: null, values: [], temps: [], info: null });
   const vals = useRef([]);
+  const tvs = useRef({});   // temperature series by channel: { 0: { name, values: [...] } }, kept in step with vals
   const whole = useRef(false);   // true while the server sends every reading (not averaged down), so only new ones need fetching
   const [now, setNow] = useState(() => Date.now());
 
@@ -39,18 +40,27 @@ function useLiveRun(token, pollMs = POLL_MS) {
       const d = await r.json();
       if (!r.ok) { setState((s) => ({ ...s, loading: false, err: d.error || 'Could not load this live link.' })); return; }
       if (d.run) {
-        if (d.from === 0 || d.from !== vals.current.length) vals.current = d.values || [];
+        const restart = d.from === 0 || d.from !== vals.current.length;
+        const prevLen = restart ? 0 : vals.current.length;
+        if (restart) vals.current = d.values || [];
         else vals.current = vals.current.concat(d.values || []);
+        const next = {};
+        (d.temps || []).forEach((t) => {
+          const old = !restart && tvs.current[t.ch] ? tvs.current[t.ch].values : new Array(prevLen).fill(null);
+          next[t.ch] = { name: t.name, values: restart ? t.values : old.concat(t.values) };
+        });
+        tvs.current = next;
         whole.current = d.run.points === vals.current.length;
-      } else vals.current = [];
-      setState({ loading: false, err: '', live: d.live, run: d.run, values: vals.current, info: d.info || null, got: Date.now() });
+      } else { vals.current = []; tvs.current = {}; }
+      const temps = Object.keys(tvs.current).map(Number).sort().map((ch) => ({ ch, name: tvs.current[ch].name, values: tvs.current[ch].values }));
+      setState({ loading: false, err: '', live: d.live, run: d.run, values: vals.current, temps, info: d.info || null, got: Date.now() });
     } catch {
       setState((s) => ({ ...s, loading: false, err: 'Could not reach hCRI.io. Trying again…' }));
     }
   }, [token]);
 
   useEffect(() => {
-    vals.current = []; whole.current = false;
+    vals.current = []; tvs.current = {}; whole.current = false;
     load();
     const id = setInterval(() => { if (!document.hidden) load(); }, pollMs);
     const tick = setInterval(() => setNow(Date.now()), 1000);
@@ -62,7 +72,7 @@ function useLiveRun(token, pollMs = POLL_MS) {
 }
 
 export function LiveView({ T, token, embedded = false }) {
-  const { loading, err, live, run, values, got, now, info } = useLiveRun(token);
+  const { loading, err, live, run, values, temps, got, now, info } = useLiveRun(token);
   const wrap = embedded ? { fontFamily: 'monospace', color: T.text } : { maxWidth: 980, margin: '0 auto', padding: '16px 16px 60px', fontFamily: 'monospace', color: T.text };
   if (loading) return <div style={wrap}><p style={{ color: T.dim }}>Loading…</p></div>;
   if (!run && err) return <div style={wrap}><p style={{ color: T.bad }}>{err}</p></div>;
@@ -98,7 +108,19 @@ export function LiveView({ T, token, embedded = false }) {
         {isRun && <div style={{ color: T.dim, fontSize: 13 }}>Running for {fmtDur(elapsed)}</div>}
         <div style={{ color: T.dim, fontSize: 13 }}>Last reading {fmtAgo(age)}</div>
       </div>
-      <RuntimeChart curves={[curve]} T={T} mode="abs" />
+      {temps && temps.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px 22px', flexWrap: 'wrap', alignItems: 'baseline', margin: '-4px 0 12px' }}>
+          {temps.map((t) => {
+            let lastT = null; for (let i = t.values.length - 1; i >= 0; i--) if (t.values[i] != null) { lastT = t.values[i]; break; }
+            return <div key={t.ch} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 7 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 5, background: TEMP_COLORS[t.ch % 4], display: 'inline-block' }} />
+              <span style={{ color: T.dim, fontSize: 13 }}>{t.name}</span>
+              <span style={{ fontSize: 24, fontWeight: 800 }}>{lastT == null ? '–' : lastT.toFixed(1)}</span><span style={{ color: T.dim, fontSize: 13 }}>°C</span>
+            </div>;
+          })}
+        </div>
+      )}
+      <RuntimeChart curves={[curve]} T={T} mode="abs" temps={temps && temps.length ? temps : null} />
       {!embedded && <p style={{ color: T.dim, fontSize: 12, marginTop: 18 }}>Shared live from hCRI.io by its owner. This page refreshes every few seconds.</p>}
     </div>
   );
