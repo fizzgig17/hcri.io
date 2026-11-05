@@ -179,7 +179,13 @@ export function LiveStationPanel({ T }) {
           {st.enabled && st.url && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
               <input readOnly style={{ ...input, flex: 1, minWidth: 220 }} value={st.url} onFocus={(e) => e.target.select()} />
-              <button style={btn('accent')} onClick={() => { try { navigator.clipboard.writeText(st.url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* copy by hand */ } }}>{copied ? 'Copied' : 'Copy'}</button>
+              <button
+                style={copied ? { ...btn('good'), background: T.good, color: '#06210f', transform: 'scale(1.04)', boxShadow: `0 0 0 4px ${T.good}40`, transition: 'all .15s' } : { ...btn('accent'), transition: 'all .15s' }}
+                onClick={async (e) => {
+                  const box = e.currentTarget.parentElement.querySelector('input');
+                  if (box) box.select();
+                  try { await navigator.clipboard.writeText(st.url); setCopied(true); setTimeout(() => setCopied(false), 3000); } catch { /* the link is selected: copy by hand */ }
+                }}>{copied ? '✓ Link copied!' : 'Copy'}</button>
               <a style={{ ...btn('accent'), textDecoration: 'none' }} href={st.url} target="_blank" rel="noreferrer">Open</a>
             </div>
           )}
