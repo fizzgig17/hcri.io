@@ -18,6 +18,11 @@ const META = [['cct', 'CCT', (v) => `${Math.round(v)} K`], ['duv', 'Duv', (v) =>
 const JSON_HINT = 'A .json file like {"items":[{"label":"My light","meta":{"cct":5000,"duv":0.001,"cri":95,"r9":90,"rf":93,"rg":101}}]} adds meter readings to lights you already have.';
 const hasMeta = (c) => !!(c.meta && Object.keys(c.meta).length);
 const rtFromUrl = () => { try { return new URLSearchParams(window.location.search).get('rt') || null; } catch { return null; } };
+// A comparison's page is `?explore=runtime&cmp=<id>,<id>...` (your own curve ids, so it only opens for you; the
+// "Share comparison link" button makes the public link).
+const cmpFromUrl = () => {
+  try { return (new URLSearchParams(window.location.search).get('cmp') || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 12); } catch { return []; }
+};
 
 function ticks(lo, hi, n = 5) {
   const span = hi - lo || 1;
@@ -293,12 +298,14 @@ export default function RuntimeTab({ T, isAdmin }) {
   const [list, setList] = useState(null);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
-  const [sel, setSel] = useState([]);
+  const [sel, setSel] = useState(() => (rtFromUrl() ? [] : cmpFromUrl()));
   const [q, setQ] = useState('');
   const [view, setViewState] = useState(() => { try { return localStorage.getItem('runtime_view') === 'newest' ? 'newest' : 'group'; } catch (e) { return 'group'; } });
   const setView = (v) => { setViewState(v); try { localStorage.setItem('runtime_view', v); } catch (e) { /* private mode */ } };
   const [rt, setRt] = useState(rtFromUrl);
-  const [comparing, setComparing] = useState(false);
+  const [comparing, setComparing] = useState(() => !rtFromUrl() && cmpFromUrl().length >= 2);
+  const [shareUi, setShareUi] = useState(null); // {key, state: 'busy' | 'done' | 'manual'}: feedback on the copy-link buttons
+  const shareTimer = useRef(null);
   const [showUp, setShowUp] = useState(false);
   const [upGroup, setUpGroup] = useState('');
   const [upUnit, setUpUnit] = useState('');
@@ -329,7 +336,17 @@ export default function RuntimeTab({ T, isAdmin }) {
     state: { hcri: 1, view: 'explore', etab: 'runtime', rt }, url: `${base()}&rt=${encodeURIComponent(rt)}`,
     closedState: { hcri: 1, view: 'explore', etab: 'runtime' }, closedUrl: base(),
   }));
-  usePanelBackClose(comparing, () => setComparing(false));
+  usePanelBackClose(comparing, () => setComparing(false), () => ({
+    state: { hcri: 1, view: 'explore', etab: 'runtime', cmp: sel }, url: `${base()}&cmp=${sel.map(encodeURIComponent).join(',')}`,
+    closedState: { hcri: 1, view: 'explore', etab: 'runtime' }, closedUrl: base(),
+  }));
+  // A comparison opened from the URL: once the list is here, drop lights that no longer exist, and close if fewer than 2 are left.
+  useEffect(() => {
+    if (!list || !comparing) return;
+    const ok = sel.filter((id) => list.some((c) => c.id === id));
+    if (ok.length !== sel.length) setSel(ok);
+    if (ok.length < 2) setComparing(false);
+  }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const sc = scroller();
     if (!sc) return;
@@ -385,15 +402,36 @@ export default function RuntimeTab({ T, isAdmin }) {
   };
   // Make (or reuse) a share token for each curve; the same token is returned every time, so links already given out keep working.
   const shareLink = async (ids) => {
+    const key = ids.join(',');
+    clearTimeout(shareTimer.current);
     setErr(''); setMsg('');
+    setShareUi({ key, state: 'busy' });
     try {
       const tokens = [];
       for (const id of ids) { const r = await api.post(fu('/runtime?share=' + encodeURIComponent(id)), {}); tokens.push(r.shareToken); }
       await load();
       const ok = await copy(linkFor(tokens));
+      setShareUi({ key, state: ok ? 'done' : 'manual' });
       setMsg(ok ? 'Link copied. Anyone with it can view this runtime, without signing in.' : 'Link ready.');
-    } catch (e) { setErr(e.message); }
+      shareTimer.current = setTimeout(() => setShareUi(null), 3500);
+    } catch (e) { setShareUi(null); setErr(e.message); }
   };
+  useEffect(() => () => clearTimeout(shareTimer.current), []);
+  // The copy-link buttons: "Making link…" while working, then a solid green "✓ Link copied" for a few seconds.
+  const shareBtn = (ids, idle) => {
+    const key = ids.join(',');
+    const st = shareUi && shareUi.key === key ? shareUi.state : null;
+    const style = st === 'done'
+      ? { ...btn('good'), background: T.good, color: '#06210f', transform: 'scale(1.04)', boxShadow: `0 0 0 4px ${T.good}40`, transition: 'all .15s' }
+      : { ...btn('accent', st === 'busy'), transition: 'all .15s' };
+    const label = st === 'busy' ? 'Making link…' : st === 'done' ? '✓ Link copied!' : st === 'manual' ? 'Link ready' : idle;
+    return <button style={style} disabled={st === 'busy'} onClick={() => shareLink(ids)}>{label}</button>;
+  };
+  const toast = shareUi && shareUi.state === 'done' && (
+    <div role="status" style={{ position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: 9999, background: T.good, color: '#06210f', fontFamily: 'monospace', fontWeight: 700, fontSize: 14, padding: '10px 18px', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.35)', maxWidth: '90vw', textAlign: 'center' }}>
+      ✓ Link copied to clipboard
+    </div>
+  );
   const unshare = async (id) => {
     if (!window.confirm('Stop sharing this light? Links already sent (including comparisons that use it) will stop working.')) return;
     setErr(''); setMsg('');
@@ -445,18 +483,20 @@ export default function RuntimeTab({ T, isAdmin }) {
         {err && <div style={{ color: T.bad, fontSize: 13, margin: '10px 0' }}>{err}</div>}
         {msg && <div style={{ color: T.good, fontSize: 13, margin: '10px 0' }}>{msg}</div>}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={btn('accent')} onClick={() => shareLink([c.id])}>{c.shareToken ? 'Copy share link' : 'Share link'}</button>
+          {shareBtn([c.id], c.shareToken ? 'Copy share link' : 'Share link')}
           {c.shareToken && <button style={btn('dim')} onClick={() => unshare(c.id)}>Stop sharing</button>}
           <button style={btn('dim')} onClick={() => setDuration(c)} title="Fix the time spacing if the length is wrong">Set duration…</button>
           <button style={btn('dim')} onClick={() => trim(c.id)} title="Drops the near-dark readings before the light came on">Trim leading zeros</button>
           <button style={btn('bad')} onClick={() => remove([c.id])}>Delete</button>
         </div>
+        {toast}
       </div>
     );
   }
 
   // ── Overlay ──────────────────────────────────────────────────────────────
   if (comparing) {
+    if (!list) return <div ref={rootRef} style={wrap}><p style={{ color: T.dim }}>{err || 'Loading…'}</p></div>;
     const cs = sel.map((id) => byId[id]).filter(Boolean);
     return (
       <div ref={rootRef} style={wrap}>
@@ -465,9 +505,10 @@ export default function RuntimeTab({ T, isAdmin }) {
         {err && <div style={{ color: T.bad, fontSize: 13, margin: '10px 0' }}>{err}</div>}
         {msg && <div style={{ color: T.good, fontSize: 13, margin: '10px 0' }}>{msg}</div>}
         <div style={{ marginTop: 14 }}>
-          <button style={btn('accent')} onClick={() => shareLink(cs.map((x) => x.id))}>Share comparison link</button>
+          {shareBtn(cs.map((x) => x.id), 'Share comparison link')}
           <span style={{ color: T.dim, fontSize: 12, marginLeft: 10 }}>Makes a link for these {cs.length} lights; anyone with it can view them.</span>
         </div>
+        {toast}
       </div>
     );
   }

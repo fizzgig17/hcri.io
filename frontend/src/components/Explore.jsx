@@ -2614,22 +2614,26 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           )}
           <button
             onClick={() => {
-              try {
-                navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?explore${tab === 'insights' ? '=insights' : ''}`).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                });
-              } catch {}
+              // Runtime's pages (a light, a comparison) put themselves in the address bar, so copy exactly that.
+              const link = tab === 'runtime' ? window.location.href : `${window.location.origin}${window.location.pathname}?explore${tab === 'insights' ? '=insights' : ''}`;
+              const done = () => { setCopied(true); setTimeout(() => setCopied(false), 3000); };
+              try { navigator.clipboard.writeText(link).then(done, () => window.prompt('Copy this link:', link)); } catch { window.prompt('Copy this link:', link); }
             }}
             title="Copy a shareable link to this page"
             style={{
               height: 34, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
-              background: copied ? `${r.good}20` : 'none', border: `1.5px solid ${copied ? r.good : r.border}`, color: copied ? r.good : r.text,
-              borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 600, whiteSpace: 'nowrap',
+              background: copied ? r.good : 'none', border: `1.5px solid ${copied ? r.good : r.border}`, color: copied ? '#06210f' : r.text,
+              borderRadius: 6, padding: '6px 12px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: copied ? 700 : 600, whiteSpace: 'nowrap',
+              boxShadow: copied ? `0 0 0 4px ${r.good}40` : 'none', transition: 'all .15s',
             }}
           >
-            {copied ? (o ? '✓' : '✓ Copied') : (o ? '🔗' : '🔗 Copy link')}
+            {copied ? (o ? '✓' : '✓ Link copied!') : (o ? '🔗' : '🔗 Copy link')}
           </button>
+          {copied && (
+            <div role="status" style={{ position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: 9999, background: r.good, color: '#06210f', fontFamily: 'monospace', fontWeight: 700, fontSize: 14, padding: '10px 18px', borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,.35)', maxWidth: '90vw', textAlign: 'center' }}>
+              ✓ Link copied to clipboard
+            </div>
+          )}
           {chromeButtons(null)}
           {o && (
             <button onClick={() => te((e) => !e)} style={{ ...btn(I ? 'warn' : 'accent'), padding: '6px 12px' }}>
