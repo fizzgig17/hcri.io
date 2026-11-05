@@ -23,7 +23,6 @@ LASER_D = 6.2             # laser body measured 5.93 mm, plus clearance (the fro
 LASER_REAR_D = 6.5        # the little board 7 mm back from the tip is 6.13 mm wide, so the bore opens up behind the body
 LASER_FRONT_LEN = 7.5     # length of the snug front part of the bore (the body is 7 mm long)
 LASER_WALL = -0.1         # no wall: the two bores overlap slightly, so the laser and the sensor can sit almost touching (about 0.25 mm apart)
-LASER_LUG = 12.0          # depth of the laser's bore, at the front (the laser is short; its wires leave into the open space behind)
 BACK_SPACE = 12.5         # measured: board with its pins and plug is 12 mm thick, plus 0.5 clearance
 STUD_HOLE_D = 6.8         # 1/4"-20 stud clearance
 NUT_AF = 11.1 + 0.4       # 1/4"-20 hex nut across flats plus clearance
@@ -77,9 +76,6 @@ def make_pod():
     # laser bore: straight, through the front lug and on out the back
     cuts.append(cyl_y(LASER_D, LASER_FRONT_LEN + 0.5, lx, cz, D - LASER_FRONT_LEN))
     cuts.append(cyl_y(LASER_REAR_D, D - LASER_FRONT_LEN + 0.6, lx, cz, -0.5))
-    # relief behind the lug so the laser body and its wires have room (open at the back and to the +x side)
-    rx0 = sx + BOARD_W / 2 + WALL
-    cuts.append(box(rx0, -0.5, cz - 6.0, x_max - rx0 + 1, D - LASER_LUG + 0.5, 12.0))
     # stud: in through the block's rear wall (along +y), hex nut behind that wall, slot down through the bottom to slide the nut in
     mz = -MOUNT_H / 2
     cuts.append(cyl_y(STUD_HOLE_D, STUD_WALL + 0.6, cx_body, mz, y_b0 - 0.3))
