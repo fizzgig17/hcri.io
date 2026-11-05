@@ -18,6 +18,8 @@ const META = [['cct', 'CCT', (v) => `${Math.round(v)} K`], ['duv', 'Duv', (v) =>
 const JSON_HINT = 'A .json file like {"items":[{"label":"My light","meta":{"cct":5000,"duv":0.001,"cri":95,"r9":90,"rf":93,"rg":101}}]} adds meter readings to lights you already have.';
 const hasMeta = (c) => !!(c.meta && Object.keys(c.meta).length);
 const rtFromUrl = () => { try { return new URLSearchParams(window.location.search).get('rt') || null; } catch { return null; } };
+// An admin working on another user's runtime: `&for=<user id>`, so a refresh keeps that user.
+const forFromUrl = () => { try { return (new URLSearchParams(window.location.search).get('for') || '').replace(/\D/g, ''); } catch { return ''; } };
 // A comparison's page is `?explore=runtime&cmp=<id>,<id>...` (your own curve ids, so it only opens for you; the
 // "Share comparison link" button makes the public link).
 const cmpFromUrl = () => {
@@ -293,8 +295,9 @@ export function SharedRuntime({ T, tokens }) {
 
 export default function RuntimeTab({ T, isAdmin }) {
   const [users, setUsers] = useState([]);
-  const [forUser, setForUser] = useState('');
-  const fu = (url) => (forUser ? url + (url.includes('?') ? '&' : '?') + 'for_user=' + forUser : url);
+  const [forUser, setForUser] = useState(() => (isAdmin ? forFromUrl() : ''));
+  const fuId = (url, id) => (id ? url + (url.includes('?') ? '&' : '?') + 'for_user=' + id : url);
+  const fu = (url) => fuId(url, forUser);
   const [list, setList] = useState(null);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
@@ -311,15 +314,38 @@ export default function RuntimeTab({ T, isAdmin }) {
   const [upUnit, setUpUnit] = useState('');
   const [upInterval, setUpInterval] = useState('');
   const [upName, setUpName] = useState('');
+  const [allUsers, setAllUsers] = useState([]); // every user, for the upload panel's typeahead
+  const [upUserText, setUpUserText] = useState(''); // admin: who the upload is for ('' = me)
   const [busy, setBusy] = useState(false);
+  const userLabel = (u) => `${u.name || u.email} (${u.email})`;
+  // The typed text → a user: an exact match on the label or email, else the only user whose label contains it.
+  const upTarget = (() => {
+    const t = upUserText.trim().toLowerCase();
+    if (!t) return { id: '', ok: true };
+    const exact = allUsers.find((u) => userLabel(u).toLowerCase() === t || String(u.email || '').toLowerCase() === t);
+    if (exact) return { id: String(exact.id), ok: true, u: exact };
+    const part = allUsers.filter((u) => userLabel(u).toLowerCase().includes(t));
+    return part.length === 1 ? { id: String(part[0].id), ok: true, u: part[0] } : { id: '', ok: false, many: part.length > 1 };
+  })();
   const fileRef = useRef(null);
 
   const load = useCallback(() => api.get(fu('/runtime?full=1')).then((d) => { setList(d.items || []); setErr(''); }).catch((e) => setErr(e.message)), [forUser]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
+  // The admin's user list: the dropdown shows only users who have runtimes; the upload panel's typeahead takes everyone.
+  const refreshUsers = useCallback(async () => {
     if (!isAdmin) return;
-    api.get('/admin/users').then((d) => setUsers(Array.isArray(d) ? d : d.users || [])).catch(() => {});
+    try {
+      const d = await api.get('/admin/users');
+      const all = Array.isArray(d) ? d : d.users || [];
+      setAllUsers(all);
+      try {
+        const c = await api.get('/runtime?users=1');
+        const n = Object.fromEntries(((c && c.users) || []).map((x) => [String(x.id), x.count]));
+        setUsers(all.filter((u) => n[String(u.id)]).map((u) => ({ ...u, runtimes: n[String(u.id)] })));
+      } catch (e) { setUsers(all); }
+    } catch (e) { /* the picker just stays empty */ }
   }, [isAdmin]);
+  useEffect(() => { refreshUsers(); }, [refreshUsers]);
 
   // A light's page and the comparison are "panels": the browser Back button closes them (same mechanism as the report
   // pages in Explore), so Back never reloads the screen, and the list keeps its scroll position underneath.
@@ -331,7 +357,7 @@ export default function RuntimeTab({ T, isAdmin }) {
     return null;
   };
   const remember = () => { const sc = scroller(); savedTop.current = sc ? sc.scrollTop : 0; };
-  const base = () => window.location.pathname + '?explore=runtime';
+  const base = () => window.location.pathname + '?explore=runtime' + (forUser ? `&for=${forUser}` : '');
   usePanelBackClose(!!rt, () => setRt(null), () => ({
     state: { hcri: 1, view: 'explore', etab: 'runtime', rt }, url: `${base()}&rt=${encodeURIComponent(rt)}`,
     closedState: { hcri: 1, view: 'explore', etab: 'runtime' }, closedUrl: base(),
@@ -363,13 +389,15 @@ export default function RuntimeTab({ T, isAdmin }) {
 
   const upload = async (file) => {
     if (!file) return;
+    if (isAdmin && !upTarget.ok) { setErr(upTarget.many ? 'More than one user matches. Type more of the name or email, or pick one from the list.' : 'No such user. Pick one from the list, or clear the box to upload for yourself.'); return; }
+    const target = isAdmin ? upTarget.id : '';
     setBusy(true); setErr(''); setMsg('');
     try {
       let r;
       if (/\.json$/i.test(file.name)) {
         // JSON: {"items":[{label, meta:{cct,duv,cri,r9,rf,rg,tempF}}]} (readings for lights you already have) or full curves.
         const j = JSON.parse(await file.text());
-        r = await api.post(fu('/runtime'), Array.isArray(j) ? { items: j } : j);
+        r = await api.post(fuId('/runtime', target), Array.isArray(j) ? { items: j } : j);
       } else {
         const fd = new FormData();
         fd.append('file', file);
@@ -377,11 +405,13 @@ export default function RuntimeTab({ T, isAdmin }) {
         if (upUnit.trim()) fd.append('unit', upUnit.trim());
         if (Number(upInterval) > 0) fd.append('interval', String(Number(upInterval)));
         if (upName.trim()) fd.append('name', upName.trim());
-        r = await api.upload(fu('/runtime'), fd);
+        r = await api.upload(fuId('/runtime', target), fd);
       }
-      setMsg(`Saved ${r.saved} light${r.saved === 1 ? '' : 's'}${r.skipped && r.skipped.length ? `, skipped ${r.skipped.length} (${r.skipped.slice(0, 3).map((s) => `${s.label || '?'}: ${s.reason}`).join('; ')}${r.skipped.length > 3 ? '…' : ''})` : ''}.`);
+      const whom = target && upTarget.u ? ` for ${upTarget.u.name || upTarget.u.email}` : '';
+      setMsg(`Saved ${r.saved} light${r.saved === 1 ? '' : 's'}${whom}${r.skipped && r.skipped.length ? `, skipped ${r.skipped.length} (${r.skipped.slice(0, 3).map((s) => `${s.label || '?'}: ${s.reason}`).join('; ')}${r.skipped.length > 3 ? '…' : ''})` : ''}.`);
       setShowUp(false);
-      await load();
+      if (String(target || '') === String(forUser || '')) await load();
+      else await refreshUsers();
     } catch (e) { setErr(e.message); }
     setBusy(false);
   };
@@ -535,21 +565,35 @@ export default function RuntimeTab({ T, isAdmin }) {
         </select>
         <input style={{ ...input, width: 170 }} placeholder="Search lights…" value={q} onChange={(e) => setQ(e.target.value)} />
         {shown.length > 0 && <button style={btn('dim')} onClick={() => setSel(shown.every((c) => sel.includes(c.id)) ? [] : shown.map((c) => c.id))}>{shown.every((c) => sel.includes(c.id)) ? 'Clear all' : `Select all (${shown.length})`}</button>}
-        <button style={btn('accent')} onClick={() => setShowUp((v) => !v)}>Upload CSV</button>
+        <button style={btn('accent')} onClick={() => { if (!showUp && isAdmin) { const cur = allUsers.find((u) => String(u.id) === String(forUser)); setUpUserText(cur ? userLabel(cur) : ''); } setShowUp((v) => !v); }}>Upload CSV</button>
       </div>
       {!forUser && <LiveStationPanel T={T} />}
       {isAdmin && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13 }}>
           <span style={{ color: T.dim }}>Admin: working on</span>
-          <select style={{ ...input, maxWidth: 320 }} value={forUser} onChange={(e) => { setForUser(e.target.value); setList(null); setSel([]); setMsg(''); }}>
+          <select style={{ ...input, maxWidth: 320 }} value={forUser} onChange={(e) => {
+            const v = e.target.value;
+            setForUser(v); setList(null); setSel([]); setMsg('');
+            try { window.history.replaceState(window.history.state, '', window.location.pathname + '?explore=runtime' + (v ? `&for=${v}` : '')); } catch (e2) { /* ignore */ }
+          }}>
             <option value="">My own curves</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}
+            {forUser && !users.some((u) => String(u.id) === String(forUser)) && <option value={forUser}>{(() => { const u = allUsers.find((x) => String(x.id) === String(forUser)); return u ? userLabel(u) : `User ${forUser}`; })()}</option>}
+            {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email}){u.runtimes ? ` · ${u.runtimes}` : ''}</option>)}
           </select>
         </div>
       )}
       {showUp && (
         <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 13, lineHeight: 1.6 }}>
           <div style={{ color: T.dim, marginBottom: 8 }}>CSV with minutes in the first column and one column per light (the header is the light’s name). Optional rows under the header starting #group, #unit, #cct, #duv, #cri, #r9, #r12, #rf, #rg, #tempF set each light’s info. Re-uploading a light replaces its curve. {JSON_HINT} A TKLamp tester's Output CSV (a row number in the first column, then lumen, candela and lux) also works: type the seconds between readings, which is its Metadata file's Sampling time in ms divided by 1000.</div>
+          {isAdmin && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ color: T.dim }}>Upload for</span>
+              <input list="rt-upload-users" style={{ ...input, width: 320, borderColor: upTarget.ok ? undefined : T.bad }} placeholder="Me (type a name or email to pick a user)" value={upUserText} onChange={(e) => setUpUserText(e.target.value)} onFocus={(e) => e.target.select()} autoComplete="off" />
+              <datalist id="rt-upload-users">{allUsers.map((u) => <option key={u.id} value={userLabel(u)} />)}</datalist>
+              {upUserText.trim() && <button style={btn('dim')} onClick={() => setUpUserText('')}>Me</button>}
+              <span style={{ color: upTarget.ok ? T.dim : T.bad, fontSize: 12 }}>{upTarget.ok ? (upTarget.u ? `Saves to ${upTarget.u.name || upTarget.u.email}'s runtime.` : 'Saves to your own runtime.') : upTarget.many ? 'More than one match: keep typing.' : 'No user matches.'}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <input style={{ ...input, width: 150 }} placeholder="Group (optional)" value={upGroup} onChange={(e) => setUpGroup(e.target.value)} />
             <input style={{ ...input, width: 110 }} placeholder="Unit, e.g. lm" value={upUnit} onChange={(e) => setUpUnit(e.target.value)} />

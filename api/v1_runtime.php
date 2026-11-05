@@ -40,6 +40,18 @@ $user = user_from_api_token($db, api_token_from_request());
 if (!$user) $user = require_auth(); // the website sends its session token instead of an API token
 $uid = (int)$user['id'];
 
+// Admins: GET ?users=1 lists the users who have any curves ({"users":[{"id":..,"count":..}]}), for the website's user picker.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['users'])) {
+    $a = $db->prepare('SELECT is_admin FROM users WHERE id = ?');
+    $a->execute([$uid]);
+    if ((int)$a->fetchColumn() !== 1) json_error('Admins only', 403);
+    runtime_curves_ensure($db);
+    $q = $db->prepare('SELECT user_id, COUNT(*) AS n FROM runtime_curves WHERE user_id <> ? GROUP BY user_id'); // not the admin's own ("My own curves" covers those)
+    $q->execute([$uid]);
+    $rows = $q->fetchAll();
+    json_out(['users' => array_map(fn($r) => ['id' => (int)$r['user_id'], 'count' => (int)$r['n']], $rows)]);
+}
+
 // Admins can work on another user's curves: add ?for_user=<user id> (or a "for_user" form field).
 $forUser = (int)($_GET['for_user'] ?? $_POST['for_user'] ?? 0);
 if ($forUser > 0 && $forUser !== $uid) {
