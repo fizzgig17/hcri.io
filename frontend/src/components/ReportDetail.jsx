@@ -59,6 +59,7 @@ import Votes from './Votes.jsx';
 import ShareCardModal from './ShareCardModal.jsx';
 
 import SPDChart from './SPDChart.jsx';
+import LERChart from './LERChart.jsx';
 import { BinBarChart, CESBars } from './ReportCharts.jsx';
 import FlickerSection from './FlickerSection.jsx';
 import CVGWheel from './CVGWheel.jsx';
@@ -249,12 +250,15 @@ export function CRIBars({ ri, C, noHelp }) {
 export function DraggableChartsRow({ report, theme }) {
   const rfBins = report.rfBins || Array(16).fill(report.Rf || 75);
   const storageKey = `chartorder_${report.id}`;
-  const DEFAULT_ORDER = ['spd', 'chroma', 'hue', 'fidelity'];
+  const DEFAULT_ORDER = ['spd', 'chroma', 'hue', 'fidelity', 'ler'];
 
+  // A saved order keeps its arrangement; charts added since it was saved (LER) are appended at the end.
   const [order, setOrder] = useState(() => {
     try {
       const v = JSON.parse(localStorage.getItem(storageKey));
-      return Array.isArray(v) && v.length === 4 ? v : DEFAULT_ORDER;
+      if (!Array.isArray(v)) return DEFAULT_ORDER;
+      const kept = v.filter((id, i) => DEFAULT_ORDER.includes(id) && v.indexOf(id) === i);
+      return [...kept, ...DEFAULT_ORDER.filter((id) => !kept.includes(id))];
     } catch { return DEFAULT_ORDER; }
   });
   useEffect(() => {
@@ -278,7 +282,9 @@ export function DraggableChartsRow({ report, theme }) {
     chroma: 'LOCAL CHROMA SHIFT\n\n\n\nChroma shift per hue bin. + = more vivid, - = less saturated.',
     hue: 'LOCAL HUE SHIFT\n\n\n\nHue rotation per bin, in degrees. + = toward yellow, - = toward blue.',
     fidelity: 'LOCAL COLOR FIDELITY\n\n\n\nColor fidelity per hue bin (0-100). Higher = more accurate rendering in that hue range.',
+    ler: 'LUMINOUS EFFICACY OF RADIATION (LER)\n\n\n\nHow much brightness the spectrum gives per watt of light, in lumens per optical watt: 683 x the part of the spectrum the eye counts (spectrum x V(lambda)) divided by the whole spectrum, over 380-780 nm. It is a property of the spectrum alone, not of the LED or driver. If the instrument did not measure the whole 380-780 nm range, the value is marked partial and reads higher.',
   };
+  const shown = order.filter((id) => id !== 'ler' || (report.wls && report.vals && report.ler != null));
 
   const chart = (id) => {
     if (id === 'spd') {
@@ -297,6 +303,16 @@ export function DraggableChartsRow({ report, theme }) {
         </div>
       );
     }
+    if (id === 'ler') {
+      return (
+        <div>
+          <div style={{ fontSize: 12, color: theme.dim, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, fontFamily: 'monospace', marginBottom: 6 }}>
+            Luminous Efficacy (LER)
+          </div>
+          <LERChart wls={report.wls} vals={report.vals} ler={report.ler} lerLo={report.lerLo} lerHi={report.lerHi} lerPartial={report.lerPartial} theme={theme} />
+        </div>
+      );
+    }
     if (id === 'chroma') {
       return <BinBarChart title="Local Chroma Shift (Rcs,hj)" tip={TIPS.chroma} rfBins={rfBins} mode="chroma" data={report.rcsBins} theme={theme} noHelp />;
     }
@@ -308,7 +324,7 @@ export function DraggableChartsRow({ report, theme }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '16px 22px', borderBottom: `1px solid ${theme.border}` }}>
-      {order.map((id) => (
+      {shown.map((id, idx) => (
         <div
           key={id}
           draggable
@@ -328,6 +344,7 @@ export function DraggableChartsRow({ report, theme }) {
             gap: 8,
             transition: 'border-color .15s,opacity .15s',
             position: 'relative',
+            gridColumn: shown.length % 2 === 1 && idx === shown.length - 1 ? '1 / -1' : undefined,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -498,10 +515,11 @@ const BASE_METRICS = [
   { id: 'R9', label: 'R9', getValue: (e) => String(Math.round(e.r9)), getColor: (e, t) => (e.r9 >= 50 ? t.good : e.r9 >= 0 ? t.warn : t.bad), condition: (e) => e.r9 != null },
   { id: 'Rf', label: 'Rf', getValue: (e) => String(e.Rf), getColor: (e, t) => (e.Rf >= 85 ? t.good : e.Rf >= 70 ? t.warn : t.bad), condition: (e) => e.Rf != null },
   { id: 'Rg', label: 'Rg', getValue: (e) => String(e.Rg), getColor: (e, t) => t.text, condition: (e) => e.Rg != null },
+  { id: 'LER', label: 'LER (lm/W)', getValue: (e) => `${Math.round(e.ler)}${e.lerPartial ? '*' : ''}`, getColor: (e, t) => t.text, condition: (e) => e.ler != null },
   { id: 'CIEx', label: 'CIE x', getValue: (e) => e.x?.toFixed(4), getColor: (e, t) => t.text, condition: (e) => e.x != null },
   { id: 'CIEy', label: 'CIE y', getValue: (e) => e.y?.toFixed(4), getColor: (e, t) => t.text, condition: (e) => e.y != null },
 ];
-const DEFAULT_METRIC_ORDER = ['CCT', 'Duv', 'Ra', 'R9', 'CIEx', 'CIEy'];
+const DEFAULT_METRIC_ORDER = ['CCT', 'Duv', 'Ra', 'R9', 'LER', 'CIEx', 'CIEy'];
 
 export function MetricGrid({ report, C: t }) {
   const key = `metricgrid_${report.id}`;
@@ -1026,6 +1044,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <KeyMetric label="CIE x" value={report.x?.toFixed(4)} />
                   <KeyMetric label="CIE y" value={report.y?.toFixed(4)} />
                   <KeyMetric label="R9" value={report.r9 == null ? null : Math.round(report.r9)} />
+                  {report.ler != null && <KeyMetric label="LER lm/W" value={`${Math.round(report.ler)}${report.lerPartial ? '*' : ''}`} />}
                 </div>
 
                 <div style={{ padding: 16, borderBottom: `1px solid ${U.border}`, display: 'flex', justifyContent: 'center' }}>
