@@ -1,6 +1,6 @@
 """Sensor + laser pod for a camera-style spring clamp with a ball head (version 0: sizes are assumptions, print a fit test first).
 
-Run:  python3 make_pod.py   ->  sensor_pod_30mm.stl, sensor_pod_50mm.stl, sensor_pod_100mm.stl   (needs: pip install manifold3d trimesh numpy)
+Run:  python3 make_pod.py   ->  sensor_pod.stl   (needs: pip install manifold3d trimesh numpy)
 Edit the numbers below (millimetres) to match your parts, then run again.
 
 The pod screws onto the 1/4"-20 stud of the ball head (a standard camera thread). The stud goes up through a 6.8 mm hole in the
@@ -20,8 +20,7 @@ SENSOR_BARREL_LEN = 12.0  # how much of the barrel sits in the front bore
 BOARD_W, BOARD_H = 12.5 + 0.4, 19.0 + 0.4   # measured: board 12.5 wide, 19 tall, plus clearance
 LASER_D = 6.2             # 6 mm laser module plus clearance
 LASER_WALL = 0.8          # plastic left between the sensor can and the laser (thin, so they sit side by side; also keeps laser heat off the can)
-AIM_DISTANCES = (30, 50, 100)   # one pod per distance (mm in front of the pod where the laser dot meets the sensor's line of sight)
-LASER_LUG = 12.0          # depth of the laser's tilted bore, at the front (the laser is short; its wires leave into the open space behind)
+LASER_LUG = 12.0          # depth of the laser's bore, at the front (the laser is short; its wires leave into the open space behind)
 BACK_SPACE = 15.0         # room behind the barrel for the board and its plug
 STUD_HOLE_D = 6.8         # 1/4"-20 stud clearance
 NUT_AF = 11.1 + 0.4       # 1/4"-20 hex nut across flats plus clearance
@@ -55,12 +54,10 @@ def to_trimesh(man):
     return trimesh.Trimesh(vertices=np.asarray(ms.vert_properties)[:, :3], faces=np.asarray(ms.tri_verts))
 
 
-def make_pod(dist):
-    """The laser bore is tilted in toward the sensor's line of sight so the dot meets the sensor's spot `dist` mm in front of the pod."""
-    phi = math.degrees(math.atan(HOLE_SPACING / dist))
-    t = math.tan(math.radians(phi))
+def make_pod():
+    """The laser bore is straight, parallel to the sensor (the dot lands HOLE_SPACING mm to the side of the sensor's spot)."""
     x_min = sx - BOARD_W / 2 - WALL
-    x_max = lx + LASER_D / 2 / math.cos(math.radians(phi)) + LASER_LUG * t + WALL
+    x_max = lx + LASER_D / 2 + WALL
     W = x_max - x_min
     cx_body = (x_min + x_max) / 2
     body = box(x_min, 0, 0, W, D, H)
@@ -70,10 +67,8 @@ def make_pod(dist):
         cyl_y(SENSOR_BARREL_D, SENSOR_BARREL_LEN + 0.5, sx, cz, D - SENSOR_BARREL_LEN),             # barrel bore through the front
         box(sx - BOARD_W / 2, -0.5, cz - BOARD_H / 2, BOARD_W, D - SENSOR_BARREL_LEN + 0.5, BOARD_H),  # board pocket, open at the back
     ]
-    # laser bore: tilted, pivoting at the front face, through the front lug and on out the back
-    L = D * 1.3 + 3
-    cuts.append(Manifold.cylinder(L, LASER_D / 2, LASER_D / 2, 48).rotate((-90, 0, 0)).translate((0, -(L - 1), 0))
-                .rotate((0, 0, phi)).translate((lx, D, cz)))
+    # laser bore: straight, through the front lug and on out the back
+    cuts.append(cyl_y(LASER_D, D + 1, lx, cz, -0.5))
     # relief behind the lug so the laser body and its wires have room (open at the back and to the +x side)
     rx0 = sx + BOARD_W / 2 + WALL
     cuts.append(box(rx0, -0.5, cz - 6.0, x_max - rx0 + 1, D - LASER_LUG + 0.5, 12.0))
@@ -89,12 +84,10 @@ def make_pod(dist):
     cuts.append(box(tab_cx - GROOVE_W / 2, -TAB_L - 0.5, TAB_T - GROOVE_D, GROOVE_W, TAB_L + 0.5, GROOVE_D + 0.5))
     for c in cuts:
         body = body - c
-    return to_trimesh(body), phi
+    return to_trimesh(body)
 
 
 print(f'laser-to-sensor centre spacing: {HOLE_SPACING:.2f} mm')
-for dist in AIM_DISTANCES:
-    m, phi = make_pod(dist)
-    m.export(f'sensor_pod_{dist}mm.stl')
-    print(f'pod {dist:>3} mm: laser tilt {phi:4.1f} deg  watertight:', m.is_watertight,
-          ' size mm (x, y, z):', [round(float(v), 1) for v in m.extents])
+m = make_pod()
+m.export('sensor_pod.stl')
+print('pod watertight:', m.is_watertight, ' size mm (x, y, z):', [round(float(v), 1) for v in m.extents])
