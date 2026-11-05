@@ -7,7 +7,7 @@ The sensor tube and a 6 mm aiming laser sit side by side and look straight out o
 board (with its plug) and the laser slide in from the back, and the wires leave through the back.
 The pod screws onto the 1/4"-20 stud of the ball head from BEHIND: a solid mounting block along the bottom (reaching 7.8 mm behind the back face) holds a hex nut, and
 the stud goes in through the block's rear wall and points forward, parallel to the sensor. Slide the nut in from underneath.
-A small tab on the top edge at the back anchors the cable with a zip tie.
+Two zip-tie slots in the block, low down behind the pod, hold the cable: the tie goes down one slot, under the block, up the other.
 """
 import math
 import numpy as np
@@ -30,10 +30,9 @@ NUT_H = 5.8               # nut thickness plus clearance
 STUD_WALL = 2.0           # plastic between the knurled disc and the nut: the measured stud is 5.83 mm long, so it reaches about 3.8 mm into the nut
 BOTTOM_WALL = 2.5         # plastic under the board pocket
 MOUNT_H = 15.0            # height of the mounting block under the back end (the nut sits in its middle)
-TAB_W, TAB_L, TAB_T = 18.0, 10.0, WALL      # cable tab on the top edge at the back
 TIE_SLOT_W, TIE_SLOT_T = 3.2, 1.6           # fits a 2.5 mm wide zip tie
-TIE_SLOT_X, TIE_SLOT_Y = 5.5, 5.0           # slot centre offset from the tab centre line, and distance behind the back face
-GROOVE_W, GROOVE_D = 6.4, 0.6               # shallow cradle for a 6 mm sleeve
+TIE_SLOT_X, TIE_SLOT_Y = 8.5, NUT_H / 2     # slots sit in the solid side areas of the block, each side of the nut pocket; Y = distance behind the pod's back face
+GROOVE_W, GROOVE_D = 6.4, 0.8               # shallow cradle for the sleeved cable, along the top of the block's rear part
 # ----------------------------------------------------------------------------------------------------------------------
 
 HOLE_SPACING = SENSOR_BARREL_D / 2 + LASER_WALL + LASER_D / 2   # sensor centre to laser centre at the front face
@@ -64,8 +63,6 @@ def make_pod():
     W = x_max - x_min
     cx_body = (x_min + x_max) / 2
     body = box(x_min, 0, 0, W, D, H)
-    tab_cx = (sx + lx) / 2
-    body = body + box(tab_cx - TAB_W / 2, -TAB_L, H - TAB_T, TAB_W, TAB_L + 0.5, TAB_T)          # cable tab, top edge at the back
     y_b0 = -(STUD_WALL + NUT_H)                                                                    # outer face of the block's rear wall
     body = body + box(x_min, y_b0, -MOUNT_H, W, D - y_b0, MOUNT_H + 0.01)                       # mounting block along the whole bottom (so nothing overhangs when printed front-down)
     cuts = [
@@ -82,10 +79,10 @@ def make_pod():
     hexp = Manifold.cylinder(NUT_H, r, r, 6).rotate((0, 0, 90)).rotate((-90, 0, 0)).translate((cx_body, y_b0 + STUD_WALL, mz))
     cuts.append(hexp)
     cuts.append(box(cx_body - NUT_AF / 2, y_b0 + STUD_WALL, -MOUNT_H - 0.5, NUT_AF, NUT_H, MOUNT_H / 2 + 0.5))
-    # zip-tie slots and groove in the cable tab (the cable lies under the tab, in the groove; the tie goes up through both slots)
+    # cable: a shallow groove along the top of the block's rear part, and a vertical tie slot through the block each side of the nut pocket
+    cuts.append(box(cx_body - GROOVE_W / 2, y_b0 - 0.5, -GROOVE_D, GROOVE_W, -y_b0 + 0.5, GROOVE_D + 0.01))
     for sgn in (-1, 1):
-        cuts.append(box(tab_cx + sgn * TIE_SLOT_X - TIE_SLOT_W / 2, -TIE_SLOT_Y - TIE_SLOT_T / 2, H - TAB_T - 0.5, TIE_SLOT_W, TIE_SLOT_T, TAB_T + 1))
-    cuts.append(box(tab_cx - GROOVE_W / 2, -TAB_L - 0.5, H - TAB_T - 0.5, GROOVE_W, TAB_L + 0.5, GROOVE_D + 0.5))
+        cuts.append(box(cx_body + sgn * TIE_SLOT_X - TIE_SLOT_T / 2, -TIE_SLOT_Y - TIE_SLOT_W / 2, -MOUNT_H - 0.5, TIE_SLOT_T, TIE_SLOT_W, MOUNT_H + 1.0))
     for c in cuts:
         body = body - c
     return to_trimesh(body)
