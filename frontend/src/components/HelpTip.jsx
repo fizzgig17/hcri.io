@@ -59,7 +59,7 @@ export default function HelpTip({ text, children }) {
             pointerEvents: 'none', whiteSpace: 'pre-line',
           }}
         >
-          {text}
+          {typeof text === 'string' ? text.replace(/\n{3,}/g, '\n\n') : text}
         </div>
       )}
       {children}
