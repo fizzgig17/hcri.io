@@ -274,7 +274,7 @@ export default function AdminNotices({ theme: o }) {
                 </div>
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={lbl}>Message</label>
+                <label style={lbl}>Message (links: [text](https://example.com) or [text](/help/))</label>
                 <textarea value={nmsg} onChange={(e) => setMsg(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
               </div>
               <div style={{ marginBottom: 12 }}>
