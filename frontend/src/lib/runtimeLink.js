@@ -1,5 +1,5 @@
-// An owner's comparison address (?explore=runtime&cmp=<curve id>,...) is private to them. When someone else opens it
-// (or the owner is signed out), turn it into the public link for the same lights if those lights are shared.
+// An owner's comparison address (?explore=runtime&cmp=<curve id>,...) opens for its owner. For anyone else (or the owner
+// signed out) it becomes the public comparison page for the same lights: ?runtime=<curve id>,...
 export function cmpIdsFromUrl() {
   try {
     const sp = new URLSearchParams(window.location.search);
@@ -7,15 +7,9 @@ export function cmpIdsFromUrl() {
     return (sp.get('cmp') || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 12);
   } catch { return []; }
 }
-export async function redirectCmpToShared() {
+export function redirectCmpToShared() {
   const ids = cmpIdsFromUrl();
   if (!ids.length) return false;
-  try {
-    const r = await fetch('./index.php/api/runtime_shared?ids=' + encodeURIComponent(ids.join(',')));
-    if (!r.ok) return false;
-    const j = await r.json();
-    if (!j.tokens || !j.tokens.length) return false;
-    window.location.replace(window.location.pathname + '?runtime=' + j.tokens.join(','));
-    return true;
-  } catch { return false; }
+  window.location.replace(window.location.pathname + '?runtime=' + ids.map(encodeURIComponent).join(','));
+  return true;
 }

@@ -372,7 +372,7 @@ export default function RuntimeTab({ T, isAdmin }) {
     if (!list || !comparing) return;
     const ok = sel.filter((id) => list.some((c) => c.id === id));
     if (ok.length !== sel.length) setSel(ok);
-    if (ok.length < 2) { setComparing(false); redirectCmpToShared(); }  // not your lights: open the public link if they are shared
+    if (ok.length < 2) { setComparing(false); redirectCmpToShared(); }  // not your lights: open the public comparison page
   }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const sc = scroller();

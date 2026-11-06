@@ -39,14 +39,14 @@ foreach ([$F_WORK_B, $F_WORK_R, $F_MONO_B, $F_MONO_R] as $f) {
 
 
 // ── Resolve the shared curves ────────────────────────────────────────────────
-$toks = array_slice(array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_GET['t'] ?? ''))), 'runtime_valid_share_token'))), 0, 10);
+$toks = array_slice(array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_GET['t'] ?? ''))), fn($t) => runtime_valid_share_token($t) || runtime_curve_valid_id($t)))), 0, 10);
 if (!$toks) ogc_fallback();
 $db = get_db();
 runtime_curves_ensure($db);
-$q = $db->prepare('SELECT label, unit, interval_s, payload FROM runtime_curves WHERE share_token = ?');
+$q = $db->prepare('SELECT label, unit, interval_s, payload FROM runtime_curves WHERE share_token = ? OR curve_id = ? LIMIT 1');
 $curves = [];
 foreach ($toks as $t) {
-    try { $q->execute([$t]); $r = $q->fetch(); } catch (\Throwable $e) { $r = false; }
+    try { $q->execute([$t, $t]); $r = $q->fetch(); } catch (\Throwable $e) { $r = false; }
     if (!$r) continue;
     $v = json_decode((string)$r['payload'], true);
     if (!is_array($v) || count($v) < 2) continue;
