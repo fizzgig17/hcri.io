@@ -87,6 +87,23 @@ function useNotices(location) {
   return [shown, dismiss];
 }
 
+// Message text with [link text](url) turned into links. Only http(s) links and links on this site (/path or #anchor) are accepted;
+// anything else stays as plain text. External links open in a new tab.
+function renderMessage(text, linkColor) {
+  const out = [];
+  const re = /\[([^\]\n]{1,120})\]\(\s*((?:https?:\/\/|\/|#)[^\s)]*)\s*\)/g;
+  let last = 0, m, i = 0;
+  const msg = String(text || '');
+  while ((m = re.exec(msg))) {
+    if (m.index > last) out.push(msg.slice(last, m.index));
+    const url = m[2], ext = /^https?:/i.test(url);
+    out.push(<a key={i++} href={url} {...(ext ? { target: '_blank', rel: 'noopener noreferrer' } : {})} style={{ color: linkColor, fontWeight: 700, textDecoration: 'underline' }}>{m[1]}</a>);
+    last = m.index + m[0].length;
+  }
+  if (last < msg.length) out.push(msg.slice(last));
+  return out;
+}
+
 export function NoticeBar({ notice, theme: t, variant, onDismiss }) {
   const c = noticeColor(notice.type, t);
   const base = {
@@ -102,7 +119,7 @@ export function NoticeBar({ notice, theme: t, variant, onDismiss }) {
     <div style={style} role="status">
       <NoticeIcon name={noticeIconName(notice)} color={c} />
       <span style={{ maxWidth: variant === 'top' ? 860 : 'none', whiteSpace: 'pre-line', flex: variant === 'top' ? '0 1 auto' : 1 }}>
-        {notice.message}
+        {renderMessage(notice.message, c)}
       </span>
       {canClose && (
         <button onClick={() => onDismiss(notice)} aria-label="Dismiss this message" title="Dismiss"
