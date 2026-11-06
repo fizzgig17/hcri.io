@@ -13,6 +13,7 @@
 import LedGroupsEditor from './LedGroupsEditor.jsx';
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
+import { RawDataPanel } from './ReportCharts.jsx';
 
 async function adminFetch(path, opts = {}) {
   const res = await fetch(`${basePath()}index.php/api/admin${path}`, {
@@ -282,6 +283,12 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
           Allow raw data download
         </span>
       </label>
+      {report && report.wls && (
+        <div style={{ marginBottom: 14 }}>
+          {/* Admins can always download the raw data here, whatever the report's own switch says. */}
+          <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={t} />
+        </div>
+      )}
       <button
         onClick={save}
         disabled={busy}
