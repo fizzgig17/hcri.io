@@ -337,7 +337,7 @@ export default function ReportView({ report, allReports = [], isGuest = false, o
             <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
           </div>
 
-          {report.rawDownload && (
+          {!isGuest && report.rawDownload && (
             <div style={{ padding: isMobile ? '0 14px 24px' : '0 22px 32px' }}>
               <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={C} isMobile={isMobile} />
             </div>

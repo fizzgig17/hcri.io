@@ -1031,7 +1031,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                 </label>
                 {!isShared && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', marginLeft: 18 }}
-                    title="When on, anyone who can view this report (public, Explore, or share link) sees a Raw Instrument Data section with a CSV download of the headers and full spectrum. That makes it easy to copy in bulk, e.g. by scrapers, and copies can't be recalled by turning it off.">
+                    title="When on, signed-in users who can view this report see a Raw Instrument Data section with a CSV download of the headers and full spectrum. That makes it easy to copy in bulk, e.g. by scrapers, and copies can't be recalled by turning it off.">
                     <input
                       type="checkbox"
                       checked={rawOn}
@@ -1160,7 +1160,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <div style={{ height: 40 }} />
                 </div>
 
-                {rawOn && (
+                {rawOn && !isGuest && (
                   <div style={{ padding: '0 14px 40px' }}>
                     <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                   </div>
@@ -1219,7 +1219,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
                 </div>
 
-                {rawOn && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
+                {rawOn && !isGuest && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>
