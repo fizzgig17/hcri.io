@@ -482,6 +482,7 @@ if ($method === 'POST') {
 
 
 
+    if($action==='apply_license_all'){require_once __DIR__ . '/../_core/user_prefs.php';try{user_prefs_ensure($db);$v=user_default_license((int)$uid);$st=$db->prepare('UPDATE reports SET license=? WHERE user_id=?');$st->execute([$v,$uid]);json_out(['ok'=>true,'license'=>$v,'count'=>(int)$st->rowCount()]);}catch(\Throwable $e){json_error('Could not apply',500);}}
     if($action==='reports_license'){require_once __DIR__ . '/../_core/user_prefs.php';$v=license_clean($b['value'] ?? '');try{user_prefs_ensure($db);$db->prepare('UPDATE users SET reports_license=? WHERE id=?')->execute([$v,$uid]);}catch(\Throwable $e){json_error('Setting unavailable',500);}json_out(['ok'=>true,'reportsLicense'=>$v]);}
     if($action==='reports_download'){$v=!empty($b['value'])?1:0;try{user_prefs_ensure($db);$db->prepare('UPDATE users SET reports_allow_download=? WHERE id=?')->execute([$v,$uid]);}catch(\Throwable $e){json_error('Setting unavailable',500);}json_out(['ok'=>true,'reportsAllowDownload'=>(bool)$v]);}
     if($action==='reports_default'){$v=!empty($b['value'])?1:0;try{$db->prepare('UPDATE users SET reports_default_private=? WHERE id=?')->execute([$v,$uid]);}catch(\Throwable $e){json_error('Setting unavailable â run users_reports_default.sql',500);}json_out(['ok'=>true,'reportsDefaultPrivate'=>(bool)$v]);} json_error('Unknown action', 400);

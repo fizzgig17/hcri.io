@@ -9,6 +9,7 @@
 // share-link management, none of which existed before.
 
 import LicenseSelect from './LicenseSelect.jsx';
+import { licenseInfo } from '../lib/licenses.js';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { api, setToken } from '../lib/api';
@@ -203,6 +204,20 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .then(d => setShareTokens((d && d.tokens) || []))
       .catch(() => {});
   }, []);
+
+  async function applyLicenseAll() {
+    const name = (licenseInfo(defLicense).short);
+    if (!window.confirm(`Set the license on ALL of your existing reports to "${name}"? This replaces whatever license each report has now.`)) return;
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action: 'apply_license_all' });
+      notify(`License "${name}" applied to ${r.count} report${r.count === 1 ? '' : 's'}.`);
+    } catch (x) {
+      notify((x && x.message) || 'Failed to apply', false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveDefLicense(val) {
     setBusy(true); clearNotice();
@@ -555,6 +570,9 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 The starting license for reports you upload from now on. "All rights reserved" is the default. You can change the license on any report from its own page, and existing reports keep theirs.
               </div>
               <LicenseSelect T={T} value={defLicense} disabled={busy} onChange={saveDefLicense} style={{ fontSize:13, padding:'8px 10px' }} />
+              <div style={{ marginTop:8 }}>
+                <button style={S.btn()} disabled={busy} onClick={applyLicenseAll}>Apply to all my existing reports</button>
+              </div>
 
               <div style={{ height:1, background:T.border, margin:'18px 0 4px' }} />
 
