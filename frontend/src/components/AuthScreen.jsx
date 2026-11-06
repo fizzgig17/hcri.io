@@ -17,6 +17,7 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { basePath, setToken } from '../lib/api';
 import ReportView from './ReportView';
+import { TopNotices } from './Notices';
 // "Paste data instead" opens a modal (minified `Le`) that lets a guest paste
 // SPD text directly instead of uploading a file, and returns the same shape
 // as guest_analyze. That modal is reconstructed as PasteSPDModal.jsx.
@@ -241,6 +242,11 @@ export default function AuthScreen({ onLogin, onRegister, onGuestUpload, onExplo
       padding: isMobile ? '12px' : '20px',
       overflowY:'auto', overflowX:'hidden', flexDirection:'column',
     }}>
+      {!overlayMode && (
+        <div style={{ alignSelf:'stretch', margin: isMobile ? '-12px -12px 12px' : '-20px -20px 16px', flexShrink:0 }}>
+          <TopNotices theme={T} />
+        </div>
+      )}
       {!overlayMode && (
         <>
           {/* ── Top bar: logo + sign in / register / theme / help ── */}

@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $spdData, $meta, $now
         ]);
 
-        $newId = (int)$db->lastInsertId();
+        $newId = (int)$db->lastInsertId(); require_once __DIR__ . '/_core/user_prefs.php'; report_apply_download_default($newId, (int)$user['id']);
         if ($newId === 0) {
             $s2 = $db->prepare('SELECT id FROM reports WHERE user_id=? AND created_at=? ORDER BY id DESC LIMIT 1');
             $s2->execute([$user['id'], $now]);

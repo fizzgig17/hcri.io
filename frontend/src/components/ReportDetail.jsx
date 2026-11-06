@@ -51,6 +51,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getToken } from '../lib/api';
+import LicenseSelect from './LicenseSelect.jsx';
+import { licenseInfo } from '../lib/licenses.js';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { fmtTZ } from '../lib/tz';
@@ -60,7 +62,7 @@ import ShareCardModal from './ShareCardModal.jsx';
 
 import SPDChart from './SPDChart.jsx';
 import LERChart from './LERChart.jsx';
-import { BinBarChart, CESBars } from './ReportCharts.jsx';
+import { BinBarChart, CESBars, RawDataPanel } from './ReportCharts.jsx';
 import FlickerSection from './FlickerSection.jsx';
 import CVGWheel from './CVGWheel.jsx';
 import ChromaticityPanel, { ChromaticityMini } from './Chromaticity.jsx';
@@ -671,6 +673,14 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [shareToken, setShareToken] = useState(report?.shareToken || null);
   const [isPublic, setIsPublic] = useState(report?.isPublic || false);
   const [publicSaving, setPublicSaving] = useState(false);
+  // null = follow the report data; a boolean = what the owner just set with the checkbox (reset when another report opens)
+  const [rawLocal, setRawOn] = useState(null);
+  const rawOn = rawLocal !== null ? rawLocal : !!(report && report.rawDownload);
+  const [rawSaving, setRawSaving] = useState(false);
+  const [licLocal, setLicLocal] = useState(null); // null = follow the report data
+  const [licSaving, setLicSaving] = useState(false);
+  const [ctlOpen, setCtlOpen] = useState(false); // the Sharing & data bar starts folded
+  const licNow = licLocal !== null ? licLocal : (report && report.license) || '';
   const [shareBusy, setShareBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   usePanelBackClose(helpOpen, () => setHelpOpen(false));
@@ -691,6 +701,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   useEffect(() => {
     setShareToken(report?.shareToken || null);
     setIsPublic(report?.isPublic || false);
+    setRawOn(null);
+    setLicLocal(null);
   }, [report?.id]);
 
   if (!report) {
@@ -1002,7 +1014,15 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
             )}
 
             {!isGuest && report?.id && (
-              <div style={{ padding: '6px 22px 10px', borderBottom: `1px solid ${U.border}`, display: 'flex', alignItems: 'center', gap: 10, background: U.surface }}>
+              <div style={{ padding: '0 22px', borderBottom: `1px solid ${U.border}`, background: U.surface }}>
+                <button type="button" onClick={() => setCtlOpen((o) => !o)} aria-expanded={ctlOpen}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 0', cursor: 'pointer', textAlign: 'left', color: U.dim, fontFamily: 'monospace', fontSize: 12 }}>
+                  <span style={{ fontSize: 11 }}>{ctlOpen ? '▾' : '▸'}</span>
+                  <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, fontSize: 11 }}>Sharing &amp; data</span>
+                  {!ctlOpen && <span style={{ marginLeft: 'auto', textAlign: 'right' }}>{`Explore: ${isPublic ? 'included' : 'excluded'} · Raw data download: ${rawOn ? 'on' : 'off'} · License: ${licenseInfo(licNow).short}`}</span>}
+                </button>
+                {ctlOpen && (
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '0 0 10px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
                   <input
                     type="checkbox"
@@ -1026,6 +1046,45 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                     {publicSaving ? 'Saving…' : 'Exclude Report From Explore'}
                   </span>
                 </label>
+                {!isShared && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', marginLeft: 18 }}
+                    title="When on, signed-in users who can view this report see a Raw Instrument Data section with a CSV download of the headers and full spectrum. That makes it easy to copy in bulk, e.g. by scrapers, and copies can't be recalled by turning it off.">
+                    <input
+                      type="checkbox"
+                      checked={rawOn}
+                      disabled={rawSaving}
+                      onChange={async (ev) => {
+                        const on = ev.target.checked;
+                        setRawSaving(true);
+                        try {
+                          await saveMeta({ allowDownload: on });
+                          setRawOn(on);
+                        } catch {} finally { setRawSaving(false); }
+                      }}
+                      style={{ accentColor: U.accent, width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 12, color: rawOn ? U.warn : U.dim, fontFamily: 'monospace', fontWeight: rawOn ? 700 : 400 }}>
+                      {rawSaving ? 'Saving…' : 'Allow raw data download'}
+                    </span>
+                  </label>
+                )}
+                {!isShared && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 18 }}>
+                    <span style={{ fontSize: 12, color: U.dim, fontFamily: 'monospace' }}>{licSaving ? 'Saving…' : 'License'}</span>
+                    <LicenseSelect T={U} value={licNow} disabled={licSaving}
+                      onChange={async (v) => { setLicSaving(true); try { await saveMeta({ license: v }); setLicLocal(v); } catch {} finally { setLicSaving(false); } }} />
+                  </span>
+                )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(isGuest || isShared) && report?.id && (
+              <div style={{ padding: '6px 22px', borderBottom: `1px solid ${U.border}`, background: U.surface, fontSize: 12, fontFamily: 'monospace', color: U.dim }}>
+                License: {licenseInfo(licNow).url
+                  ? <a href={licenseInfo(licNow).url} target="_blank" rel="noopener noreferrer" style={{ color: U.accent }}>{licenseInfo(licNow).short}</a>
+                  : licenseInfo(licNow).short}
               </div>
             )}
 
@@ -1135,6 +1194,12 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <div style={{ height: 40 }} />
                 </div>
 
+                {rawOn && !!getToken() && (
+                  <div style={{ padding: '0 14px 40px' }}>
+                    <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} license={licLocal !== null ? licLocal : report.license} C={U} />
+                  </div>
+                )}
+
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} pad="0 14px 40px" />
               </div>
             ) : (
@@ -1187,6 +1252,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                 <div style={{ padding: '16px 22px 32px' }}>
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
                 </div>
+
+                {rawOn && !!getToken() && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} license={licLocal !== null ? licLocal : report.license} C={U} />}
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>

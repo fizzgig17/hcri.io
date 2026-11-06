@@ -8,6 +8,8 @@
 // setting, a timezone picker, GDPR-style data export/account deletion, and
 // share-link management, none of which existed before.
 
+import LicenseSelect from './LicenseSelect.jsx';
+import { licenseInfo } from '../lib/licenses.js';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { api, setToken } from '../lib/api';
@@ -158,6 +160,22 @@ function basePathForTokens() {
 }
 
 // ── Main account/settings modal (bundle: `k`) ──────────────────────────────
+// A titled section that opens and closes; the closed header shows a one-line summary of the current setting.
+function Collapse({ T, title, summary, children, open: startOpen = false }) {
+  const [open, setOpen] = useState(startOpen);
+  return (
+    <div style={{ borderTop:`1px solid ${T.border}`, padding:'2px 0' }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        style={{ display:'flex', alignItems:'center', gap:8, width:'100%', background:'none', border:'none', padding:'10px 0', cursor:'pointer', textAlign:'left', color:T.text, fontFamily:'inherit' }}>
+        <span style={{ color:T.dim, fontSize:11, width:12 }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontSize:11, textTransform:'uppercase', letterSpacing:1, fontWeight:700, color:T.dim }}>{title}</span>
+        {!open && summary && <span style={{ fontSize:12, color:T.dim, marginLeft:'auto', textAlign:'right' }}>{summary}</span>}
+      </button>
+      {open && <div style={{ paddingBottom:12 }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function AccountSettings({ user, onClose, onUserUpdate }) {
   const { theme: T } = useTheme();
   const [tab, setTab] = useState('password');
@@ -177,6 +195,8 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
   const [delKeep, setDelKeep]   = useState(true);
 
   const [reportsDefaultPrivate, setReportsDefaultPrivate] = useState(!!(user && user.reportsDefaultPrivate));
+  const [allowDownload, setAllowDownload] = useState(!!(user && user.reportsAllowDownload));
+  const [defLicense, setDefLicense] = useState((user && user.reportsLicense) || '');
   const [viewExplore, setViewExplore]     = useState(user && user.viewExplore === 'all' ? 'all' : 'cards');
   const [viewMyReports, setViewMyReports] = useState(user && user.viewMyReports === 'all' ? 'all' : 'cards');
   const [timezone, setTimezone]           = useState((user && user.timezone) || 'America/New_York');
@@ -188,6 +208,8 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
     api.get('/auth/profile')
       .then(d => {
         if (d && typeof d.reportsDefaultPrivate === 'boolean') setReportsDefaultPrivate(d.reportsDefaultPrivate);
+        if (d && typeof d.reportsAllowDownload === 'boolean') setAllowDownload(d.reportsAllowDownload);
+        if (d && typeof d.reportsLicense === 'string') setDefLicense(d.reportsLicense);
         if (d && d.timezone) setTimezone(d.timezone);
       })
       .catch(() => {});
@@ -198,6 +220,61 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .then(d => setShareTokens((d && d.tokens) || []))
       .catch(() => {});
   }, []);
+
+  async function applyAll(action, confirmText, doneText) {
+    if (!window.confirm(confirmText)) return;
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action });
+      notify(`${doneText} (${r.count} report${r.count === 1 ? '' : 's'}).`);
+    } catch (x) {
+      notify((x && x.message) || 'Failed to apply', false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyLicenseAll() {
+    const name = (licenseInfo(defLicense).short);
+    if (!window.confirm(`Set the license on ALL of your existing reports to "${name}"? This replaces whatever license each report has now.`)) return;
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action: 'apply_license_all' });
+      notify(`License "${name}" applied to ${r.count} report${r.count === 1 ? '' : 's'}.`);
+    } catch (x) {
+      notify((x && x.message) || 'Failed to apply', false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDefLicense(val) {
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action: 'reports_license', value: val });
+      setDefLicense(r.reportsLicense || '');
+      notify('Default license saved. It applies to reports you upload from now on.');
+      onUserUpdate && onUserUpdate({ ...user, reportsLicense: r.reportsLicense || '' });
+    } catch (x) {
+      notify((x && x.message) || 'Failed to save', false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveAllowDownload(val) {
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action: 'reports_download', value: val });
+      setAllowDownload(!!r.reportsAllowDownload);
+      notify(val ? 'Your reports\' raw data can now be downloaded by signed-in users who can view them.' : 'Raw data downloads are turned off for your reports.');
+      onUserUpdate && onUserUpdate({ ...user, reportsAllowDownload: !!r.reportsAllowDownload });
+    } catch (x) {
+      notify((x && x.message) || 'Failed to save', false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveReportsDefaultPrivate(val) {
     setBusy(true); clearNotice();
@@ -492,7 +569,8 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
 
           {tab === 'privacy' && (
             <>
-              <label style={S.label}>Explore visibility</label>
+              <div style={{ height:6 }} />
+              <Collapse T={T} title="Explore visibility" summary={reportsDefaultPrivate ? 'New reports excluded' : 'New reports are public'}>
               <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'4px 0' }}>
                 <input type="checkbox" checked={reportsDefaultPrivate} disabled={busy}
                   onChange={e => saveReportsDefaultPrivate(e.target.checked)}
@@ -504,10 +582,53 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
+              <div style={{ marginTop:8 }}>
+                <button style={S.btn()} disabled={busy}
+                  onClick={() => applyAll('apply_explore_all',
+                    reportsDefaultPrivate
+                      ? 'Remove ALL of your existing reports from Explore? Anyone who only found them there will no longer see them. Share links keep working.'
+                      : 'Make ALL of your existing reports public in Explore? Anyone can then find them. This replaces the setting on each report.',
+                    reportsDefaultPrivate ? 'All your reports are now excluded from Explore' : 'All your reports are now public in Explore')}>
+                  {reportsDefaultPrivate ? 'Exclude all my existing reports from Explore' : 'Make all my existing reports public'}
+                </button>
+              </div>
+              </Collapse>
 
-              <div style={{ height:1, background:T.border, margin:'18px 0 4px' }} />
+              <Collapse T={T} title="Raw data download" summary={allowDownload ? 'On for new reports' : 'Off for new reports'}>
+              <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'4px 0' }}>
+                <input type="checkbox" checked={allowDownload} disabled={busy}
+                  onChange={e => saveAllowDownload(e.target.checked)}
+                  style={{ accentColor:T.accent, width:16, height:16, marginTop:2, flexShrink:0 }} />
+                <span style={{ fontSize:13.5, color:T.text, lineHeight:1.5 }}>
+                  Allow raw data download on my new reports
+                  <div style={{ fontSize:12, color:T.dim, marginTop:4 }}>
+                    On by default. This is only the starting value for reports you upload from now on; you can switch any report on or off from its own page, and existing reports keep their current setting. When a report has it on, signed-in users who can view it (including public reports in Explore) see a Raw Instrument Data section with a CSV download of the instrument's headers and full spectrum. That makes your measurements much easier to copy in bulk: automated scrapers and other sites can collect, republish or reuse them, and once someone has a copy, turning this off won't take it back. Leave it off unless you want your data to be reusable.
+                  </div>
+                </span>
+              </label>
+              <div style={{ marginTop:8 }}>
+                <button style={S.btn()} disabled={busy}
+                  onClick={() => applyAll('apply_download_all',
+                    allowDownload
+                      ? 'Turn raw data download ON for ALL of your existing reports? Signed-in viewers will be able to download their data. This replaces the setting on each report.'
+                      : 'Turn raw data download OFF for ALL of your existing reports? This replaces the setting on each report.',
+                    allowDownload ? 'Raw data download is on for all your reports' : 'Raw data download is off for all your reports')}>
+                  {allowDownload ? 'Turn on for all my existing reports' : 'Turn off for all my existing reports'}
+                </button>
+              </div>
+              </Collapse>
 
-              <label style={S.label}>Your data</label>
+              <Collapse T={T} title="License for my reports" summary={licenseInfo(defLicense).short}>
+              <div style={{ fontSize:12, color:T.dim, lineHeight:1.5, marginBottom:8 }}>
+                The starting license for reports you upload from now on. "All rights reserved" is the default. You can change the license on any report from its own page, and existing reports keep theirs.
+              </div>
+              <LicenseSelect T={T} block value={defLicense} disabled={busy} onChange={saveDefLicense} style={{ fontSize:13, padding:'8px 10px' }} />
+              <div style={{ marginTop:8 }}>
+                <button style={S.btn()} disabled={busy} onClick={applyLicenseAll}>Apply to all my existing reports</button>
+              </div>
+              </Collapse>
+
+              <Collapse T={T} title="Your data" summary="Export or delete your account">
               <div style={{ fontSize:12.5, color:T.dim, lineHeight:1.5, marginBottom:10 }}>
                 Download everything we hold about your account, or permanently delete your account.
               </div>
@@ -591,6 +712,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 {' · '}
                 <a href="/terms" target="_blank" rel="opener" style={{ color:T.accent, textDecoration:'none' }}>Terms</a>
               </div>
+              </Collapse>
             </>
           )}
         </div>

@@ -151,6 +151,11 @@ function notice_payload(array $r): array {
         'endsAt'    => $r['ends_at'],
         'enabled'   => !empty($r['enabled']),
         'createdAt' => $r['created_at'] ?? null,
+        'icon'        => $r['icon'] ?? '',
+        'dismissible' => !array_key_exists('dismissible', $r) || !empty($r['dismissible']),
+        'rev'         => (int)($r['rev'] ?? 1),
+        'liveNow'     => !empty($r['live_now']),   // decided by the database clock, the same test the public list uses
+        'dbNow'       => $r['db_now'] ?? null,
     ];
 }
 function notice_norm_dt($v): ?string {
@@ -159,35 +164,39 @@ function notice_norm_dt($v): ?string {
     return $ts ? date('Y-m-d H:i:s', $ts) : null;
 }
 function notice_validate(array $b): array {
-    $type = in_array($b['type'] ?? '', ['news','important','issue'], true) ? $b['type'] : 'news';
+    $type = in_array($b['type'] ?? '', NOTICE_TYPES, true) ? $b['type'] : 'news';
+    $icon = in_array($b['icon'] ?? '', NOTICE_ICONS, true) ? $b['icon'] : '';
+    $dis  = array_key_exists('dismissible', $b) ? (int)!empty($b['dismissible']) : 1;
     $loc  = in_array($b['location'] ?? '', ['top','report','both'], true) ? $b['location'] : 'top';
     $msg  = trim((string)($b['message'] ?? ''));
     if ($msg === '') json_error('message required', 400);
     $sa = notice_norm_dt($b['startsAt'] ?? null);
     $ea = notice_norm_dt($b['endsAt'] ?? null);
-    if (!$sa) json_error('startsAt required', 400);
-    if (!$ea) json_error('endsAt required', 400);
+    if (!$sa) { global $db; $sa = (string)$db->query('SELECT NOW()')->fetchColumn(); } // no start: begins now (the database's clock, which is what the public list compares against)
+    if (!$ea) $ea = '2099-12-31 23:59:59'; // no end: runs until it is disabled or deleted
     $en = array_key_exists('enabled', $b) ? (int)!empty($b['enabled']) : 1;
-    return [$type, $loc, $msg, $sa, $ea, $en];
+    return [$type, $loc, $msg, $sa, $ea, $en, $icon, $dis];
 }
-$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at';
+$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at,icon,dismissible,rev,(enabled=1 AND starts_at<=NOW() AND ends_at>=NOW()) AS live_now,NOW() AS db_now';
+if (strpos($path, '/notices') === 0) { require_once __DIR__ . '/_core/notices.php'; notices_ensure($db); }
 if ($m === 'GET' && $path === '/notices') {
     try { $rows = $db->query("SELECT $NOTICE_COLS FROM notices ORDER BY id DESC")->fetchAll(); }
     catch (\Throwable $e) { $rows = []; }
     json_out(array_map('notice_payload', $rows));
 }
 if ($m === 'POST' && $path === '/notices') {
-    [$type,$loc,$msg,$sa,$ea,$en] = notice_validate(body());
-    $db->prepare('INSERT INTO notices (type,location,message,starts_at,ends_at,enabled) VALUES (?,?,?,?,?,?)')
-       ->execute([$type,$loc,$msg,$sa,$ea,$en]);
+    [$type,$loc,$msg,$sa,$ea,$en,$icon,$dis] = notice_validate(body());
+    $db->prepare('INSERT INTO notices (type,location,message,starts_at,ends_at,enabled,icon,dismissible) VALUES (?,?,?,?,?,?,?,?)')
+       ->execute([$type,$loc,$msg,$sa,$ea,$en,$icon,$dis]);
     $row = $db->query("SELECT $NOTICE_COLS FROM notices WHERE id=".(int)$db->lastInsertId())->fetch();
     json_out(notice_payload($row));
 }
 if ($m === 'PATCH' && preg_match('#^/notices/(\d+)$#', $path, $nm)) {
     $id = (int)$nm[1];
-    [$type,$loc,$msg,$sa,$ea,$en] = notice_validate(body());
-    $db->prepare('UPDATE notices SET type=?,location=?,message=?,starts_at=?,ends_at=?,enabled=? WHERE id=?')
-       ->execute([$type,$loc,$msg,$sa,$ea,$en,$id]);
+    [$type,$loc,$msg,$sa,$ea,$en,$icon,$dis] = notice_validate(body());
+    // every save bumps rev: browsers that dismissed the old version show it again
+    $db->prepare('UPDATE notices SET type=?,location=?,message=?,starts_at=?,ends_at=?,enabled=?,icon=?,dismissible=?,rev=rev+1 WHERE id=?')
+       ->execute([$type,$loc,$msg,$sa,$ea,$en,$icon,$dis,$id]);
     $row = $db->query("SELECT $NOTICE_COLS FROM notices WHERE id=".$id)->fetch();
     if (!$row) json_error('not found', 404);
     json_out(notice_payload($row));
@@ -223,6 +232,7 @@ if ($m === 'POST' && $path === '/featured') {
 }
 // Build the full admin view payload for a report (including categories).
 function admin_report_payload(PDO $db, int $rid): ?array {
+    require_once __DIR__ . '/_core/user_prefs.php'; try { user_prefs_ensure($db); } catch (\Throwable $e) {}
     $r = $db->prepare('SELECT r.*, u.name as user_name, u.email as user_email
                        FROM reports r JOIN users u ON u.id=r.user_id
                        WHERE r.id=?');
@@ -292,6 +302,8 @@ function admin_report_payload(PDO $db, int $rid): ?array {
         'categories'   => report_categories_map($db, $rid),
         'leds'         => report_leds_get($db, $rid),
         'isPublic'     => !empty($row['is_public']),
+        'allowDownload'=> !empty($row['allow_download']),
+        'license'      => (function($v){ require_once __DIR__ . '/_core/user_prefs.php'; return license_clean((string)$v); })($row['license'] ?? ''),
     ];
     if (!empty($row['spd_data'])) {
         $pairs       = json_decode($row['spd_data'], true);
@@ -316,6 +328,8 @@ if ($m === 'PATCH' && preg_match('#^/reports/([A-Za-z0-9]+)$#', $path, $rm)) {
     if (array_key_exists('label', $b))        { $sets[] = 'label=?';        $params[] = trim((string)$b['label']); }
     if (array_key_exists('notes', $b))        { $sets[] = 'notes=?';        $params[] = (string)$b['notes']; }
     if (array_key_exists('isPublic', $b))     { $sets[] = 'is_public=?';   $params[] = $b['isPublic'] ? 1 : 0; }
+    if (array_key_exists('license', $b)) { require_once __DIR__ . '/_core/user_prefs.php'; user_prefs_ensure($db); $sets[] = 'license=?'; $params[] = license_clean($b['license']); }
+    if (array_key_exists('allowDownload', $b)) { require_once __DIR__ . '/_core/user_prefs.php'; user_prefs_ensure($db); $sets[] = 'allow_download=?'; $params[] = $b['allowDownload'] ? 1 : 0; }
     if ($sets) { $params[] = $rid; $db->prepare('UPDATE reports SET '.implode(',', $sets).' WHERE id=?')->execute($params); }
     $hasLeds = isset($b['leds']) && is_array($b['leds']);
     if (isset($b['categories']) && is_array($b['categories'])) {

@@ -80,7 +80,7 @@ if ($method === 'GET') {
 
 
 
-    $dp=false; try{$x=$db->prepare('SELECT reports_default_private FROM users WHERE id=?');$x->execute([$uid]);$dp=(bool)$x->fetchColumn();}catch(\Throwable $e){} $u['reportsDefaultPrivate']=$dp; $set=[]; try{$sx=$db->prepare('SELECT settings FROM users WHERE id=?');$sx->execute([$uid]);$set=json_decode((string)$sx->fetchColumn(),true)?:[];}catch(\Throwable $e){} $u['timezone']=$set['timezone']??'America/New_York'; json_out($u);
+    $dp=false; try{$x=$db->prepare('SELECT reports_default_private FROM users WHERE id=?');$x->execute([$uid]);$dp=(bool)$x->fetchColumn();}catch(\Throwable $e){} $u['reportsDefaultPrivate']=$dp; require_once __DIR__ . '/../_core/user_prefs.php'; $u['reportsAllowDownload']=user_allows_download((int)$uid); $u['reportsLicense']=user_default_license((int)$uid); $set=[]; try{$sx=$db->prepare('SELECT settings FROM users WHERE id=?');$sx->execute([$uid]);$set=json_decode((string)$sx->fetchColumn(),true)?:[];}catch(\Throwable $e){} $u['timezone']=$set['timezone']??'America/New_York'; json_out($u);
 
 
 
@@ -482,6 +482,11 @@ if ($method === 'POST') {
 
 
 
+    if($action==='apply_download_all'){require_once __DIR__ . '/../_core/user_prefs.php';try{user_prefs_ensure($db);$v=user_allows_download((int)$uid)?1:0;$st=$db->prepare('UPDATE reports SET allow_download=? WHERE user_id=?');$st->execute([$v,$uid]);json_out(['ok'=>true,'on'=>(bool)$v,'count'=>(int)$st->rowCount()]);}catch(\Throwable $e){json_error('Could not apply',500);}}
+    if($action==='apply_explore_all'){try{$x=$db->prepare('SELECT reports_default_private FROM users WHERE id=?');$x->execute([$uid]);$excl=(int)$x->fetchColumn()===1;$st=$db->prepare('UPDATE reports SET is_public=? WHERE user_id=?');$st->execute([$excl?0:1,$uid]);json_out(['ok'=>true,'excluded'=>$excl,'count'=>(int)$st->rowCount()]);}catch(\Throwable $e){json_error('Could not apply',500);}}
+    if($action==='apply_license_all'){require_once __DIR__ . '/../_core/user_prefs.php';try{user_prefs_ensure($db);$v=user_default_license((int)$uid);$st=$db->prepare('UPDATE reports SET license=? WHERE user_id=?');$st->execute([$v,$uid]);json_out(['ok'=>true,'license'=>$v,'count'=>(int)$st->rowCount()]);}catch(\Throwable $e){json_error('Could not apply',500);}}
+    if($action==='reports_license'){require_once __DIR__ . '/../_core/user_prefs.php';$v=license_clean($b['value'] ?? '');try{user_prefs_ensure($db);$db->prepare('UPDATE users SET reports_license=? WHERE id=?')->execute([$v,$uid]);}catch(\Throwable $e){json_error('Setting unavailable',500);}json_out(['ok'=>true,'reportsLicense'=>$v]);}
+    if($action==='reports_download'){$v=!empty($b['value'])?1:0;try{user_prefs_ensure($db);$db->prepare('UPDATE users SET reports_allow_download=? WHERE id=?')->execute([$v,$uid]);}catch(\Throwable $e){json_error('Setting unavailable',500);}json_out(['ok'=>true,'reportsAllowDownload'=>(bool)$v]);}
     if($action==='reports_default'){$v=!empty($b['value'])?1:0;try{$db->prepare('UPDATE users SET reports_default_private=? WHERE id=?')->execute([$v,$uid]);}catch(\Throwable $e){json_error('Setting unavailable â run users_reports_default.sql',500);}json_out(['ok'=>true,'reportsDefaultPrivate'=>(bool)$v]);} json_error('Unknown action', 400);
 
 

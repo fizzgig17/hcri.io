@@ -506,7 +506,6 @@ export default function App() {
   // ── Logged-out landing page ──────────────────────────────────────────────
   return (
     <>
-      <TopNotices theme={T} />
       <GlobalHelp />
       <AuthScreen
         onLogin={handleLogin}

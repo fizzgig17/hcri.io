@@ -2648,7 +2648,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   );
 
   const listingBody = (
-    <div style={{ display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', minHeight: 'calc(100vh - 56px)', position: 'relative' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', minHeight: 'calc(100vh - 56px - var(--notice-h, 0px))', position: 'relative' }}>
       {folderBar}
       {uploadBar}
       {quickAnalysisBar}
@@ -2710,7 +2710,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   // ── Split view: desktop, viewing a report, results list pinned/opened ──
   const splitView = (
-    <div style={{ display: 'flex', height: '100vh', background: r.bg, overflow: 'hidden', position: 'relative' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - var(--notice-h, 0px))', background: r.bg, overflow: 'hidden', position: 'relative' }}>
       <div style={{ width: 270, minWidth: 270, flexShrink: 0, borderRight: `1px solid ${r.border}`, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', background: r.surface2, borderBottom: `1px solid ${r.border}` }}>
           <button onClick={() => te(false)} style={{
@@ -2741,8 +2741,8 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           </button>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <div style={{ minHeight: '100vh', background: r.bg, color: r.text, fontFamily: 'monospace' }}>
-            <div style={{ display: 'flex', minHeight: 'calc(100vh - 56px)' }}>
+          <div style={{ minHeight: 'calc(100vh - var(--notice-h, 0px))', background: r.bg, color: r.text, fontFamily: 'monospace' }}>
+            <div style={{ display: 'flex', minHeight: 'calc(100vh - 56px - var(--notice-h, 0px))' }}>
               {I && <FilterPanel {...filterPanelProps} />}
               {!I && <ResultsPanel {...resultsPanelProps} />}
             </div>
@@ -2750,7 +2750,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
         </div>
       </div>
       <div style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: r.bg, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--notice-h, 0px))', background: r.bg, overflow: 'hidden' }}>
           {detailToolbar}
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{reportDetailView}</div>
         </div>
@@ -2762,7 +2762,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const mobileDetailView = (
     <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: r.bg, overflow: 'hidden' }}>
       {detailToolbar}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}<SiteFooter /></div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}{o && <SiteFooter />}</div>
     </div>
   );
 

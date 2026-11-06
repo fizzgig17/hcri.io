@@ -146,6 +146,7 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
             }
         }
         $newId = (int)$db->lastInsertId();
+        require_once __DIR__ . '/user_prefs.php'; report_apply_download_default($newId, (int)$userId);
 
         return [
             'id'         => $newId,
