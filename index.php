@@ -1106,6 +1106,18 @@ if ($cmpRaw !== '' && $shareTok === '' && $reportId === 0) {
 }
 
 $rtRaw = isset($_GET['runtime']) ? (string)$_GET['runtime'] : '';
+// An owner's own comparison address (?explore=runtime&cmp=<curve id>,...) previews like its public link when those curves are shared.
+if ($rtRaw === '' && (string)($_GET['explore'] ?? '') === 'runtime' && isset($_GET['cmp'])) {
+    try {
+        require_once __DIR__ . '/api/_core/db.php';
+        require_once __DIR__ . '/api/_core/runtime_curves.php';
+        $cmDb = get_db(); runtime_curves_ensure($cmDb);
+        $cmq = $cmDb->prepare("SELECT share_token FROM runtime_curves WHERE curve_id = ? AND share_token IS NOT NULL AND share_token <> ''");
+        $cmT = [];
+        foreach (array_slice(array_unique(array_filter(array_map('trim', explode(',', (string)$_GET['cmp'])), 'runtime_curve_valid_id')), 0, 12) as $cmI) { $cmq->execute([$cmI]); $cmv = $cmq->fetchColumn(); if ($cmv !== false) $cmT[] = (string)$cmv; }
+        if ($cmT) $rtRaw = implode(',', $cmT);
+    } catch (\Throwable $e) { /* no preview */ }
+}
 if ($rtRaw !== '' && $shareTok === '' && $reportId === 0 && $cmpRaw === '') {
     $rtToks = array_slice(array_values(array_filter(array_map('trim', explode(',', $rtRaw)), fn($t) => preg_match('/^[a-f0-9]{16}$/', $t) === 1)), 0, 12);
     if ($rtToks) {

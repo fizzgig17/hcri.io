@@ -22,6 +22,18 @@ $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
 if (rl_count('runtime_shared', $ip, 60) > 120) json_error('Too many requests, try again in a minute', 429);
 rl_hit('runtime_shared', $ip, 60);
 
+// ?ids=<curve id>[,<curve id>...]: for curves their owners have shared, the share tokens (so an owner's own comparison address can
+// be turned into the public link). Curves that are not shared are simply left out, and nothing else about them is returned.
+if (isset($_GET['ids'])) {
+    $ids = array_slice(array_values(array_unique(array_filter(array_map('trim', explode(',', (string)$_GET['ids'])), 'runtime_curve_valid_id'))), 0, 12);
+    $db = get_db();
+    runtime_curves_ensure($db);
+    $q = $db->prepare("SELECT share_token FROM runtime_curves WHERE curve_id = ? AND share_token IS NOT NULL AND share_token <> ''");
+    $out = [];
+    foreach ($ids as $i) { $q->execute([$i]); $tk = $q->fetchColumn(); if ($tk !== false && runtime_valid_share_token((string)$tk)) $out[] = (string)$tk; }
+    json_out(['tokens' => $out, 'requested' => count($ids)]);
+}
+
 $toks = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_GET['t'] ?? ''))), 'runtime_valid_share_token')));
 if (!$toks) json_error('No valid share token', 400);
 $toks = array_slice($toks, 0, 12);
