@@ -19,6 +19,8 @@ require_once __DIR__ . '/pdf_extract.php';
 // (the Companion app re-uploading a reading it already uploaded). The row keeps its id, link, visibility, created_at,
 // categories/LED groups and notes; label, spectrum, metrics and file are replaced. If that id isn't found or isn't
 // the user's, a new report is inserted as usual. The response carries 'replaced' => true/false.
+require_once __DIR__ . '/user_prefs.php';
+
 function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origName, string $label = '', bool $viaApi = false, int $replaceId = 0): array {
     $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
     if (!in_array($ext, ['csv', 'tsv', 'txt', 'json', 'sp', 'pdf'], true)) {
@@ -114,6 +116,7 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
                 'isPublic'   => (int)$existing['is_public'] === 1,
                 'createdAt'  => (string)$existing['created_at'],
                 'viaApi'     => $viaApi,
+                'license'    => report_license((int)$existing['id']),
                 'replaced'   => true,
             ];
         }
@@ -163,6 +166,7 @@ function ingest_spd_upload(PDO $db, int $userId, string $srcPath, string $origNa
             'isPublic'   => $pub ? true : false,
             'createdAt'  => $now,
             'viaApi'     => $viaApi,
+            'license'    => user_default_license($userId),
             'replaced'   => false,
         ];
     } catch (\Throwable $e) {
