@@ -671,6 +671,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [shareToken, setShareToken] = useState(report?.shareToken || null);
   const [isPublic, setIsPublic] = useState(report?.isPublic || false);
   const [publicSaving, setPublicSaving] = useState(false);
+  const [rawOn, setRawOn] = useState(!!report?.rawDownload);
+  const [rawSaving, setRawSaving] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   usePanelBackClose(helpOpen, () => setHelpOpen(false));
@@ -691,6 +693,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   useEffect(() => {
     setShareToken(report?.shareToken || null);
     setIsPublic(report?.isPublic || false);
+    setRawOn(!!report?.rawDownload);
   }, [report?.id]);
 
   if (!report) {
@@ -1026,6 +1029,28 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                     {publicSaving ? 'Saving…' : 'Exclude Report From Explore'}
                   </span>
                 </label>
+                {!isShared && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', marginLeft: 18 }}
+                    title="When on, anyone who can view this report (public, Explore, or share link) sees a Raw Instrument Data section with a CSV download of the headers and full spectrum. That makes it easy to copy in bulk, e.g. by scrapers, and copies can't be recalled by turning it off.">
+                    <input
+                      type="checkbox"
+                      checked={rawOn}
+                      disabled={rawSaving}
+                      onChange={async (ev) => {
+                        const on = ev.target.checked;
+                        setRawSaving(true);
+                        try {
+                          await saveMeta({ allowDownload: on });
+                          setRawOn(on);
+                        } catch {} finally { setRawSaving(false); }
+                      }}
+                      style={{ accentColor: U.accent, width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 12, color: rawOn ? U.warn : U.dim, fontFamily: 'monospace', fontWeight: rawOn ? 700 : 400 }}>
+                      {rawSaving ? 'Saving…' : 'Allow raw data download'}
+                    </span>
+                  </label>
+                )}
               </div>
             )}
 
@@ -1135,7 +1160,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <div style={{ height: 40 }} />
                 </div>
 
-                {report.rawDownload && (
+                {rawOn && (
                   <div style={{ padding: '0 14px 40px' }}>
                     <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                   </div>
@@ -1194,7 +1219,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
                 </div>
 
-                {report.rawDownload && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
+                {rawOn && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>

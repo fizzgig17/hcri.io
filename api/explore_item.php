@@ -106,7 +106,7 @@ if (!empty($r['spd_data'])) {
     $pairs2 = json_decode($r['spd_data'], true);
     $out += spd_ler_fields($pairs2); // LER, from the full spectrum (before any 5 nm reduction below)
     require_once __DIR__ . '/_core/user_prefs.php';
-    $out['rawDownload'] = user_allows_download((int)($r['user_id'] ?? 0)); // the owner opted in to a raw-data CSV download
+    $out['rawDownload'] = report_allows_download((int)($r['id'] ?? 0)); // the owner switched on raw-data download for this report
     // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
     // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
     $fullRes = $isSuper
@@ -237,7 +237,7 @@ if (!empty($r['spd_data'])) {
     $pairs2 = json_decode($r['spd_data'], true);
     $out += spd_ler_fields($pairs2); // LER, from the full spectrum (before any 5 nm reduction below)
     require_once __DIR__ . '/_core/user_prefs.php';
-    $out['rawDownload'] = user_allows_download((int)($r['user_id'] ?? 0)); // the owner opted in to a raw-data CSV download
+    $out['rawDownload'] = report_allows_download((int)($r['id'] ?? 0)); // the owner switched on raw-data download for this report
     // Full resolution for the owner, super admins and anyone holding the report's share token; everyone else
     // (logged-in or not) gets the spectrum every 5 nm. Metrics above were computed from the full spectrum.
     $fullRes = $isSuper

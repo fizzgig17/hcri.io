@@ -150,7 +150,7 @@ if (!empty($r['spd_data'])) {
 
     $out += spd_ler_fields($pairs); // LER, from the full stored spectrum
     require_once __DIR__ . '/_core/user_prefs.php';
-    $out['rawDownload'] = user_allows_download((int)($r['user_id'] ?? 0)); // the owner opted in to a raw-data CSV download
+    $out['rawDownload'] = report_allows_download((int)($r['id'] ?? 0)); // the owner switched on raw-data download for this report
 
     $out['wls']  = is_array($pairs) ? array_column($pairs, 0) : null;
 
