@@ -206,7 +206,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
     try {
       const r = await api.post('/auth/profile', { action: 'reports_download', value: val });
       setAllowDownload(!!r.reportsAllowDownload);
-      notify(val ? 'Your reports\' raw data can now be downloaded by anyone who can view them.' : 'Raw data downloads are turned off for your reports.');
+      notify(val ? 'Your reports\' raw data can now be downloaded by signed-in users who can view them.' : 'Raw data downloads are turned off for your reports.');
       onUserUpdate && onUserUpdate({ ...user, reportsAllowDownload: !!r.reportsAllowDownload });
     } catch (x) {
       notify((x && x.message) || 'Failed to save', false);
