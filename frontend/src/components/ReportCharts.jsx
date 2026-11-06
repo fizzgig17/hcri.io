@@ -230,7 +230,7 @@ export function RawDataPanel({ headers, wls, vals, label, C: T, isMobile }) {
 
   const canExpand = entries.length > 0 || hasSpectral;
   return (
-    <div style={{ marginTop: 16, border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
+    <div style={{ marginTop: 16, border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
       <div
         onClick={() => canExpand && setOpen((o) => !o)}
         style={{
