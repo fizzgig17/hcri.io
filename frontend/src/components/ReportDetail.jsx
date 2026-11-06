@@ -671,7 +671,9 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [shareToken, setShareToken] = useState(report?.shareToken || null);
   const [isPublic, setIsPublic] = useState(report?.isPublic || false);
   const [publicSaving, setPublicSaving] = useState(false);
-  const [rawOn, setRawOn] = useState(!!report?.rawDownload);
+  // null = follow the report data; a boolean = what the owner just set with the checkbox (reset when another report opens)
+  const [rawLocal, setRawOn] = useState(null);
+  const rawOn = rawLocal !== null ? rawLocal : !!(report && report.rawDownload);
   const [rawSaving, setRawSaving] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -693,7 +695,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   useEffect(() => {
     setShareToken(report?.shareToken || null);
     setIsPublic(report?.isPublic || false);
-    setRawOn(!!report?.rawDownload);
+    setRawOn(null);
   }, [report?.id]);
 
   if (!report) {
