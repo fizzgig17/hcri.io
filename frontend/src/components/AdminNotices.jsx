@@ -107,7 +107,7 @@ export default function AdminNotices({ theme: o }) {
     setLoc(no.location);
     setMsg(no.message);
     setStart((no.startsAt || '').replace(' ', 'T').slice(0, 16));
-    setEnd((no.endsAt || '').replace(' ', 'T').slice(0, 16));
+    setEnd((no.endsAt || '').startsWith('2099') ? '' : (no.endsAt || '').replace(' ', 'T').slice(0, 16));
     setDur('');
     setUnit('days');
     setEn(no.enabled !== false);
@@ -117,8 +117,6 @@ export default function AdminNotices({ theme: o }) {
   };
   const save = async () => {
     if (!nmsg.trim()) return setErr('Message is required');
-    if (!nstart) return setErr('Start date is required');
-    if (!nend) return setErr('Stop date (or a duration) is required');
     setSaving(true);
     setErr('');
     try {
@@ -309,7 +307,7 @@ export default function AdminNotices({ theme: o }) {
                 }}
               >
                 <div>
-                  <label style={lbl}>Start date</label>
+                  <label style={lbl}>Start date (blank = now)</label>
                   <input type="datetime-local" value={nstart} onChange={(e) => onStart(e.target.value)} style={inp} />
                 </div>
                 <div style={{ width: 84 }}>
@@ -333,7 +331,7 @@ export default function AdminNotices({ theme: o }) {
                 </div>
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={lbl}>Stop date (auto-filled from duration — editable)</label>
+                <label style={lbl}>Stop date (blank = until you disable it)</label>
                 <input type="datetime-local" value={nend} onChange={(e) => setEnd(e.target.value)} style={inp} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
@@ -446,7 +444,7 @@ export default function AdminNotices({ theme: o }) {
                             <div style={{ fontSize: 11, color: o.dim, fontFamily: 'monospace', marginTop: 3 }}>
                               {(no.startsAt || '').slice(0, 16).replace('T', ' ') +
                                 '  →  ' +
-                                (no.endsAt || '').slice(0, 16).replace('T', ' ')}
+                                ((no.endsAt || '').startsWith('2099') ? 'until disabled' : (no.endsAt || '').slice(0, 16).replace('T', ' '))}
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
