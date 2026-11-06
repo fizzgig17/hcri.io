@@ -154,6 +154,8 @@ function notice_payload(array $r): array {
         'icon'        => $r['icon'] ?? '',
         'dismissible' => !array_key_exists('dismissible', $r) || !empty($r['dismissible']),
         'rev'         => (int)($r['rev'] ?? 1),
+        'liveNow'     => !empty($r['live_now']),   // decided by the database clock, the same test the public list uses
+        'dbNow'       => $r['db_now'] ?? null,
     ];
 }
 function notice_norm_dt($v): ?string {
@@ -175,7 +177,7 @@ function notice_validate(array $b): array {
     $en = array_key_exists('enabled', $b) ? (int)!empty($b['enabled']) : 1;
     return [$type, $loc, $msg, $sa, $ea, $en, $icon, $dis];
 }
-$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at,icon,dismissible,rev';
+$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at,icon,dismissible,rev,(enabled=1 AND starts_at<=NOW() AND ends_at>=NOW()) AS live_now,NOW() AS db_now';
 if (strpos($path, '/notices') === 0) { require_once __DIR__ . '/_core/notices.php'; notices_ensure($db); }
 if ($m === 'GET' && $path === '/notices') {
     try { $rows = $db->query("SELECT $NOTICE_COLS FROM notices ORDER BY id DESC")->fetchAll(); }

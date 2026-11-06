@@ -408,7 +408,7 @@ export default function AdminNotices({ theme: o }) {
                     const d0 = new Date(), p2 = (x) => String(x).padStart(2, '0');
                     const nowS = `${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}T${p2(d0.getHours())}:${p2(d0.getMinutes())}`;
                     const sS = (no.startsAt || '').replace(' ', 'T').slice(0, 16), eS = (no.endsAt || '').replace(' ', 'T').slice(0, 16);
-                    const status = no.enabled === false ? 'disabled' : nowS < sS ? 'scheduled' : nowS > eS ? 'ended' : 'live';
+                    const status = no.enabled === false ? 'disabled' : no.liveNow ? 'live' : (no.dbNow ? (String(no.dbNow).replace(' ', 'T').slice(0, 16) < sS ? 'scheduled' : 'ended') : (nowS < sS ? 'scheduled' : nowS > eS ? 'ended' : 'live'));
                     return (
                       <div
                         key={no.id}
@@ -442,7 +442,7 @@ export default function AdminNotices({ theme: o }) {
                               {no.message}
                             </div>
                             <div style={{ fontSize: 11, color: o.dim, fontFamily: 'monospace', marginTop: 3 }}>
-                              {(no.startsAt || '').slice(0, 16).replace('T', ' ') +
+                              {no.dbNow ? 'server time ' + String(no.dbNow).slice(0, 16) + ' · ' : ''}{(no.startsAt || '').slice(0, 16).replace('T', ' ') +
                                 '  →  ' +
                                 ((no.endsAt || '').startsWith('2099') ? 'until disabled' : (no.endsAt || '').slice(0, 16).replace('T', ' '))}
                             </div>
