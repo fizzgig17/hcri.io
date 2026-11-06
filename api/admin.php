@@ -170,7 +170,7 @@ function notice_validate(array $b): array {
     if ($msg === '') json_error('message required', 400);
     $sa = notice_norm_dt($b['startsAt'] ?? null);
     $ea = notice_norm_dt($b['endsAt'] ?? null);
-    if (!$sa) $sa = date('Y-m-d H:i:s');   // no start: begins now
+    if (!$sa) { global $db; $sa = (string)$db->query('SELECT NOW()')->fetchColumn(); } // no start: begins now (the database's clock, which is what the public list compares against)
     if (!$ea) $ea = '2099-12-31 23:59:59'; // no end: runs until it is disabled or deleted
     $en = array_key_exists('enabled', $b) ? (int)!empty($b['enabled']) : 1;
     return [$type, $loc, $msg, $sa, $ea, $en, $icon, $dis];
