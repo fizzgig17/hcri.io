@@ -17,10 +17,8 @@ import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { NoticeBar, NoticeIcon, NOTICE_TYPES, NOTICE_ICON_IDS, noticeColor, noticeIconName } from './Notices.jsx';
 
-function noticeColor(type, t) {
-  return type === 'important' ? t.bad : type === 'issue' ? t.warn : t.good;
-}
 
 export default function AdminNotices({ theme: o }) {
   const [open, setOpen] = useState(false);
@@ -39,6 +37,8 @@ export default function AdminNotices({ theme: o }) {
   const [ndur, setDur] = useState('');
   const [nunit, setUnit] = useState('days');
   const [nen, setEn] = useState(true);
+  const [nicon, setIcon] = useState('');
+  const [ndis, setDis] = useState(true);
 
   const auth = () => ({ Authorization: `Bearer ${getToken()}` });
 
@@ -97,6 +97,8 @@ export default function AdminNotices({ theme: o }) {
     setDur('');
     setUnit('days');
     setEn(true);
+    setIcon('');
+    setDis(true);
     setErr('');
   };
   const edit = (no) => {
@@ -109,6 +111,8 @@ export default function AdminNotices({ theme: o }) {
     setDur('');
     setUnit('days');
     setEn(no.enabled !== false);
+    setIcon(no.icon || '');
+    setDis(no.dismissible !== false && no.dismissible !== 0);
     setErr('');
   };
   const save = async () => {
@@ -128,6 +132,8 @@ export default function AdminNotices({ theme: o }) {
           startsAt: nstart,
           endsAt: nend,
           enabled: nen,
+          icon: nicon,
+          dismissible: ndis,
         }),
       });
       const d = await r.json();
@@ -255,11 +261,9 @@ export default function AdminNotices({ theme: o }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <div>
-                  <label style={lbl}>Type (sets color)</label>
+                  <label style={lbl}>Type (sets the color)</label>
                   <select value={ntype} onChange={(e) => setType(e.target.value)} style={inp}>
-                    <option value="news">General news (green)</option>
-                    <option value="important">Important news (red)</option>
-                    <option value="issue">Site issue (yellow)</option>
+                    {NOTICE_TYPES.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -274,6 +278,26 @@ export default function AdminNotices({ theme: o }) {
               <div style={{ marginBottom: 12 }}>
                 <label style={lbl}>Message</label>
                 <textarea value={nmsg} onChange={(e) => setMsg(e.target.value)} rows={2} style={{ ...inp, resize: 'vertical' }} />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={lbl}>Icon</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[''].concat(NOTICE_ICON_IDS).map((id) => {
+                    const on = nicon === id;
+                    const shown = id || noticeIconName({ type: ntype });
+                    return (
+                      <button key={id || 'default'} type="button" onClick={() => setIcon(id)} title={id ? id : 'Default for this type'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, background: on ? `${o.accent}22` : 'none', border: `1px solid ${on ? o.accent : o.border}`,
+                          color: on ? o.accent : o.dim, borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 11, fontFamily: 'monospace' }}>
+                        <NoticeIcon name={shown} color={on ? o.accent : o.dim} size={16} />{id ? '' : 'Default'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={lbl}>Preview</label>
+                <NoticeBar notice={{ type: ntype, icon: nicon, message: nmsg || 'Your message appears here.', dismissible: ndis }} theme={o} variant="preview" onDismiss={() => {}} />
               </div>
               <div
                 style={{
@@ -332,6 +356,10 @@ export default function AdminNotices({ theme: o }) {
                   />
                   Enabled
                 </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, color: o.text, fontFamily: 'monospace' }}>
+                  <input type="checkbox" checked={ndis} onChange={(e) => setDis(e.target.checked)} style={{ accentColor: o.accent, width: 15, height: 15 }} />
+                  Can be dismissed
+                </label>
                 <button
                   onClick={save}
                   disabled={saving}
@@ -367,6 +395,7 @@ export default function AdminNotices({ theme: o }) {
                     Cancel
                   </button>
                 )}
+                {eid && !err && <span style={{ fontSize: 11, color: o.dim, fontFamily: 'monospace' }}>Saving shows this message again to everyone who dismissed it.</span>}
                 {err && <span style={{ fontSize: 12, color: o.bad, fontFamily: 'monospace' }}>{err}</span>}
               </div>
             </div>
@@ -377,7 +406,11 @@ export default function AdminNotices({ theme: o }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {list.map((no) => {
                     const c = noticeColor(no.type, o);
-                    const tl = no.type === 'important' ? 'Important' : no.type === 'issue' ? 'Site issue' : 'News';
+                    const tl = (NOTICE_TYPES.find((x) => x.id === no.type) || NOTICE_TYPES[1]).label;
+                    const d0 = new Date(), p2 = (x) => String(x).padStart(2, '0');
+                    const nowS = `${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}T${p2(d0.getHours())}:${p2(d0.getMinutes())}`;
+                    const sS = (no.startsAt || '').replace(' ', 'T').slice(0, 16), eS = (no.endsAt || '').replace(' ', 'T').slice(0, 16);
+                    const status = no.enabled === false ? 'disabled' : nowS < sS ? 'scheduled' : nowS > eS ? 'ended' : 'live';
                     return (
                       <div
                         key={no.id}
@@ -396,7 +429,7 @@ export default function AdminNotices({ theme: o }) {
                               <span style={{ color: o.dim }}>
                                 {' · ' +
                                   (no.location === 'both' ? 'Top + Report' : no.location === 'top' ? 'Top' : 'Report') +
-                                  (no.enabled === false ? ' · disabled' : '')}
+                                  ' · ' + status + (no.dismissible === false ? ' · not dismissible' : '')}
                               </span>
                             </div>
                             <div

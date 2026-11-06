@@ -151,6 +151,9 @@ function notice_payload(array $r): array {
         'endsAt'    => $r['ends_at'],
         'enabled'   => !empty($r['enabled']),
         'createdAt' => $r['created_at'] ?? null,
+        'icon'        => $r['icon'] ?? '',
+        'dismissible' => !array_key_exists('dismissible', $r) || !empty($r['dismissible']),
+        'rev'         => (int)($r['rev'] ?? 1),
     ];
 }
 function notice_norm_dt($v): ?string {
@@ -159,7 +162,9 @@ function notice_norm_dt($v): ?string {
     return $ts ? date('Y-m-d H:i:s', $ts) : null;
 }
 function notice_validate(array $b): array {
-    $type = in_array($b['type'] ?? '', ['news','important','issue'], true) ? $b['type'] : 'news';
+    $type = in_array($b['type'] ?? '', NOTICE_TYPES, true) ? $b['type'] : 'news';
+    $icon = in_array($b['icon'] ?? '', NOTICE_ICONS, true) ? $b['icon'] : '';
+    $dis  = array_key_exists('dismissible', $b) ? (int)!empty($b['dismissible']) : 1;
     $loc  = in_array($b['location'] ?? '', ['top','report','both'], true) ? $b['location'] : 'top';
     $msg  = trim((string)($b['message'] ?? ''));
     if ($msg === '') json_error('message required', 400);
@@ -168,26 +173,28 @@ function notice_validate(array $b): array {
     if (!$sa) json_error('startsAt required', 400);
     if (!$ea) json_error('endsAt required', 400);
     $en = array_key_exists('enabled', $b) ? (int)!empty($b['enabled']) : 1;
-    return [$type, $loc, $msg, $sa, $ea, $en];
+    return [$type, $loc, $msg, $sa, $ea, $en, $icon, $dis];
 }
-$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at';
+$NOTICE_COLS = 'id,type,location,message,starts_at,ends_at,enabled,created_at,icon,dismissible,rev';
+if (strpos($path, '/notices') === 0) { require_once __DIR__ . '/_core/notices.php'; notices_ensure($db); }
 if ($m === 'GET' && $path === '/notices') {
     try { $rows = $db->query("SELECT $NOTICE_COLS FROM notices ORDER BY id DESC")->fetchAll(); }
     catch (\Throwable $e) { $rows = []; }
     json_out(array_map('notice_payload', $rows));
 }
 if ($m === 'POST' && $path === '/notices') {
-    [$type,$loc,$msg,$sa,$ea,$en] = notice_validate(body());
-    $db->prepare('INSERT INTO notices (type,location,message,starts_at,ends_at,enabled) VALUES (?,?,?,?,?,?)')
-       ->execute([$type,$loc,$msg,$sa,$ea,$en]);
+    [$type,$loc,$msg,$sa,$ea,$en,$icon,$dis] = notice_validate(body());
+    $db->prepare('INSERT INTO notices (type,location,message,starts_at,ends_at,enabled,icon,dismissible) VALUES (?,?,?,?,?,?,?,?)')
+       ->execute([$type,$loc,$msg,$sa,$ea,$en,$icon,$dis]);
     $row = $db->query("SELECT $NOTICE_COLS FROM notices WHERE id=".(int)$db->lastInsertId())->fetch();
     json_out(notice_payload($row));
 }
 if ($m === 'PATCH' && preg_match('#^/notices/(\d+)$#', $path, $nm)) {
     $id = (int)$nm[1];
-    [$type,$loc,$msg,$sa,$ea,$en] = notice_validate(body());
-    $db->prepare('UPDATE notices SET type=?,location=?,message=?,starts_at=?,ends_at=?,enabled=? WHERE id=?')
-       ->execute([$type,$loc,$msg,$sa,$ea,$en,$id]);
+    [$type,$loc,$msg,$sa,$ea,$en,$icon,$dis] = notice_validate(body());
+    // every save bumps rev: browsers that dismissed the old version show it again
+    $db->prepare('UPDATE notices SET type=?,location=?,message=?,starts_at=?,ends_at=?,enabled=?,icon=?,dismissible=?,rev=rev+1 WHERE id=?')
+       ->execute([$type,$loc,$msg,$sa,$ea,$en,$icon,$dis,$id]);
     $row = $db->query("SELECT $NOTICE_COLS FROM notices WHERE id=".$id)->fetch();
     if (!$row) json_error('not found', 404);
     json_out(notice_payload($row));

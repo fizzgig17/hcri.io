@@ -370,6 +370,8 @@ function fmt(array $r, bool $spd): array {
     ];
 
     if (!empty($r['spd_data'])) $out += spd_ler_fields(json_decode($r['spd_data'], true)); // LER, from the full stored spectrum
+    require_once __DIR__ . '/_core/user_prefs.php';
+    $out['rawDownload'] = user_allows_download((int)($r['user_id'] ?? 0)); // the owner opted in to a raw-data CSV download
 
     if ($spd && !empty($r['spd_data'])) {
 

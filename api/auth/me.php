@@ -38,7 +38,7 @@ if ($action === 'me') {
 
     if (!$u) json_error('User not found', 404);
 
-    $u['is_admin'] = (int)($u['is_admin'] ?? 0); $dp=false; try{$x=$db->prepare('SELECT reports_default_private FROM users WHERE id=?');$x->execute([$p['id']]);$dp=(bool)$x->fetchColumn();}catch(\Throwable $e){} $u['reportsDefaultPrivate']=$dp; $set=[]; try{$x=$db->prepare('SELECT settings FROM users WHERE id=?');$x->execute([$p['id']]);$set=json_decode((string)$x->fetchColumn(),true)?:[];}catch(\Throwable $e){} $u['viewExplore']=(($set['viewExplore']??'cards')==='all')?'all':'cards'; $u['viewMyReports']=(($set['viewMyReports']??'cards')==='all')?'all':'cards'; $u['timezone']=$set['timezone']??'America/New_York';
+    $u['is_admin'] = (int)($u['is_admin'] ?? 0); $dp=false; try{$x=$db->prepare('SELECT reports_default_private FROM users WHERE id=?');$x->execute([$p['id']]);$dp=(bool)$x->fetchColumn();}catch(\Throwable $e){} $u['reportsDefaultPrivate']=$dp; require_once __DIR__ . '/../_core/user_prefs.php'; $u['reportsAllowDownload']=user_allows_download((int)$p['id']); $set=[]; try{$x=$db->prepare('SELECT settings FROM users WHERE id=?');$x->execute([$p['id']]);$set=json_decode((string)$x->fetchColumn(),true)?:[];}catch(\Throwable $e){} $u['viewExplore']=(($set['viewExplore']??'cards')==='all')?'all':'cards'; $u['viewMyReports']=(($set['viewMyReports']??'cards')==='all')?'all':'cards'; $u['timezone']=$set['timezone']??'America/New_York';
 
     json_out($u);
 

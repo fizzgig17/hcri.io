@@ -177,6 +177,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
   const [delKeep, setDelKeep]   = useState(true);
 
   const [reportsDefaultPrivate, setReportsDefaultPrivate] = useState(!!(user && user.reportsDefaultPrivate));
+  const [allowDownload, setAllowDownload] = useState(!!(user && user.reportsAllowDownload));
   const [viewExplore, setViewExplore]     = useState(user && user.viewExplore === 'all' ? 'all' : 'cards');
   const [viewMyReports, setViewMyReports] = useState(user && user.viewMyReports === 'all' ? 'all' : 'cards');
   const [timezone, setTimezone]           = useState((user && user.timezone) || 'America/New_York');
@@ -188,6 +189,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
     api.get('/auth/profile')
       .then(d => {
         if (d && typeof d.reportsDefaultPrivate === 'boolean') setReportsDefaultPrivate(d.reportsDefaultPrivate);
+        if (d && typeof d.reportsAllowDownload === 'boolean') setAllowDownload(d.reportsAllowDownload);
         if (d && d.timezone) setTimezone(d.timezone);
       })
       .catch(() => {});
@@ -198,6 +200,20 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .then(d => setShareTokens((d && d.tokens) || []))
       .catch(() => {});
   }, []);
+
+  async function saveAllowDownload(val) {
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action: 'reports_download', value: val });
+      setAllowDownload(!!r.reportsAllowDownload);
+      notify(val ? 'Your reports\' raw data can now be downloaded by anyone who can view them.' : 'Raw data downloads are turned off for your reports.');
+      onUserUpdate && onUserUpdate({ ...user, reportsAllowDownload: !!r.reportsAllowDownload });
+    } catch (x) {
+      notify((x && x.message) || 'Failed to save', false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveReportsDefaultPrivate(val) {
     setBusy(true); clearNotice();
@@ -492,7 +508,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
 
           {tab === 'privacy' && (
             <>
-              <label style={S.label}>Explore visibility</label>
+              <label style={{ ...S.label, marginTop:20 }}>Explore visibility</label>
               <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'4px 0' }}>
                 <input type="checkbox" checked={reportsDefaultPrivate} disabled={busy}
                   onChange={e => saveReportsDefaultPrivate(e.target.checked)}
@@ -501,6 +517,18 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   Exclude my new reports from Explore by default
                   <div style={{ fontSize:12, color:T.dim, marginTop:4 }}>
                     New uploads stay private and unlisted. You can still make any individual report public from its page, and existing reports are left unchanged.
+                  </div>
+                </span>
+              </label>
+
+              <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'10px 0 4px' }}>
+                <input type="checkbox" checked={allowDownload} disabled={busy}
+                  onChange={e => saveAllowDownload(e.target.checked)}
+                  style={{ accentColor:T.accent, width:16, height:16, marginTop:2, flexShrink:0 }} />
+                <span style={{ fontSize:13.5, color:T.text, lineHeight:1.5 }}>
+                  Let people download my reports' data
+                  <div style={{ fontSize:12, color:T.dim, marginTop:4 }}>
+                    Off by default. When on, anyone who can view one of your reports (including public reports in Explore and anyone with a share link) sees a Raw Instrument Data section with a CSV download of the instrument's headers and full spectrum. That makes your measurements much easier to copy in bulk: automated scrapers and other sites can collect, republish or reuse them, and once someone has a copy, turning this off won't take it back. Leave it off unless you want your data to be reusable.
                   </div>
                 </span>
               </label>
