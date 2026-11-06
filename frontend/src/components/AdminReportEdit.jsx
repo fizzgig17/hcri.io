@@ -52,12 +52,14 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [excluded, setExcluded] = useState(() => !(report && report.isPublic));
+  const [allowDl, setAllowDl] = useState(() => !!(report && report.allowDownload));
 
   useEffect(() => {
     setLabel((report && report.label) || '');
     setNotes((report && report.notes) || '');
     setCats(initCats());
     setExcluded(!(report && report.isPublic));
+    setAllowDl(!!(report && report.allowDownload));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report && report.id]);
 
@@ -75,7 +77,7 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
       const r = await adminFetch(`/reports/${report.id}`, {
         method: 'PATCH',
         // LED brand / LED / CCT are saved as LED groups by the editor below, not through the per-kind chips.
-        body: JSON.stringify({ label, notes, categories: Object.fromEntries(Object.entries(cats).filter(([k]) => !LED_IDS.includes(k))), isPublic: !excluded }),
+        body: JSON.stringify({ label, notes, categories: Object.fromEntries(Object.entries(cats).filter(([k]) => !LED_IDS.includes(k))), isPublic: !excluded, allowDownload: allowDl }),
       });
       setMsg('Saved ✓');
       if (onSaved) onSaved(r);
@@ -271,6 +273,13 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
         />
         <span style={{ fontSize: 13, color: excluded ? t.warn : t.dim, fontFamily: 'monospace', fontWeight: excluded ? 700 : 400 }}>
           Exclude Report From Explore
+        </span>
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14, userSelect: 'none' }}
+        title="Signed-in viewers see a Raw Instrument Data section with a CSV download on this report.">
+        <input type="checkbox" checked={allowDl} onChange={(e) => setAllowDl(e.target.checked)} style={{ accentColor: t.accent, width: 16, height: 16, cursor: 'pointer' }} />
+        <span style={{ fontSize: 13, color: allowDl ? t.warn : t.dim, fontFamily: 'monospace', fontWeight: allowDl ? 700 : 400 }}>
+          Allow raw data download
         </span>
       </label>
       <button
