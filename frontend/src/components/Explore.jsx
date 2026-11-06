@@ -2762,7 +2762,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const mobileDetailView = (
     <div className="vh-full" style={{ display: 'flex', flexDirection: 'column', background: r.bg, overflow: 'hidden' }}>
       {detailToolbar}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}<SiteFooter /></div>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>{reportDetailView}{o && <SiteFooter />}</div>
     </div>
   );
 
