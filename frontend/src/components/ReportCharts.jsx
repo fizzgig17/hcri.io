@@ -9,7 +9,7 @@
 //    real per-sample rfSamples/sampleHues when the instrument/analysis
 //    provided them (real=true), falling back to interpolating the 16
 //    hue-bin averages the way the stale version always did.
-//  - RawDataPanel: the "Raw Instrument Data" section with a CSV download. OFF by default; report pages render it only
+//  - RawDataPanel: the "Raw Instrument Data" section with a CSV download. ON by default; report pages render it only
 //    when the report's owner opted in (Account settings > Privacy, report.rawDownload).
 
 import { useRef, useEffect, useState } from 'react';

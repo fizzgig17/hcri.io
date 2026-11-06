@@ -232,6 +232,7 @@ if ($m === 'POST' && $path === '/featured') {
 }
 // Build the full admin view payload for a report (including categories).
 function admin_report_payload(PDO $db, int $rid): ?array {
+    require_once __DIR__ . '/_core/user_prefs.php'; try { user_prefs_ensure($db); } catch (\Throwable $e) {}
     $r = $db->prepare('SELECT r.*, u.name as user_name, u.email as user_email
                        FROM reports r JOIN users u ON u.id=r.user_id
                        WHERE r.id=?');

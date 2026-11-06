@@ -602,7 +602,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 <span style={{ fontSize:13.5, color:T.text, lineHeight:1.5 }}>
                   Allow raw data download on my new reports
                   <div style={{ fontSize:12, color:T.dim, marginTop:4 }}>
-                    Off by default. This is only the starting value for reports you upload from now on; you can switch any report on or off from its own page, and existing reports keep their current setting. When a report has it on, signed-in users who can view it (including public reports in Explore) see a Raw Instrument Data section with a CSV download of the instrument's headers and full spectrum. That makes your measurements much easier to copy in bulk: automated scrapers and other sites can collect, republish or reuse them, and once someone has a copy, turning this off won't take it back. Leave it off unless you want your data to be reusable.
+                    On by default. This is only the starting value for reports you upload from now on; you can switch any report on or off from its own page, and existing reports keep their current setting. When a report has it on, signed-in users who can view it (including public reports in Explore) see a Raw Instrument Data section with a CSV download of the instrument's headers and full spectrum. That makes your measurements much easier to copy in bulk: automated scrapers and other sites can collect, republish or reuse them, and once someone has a copy, turning this off won't take it back. Leave it off unless you want your data to be reusable.
                   </div>
                 </span>
               </label>
