@@ -5,7 +5,7 @@
 // "<id>:<rev>"; `rev` goes up every time the admin saves the notice, so saving shows it again to everyone. Colours come from
 // the active light/dark theme.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { basePath } from '../lib/api';
 
 export const NOTICE_TYPES = [
@@ -115,8 +115,18 @@ export function NoticeBar({ notice, theme: t, variant, onDismiss }) {
 // Site-wide notice banner(s), stacked at the very top of the page. Renders nothing when there is nothing to show.
 export function TopNotices({ theme }) {
   const [ns, dismiss] = useNotices('top');
+  const ref = useRef(null);
+  // The app's screens are sized to the window (100vh). Publish the banner's height so they can subtract it and still scroll to the bottom.
+  useEffect(() => {
+    const root = document.documentElement;
+    const set = () => root.style.setProperty('--notice-h', ((ref.current && ref.current.offsetHeight) || 0) + 'px');
+    set();
+    let ro;
+    if (ref.current && typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(set); ro.observe(ref.current); }
+    return () => { if (ro) ro.disconnect(); root.style.setProperty('--notice-h', '0px'); };
+  }, [ns.length]);
   if (!ns.length) return null;
-  return <div>{ns.map(n => <NoticeBar key={n.id} notice={n} theme={theme} variant="top" onDismiss={dismiss} />)}</div>;
+  return <div ref={ref}>{ns.map(n => <NoticeBar key={n.id} notice={n} theme={theme} variant="top" onDismiss={dismiss} />)}</div>;
 }
 
 // Notice banner(s) shown inline on a report detail page.
