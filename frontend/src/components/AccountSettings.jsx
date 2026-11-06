@@ -221,6 +221,19 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .catch(() => {});
   }, []);
 
+  async function applyAll(action, confirmText, doneText) {
+    if (!window.confirm(confirmText)) return;
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action });
+      notify(`${doneText} (${r.count} report${r.count === 1 ? '' : 's'}).`);
+    } catch (x) {
+      notify((x && x.message) || 'Failed to apply', false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function applyLicenseAll() {
     const name = (licenseInfo(defLicense).short);
     if (!window.confirm(`Set the license on ALL of your existing reports to "${name}"? This replaces whatever license each report has now.`)) return;
@@ -569,6 +582,16 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
+              <div style={{ marginTop:8 }}>
+                <button style={S.btn()} disabled={busy}
+                  onClick={() => applyAll('apply_explore_all',
+                    reportsDefaultPrivate
+                      ? 'Remove ALL of your existing reports from Explore? Anyone who only found them there will no longer see them. Share links keep working.'
+                      : 'Make ALL of your existing reports public in Explore? Anyone can then find them. This replaces the setting on each report.',
+                    reportsDefaultPrivate ? 'All your reports are now excluded from Explore' : 'All your reports are now public in Explore')}>
+                  {reportsDefaultPrivate ? 'Exclude all my existing reports from Explore' : 'Make all my existing reports public'}
+                </button>
+              </div>
               </Collapse>
 
               <Collapse T={T} title="Raw data download" summary={allowDownload ? 'On for new reports' : 'Off for new reports'}>
@@ -583,6 +606,16 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
+              <div style={{ marginTop:8 }}>
+                <button style={S.btn()} disabled={busy}
+                  onClick={() => applyAll('apply_download_all',
+                    allowDownload
+                      ? 'Turn raw data download ON for ALL of your existing reports? Signed-in viewers will be able to download their data. This replaces the setting on each report.'
+                      : 'Turn raw data download OFF for ALL of your existing reports? This replaces the setting on each report.',
+                    allowDownload ? 'Raw data download is on for all your reports' : 'Raw data download is off for all your reports')}>
+                  {allowDownload ? 'Turn on for all my existing reports' : 'Turn off for all my existing reports'}
+                </button>
+              </div>
               </Collapse>
 
               <Collapse T={T} title="License for my reports" summary={licenseInfo(defLicense).short}>
