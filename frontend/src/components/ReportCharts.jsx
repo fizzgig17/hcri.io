@@ -210,6 +210,11 @@ export function CESBars({ rfBins, rfSamples, sampleHues, theme: T = {}, noHelp }
 // to download both as a CSV. Renders nothing if there's neither.
 export function RawDataPanel({ headers, wls, vals, label, license, C: T, isMobile }) {
   const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  // Opening the section scrolls it into view so the table is visible without hunting for it.
+  useEffect(() => {
+    if (open && boxRef.current && boxRef.current.scrollIntoView) boxRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [open]);
   const entries = headers && typeof headers === 'object' ? Object.entries(headers) : [];
   const hasSpectral = Array.isArray(wls) && Array.isArray(vals) && wls.length > 0;
   if (entries.length === 0 && !hasSpectral) return null;
@@ -233,7 +238,7 @@ export function RawDataPanel({ headers, wls, vals, label, license, C: T, isMobil
 
   const canExpand = entries.length > 0 || hasSpectral;
   return (
-    <div style={{ marginTop: 16, border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+    <div ref={boxRef} style={{ marginTop: 16, border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
       <div
         onClick={() => canExpand && setOpen((o) => !o)}
         style={{
