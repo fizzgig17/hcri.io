@@ -1080,7 +1080,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
               </div>
             )}
 
-            {(isGuest || isShared) && report?.id && licNow && (
+            {(isGuest || isShared) && report?.id && (
               <div style={{ padding: '6px 22px', borderBottom: `1px solid ${U.border}`, background: U.surface, fontSize: 12, fontFamily: 'monospace', color: U.dim }}>
                 License: {licenseInfo(licNow).url
                   ? <a href={licenseInfo(licNow).url} target="_blank" rel="noopener noreferrer" style={{ color: U.accent }}>{licenseInfo(licNow).short}</a>
