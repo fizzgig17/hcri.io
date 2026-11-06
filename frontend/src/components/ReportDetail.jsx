@@ -1160,7 +1160,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <div style={{ height: 40 }} />
                 </div>
 
-                {rawOn && !isGuest && (
+                {rawOn && !!getToken() && (
                   <div style={{ padding: '0 14px 40px' }}>
                     <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
                   </div>
@@ -1219,7 +1219,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
                 </div>
 
-                {rawOn && !isGuest && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
+                {rawOn && !!getToken() && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>
