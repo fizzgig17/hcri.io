@@ -679,6 +679,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [rawSaving, setRawSaving] = useState(false);
   const [licLocal, setLicLocal] = useState(null); // null = follow the report data
   const [licSaving, setLicSaving] = useState(false);
+  const [ctlOpen, setCtlOpen] = useState(false); // the Sharing & data bar starts folded
   const licNow = licLocal !== null ? licLocal : (report && report.license) || '';
   const [shareBusy, setShareBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1013,7 +1014,15 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
             )}
 
             {!isGuest && report?.id && (
-              <div style={{ padding: '6px 22px 10px', borderBottom: `1px solid ${U.border}`, display: 'flex', alignItems: 'center', gap: 10, background: U.surface }}>
+              <div style={{ padding: '0 22px', borderBottom: `1px solid ${U.border}`, background: U.surface }}>
+                <button type="button" onClick={() => setCtlOpen((o) => !o)} aria-expanded={ctlOpen}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 0', cursor: 'pointer', textAlign: 'left', color: U.dim, fontFamily: 'monospace', fontSize: 12 }}>
+                  <span style={{ fontSize: 11 }}>{ctlOpen ? '▾' : '▸'}</span>
+                  <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, fontSize: 11 }}>Sharing &amp; data</span>
+                  {!ctlOpen && <span style={{ marginLeft: 'auto', textAlign: 'right' }}>{`Explore: ${isPublic ? 'included' : 'excluded'} · Raw data download: ${rawOn ? 'on' : 'off'} · License: ${licenseInfo(licNow).short}`}</span>}
+                </button>
+                {ctlOpen && (
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '0 0 10px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
                   <input
                     type="checkbox"
@@ -1065,6 +1074,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                     <LicenseSelect T={U} value={licNow} disabled={licSaving}
                       onChange={async (v) => { setLicSaving(true); try { await saveMeta({ license: v }); setLicLocal(v); } catch {} finally { setLicSaving(false); } }} />
                   </span>
+                )}
+                  </div>
                 )}
               </div>
             )}

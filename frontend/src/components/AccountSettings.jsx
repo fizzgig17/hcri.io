@@ -160,6 +160,22 @@ function basePathForTokens() {
 }
 
 // ── Main account/settings modal (bundle: `k`) ──────────────────────────────
+// A titled section that opens and closes; the closed header shows a one-line summary of the current setting.
+function Collapse({ T, title, summary, children, open: startOpen = false }) {
+  const [open, setOpen] = useState(startOpen);
+  return (
+    <div style={{ borderTop:`1px solid ${T.border}`, padding:'2px 0' }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        style={{ display:'flex', alignItems:'center', gap:8, width:'100%', background:'none', border:'none', padding:'10px 0', cursor:'pointer', textAlign:'left', color:T.text, fontFamily:'inherit' }}>
+        <span style={{ color:T.dim, fontSize:11, width:12 }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontSize:11, textTransform:'uppercase', letterSpacing:1, fontWeight:700, color:T.dim }}>{title}</span>
+        {!open && summary && <span style={{ fontSize:12, color:T.dim, marginLeft:'auto', textAlign:'right' }}>{summary}</span>}
+      </button>
+      {open && <div style={{ paddingBottom:12 }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function AccountSettings({ user, onClose, onUserUpdate }) {
   const { theme: T } = useTheme();
   const [tab, setTab] = useState('password');
@@ -540,7 +556,8 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
 
           {tab === 'privacy' && (
             <>
-              <label style={{ ...S.label, marginTop:20 }}>Explore visibility</label>
+              <div style={{ height:6 }} />
+              <Collapse T={T} title="Explore visibility" summary={reportsDefaultPrivate ? 'New reports excluded' : 'New reports are public'}>
               <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'4px 0' }}>
                 <input type="checkbox" checked={reportsDefaultPrivate} disabled={busy}
                   onChange={e => saveReportsDefaultPrivate(e.target.checked)}
@@ -552,8 +569,10 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
+              </Collapse>
 
-              <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'10px 0 4px' }}>
+              <Collapse T={T} title="Raw data download" summary={allowDownload ? 'On for new reports' : 'Off for new reports'}>
+              <label style={{ display:'flex', alignItems:'flex-start', gap:10, cursor:'pointer', padding:'4px 0' }}>
                 <input type="checkbox" checked={allowDownload} disabled={busy}
                   onChange={e => saveAllowDownload(e.target.checked)}
                   style={{ accentColor:T.accent, width:16, height:16, marginTop:2, flexShrink:0 }} />
@@ -564,19 +583,19 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
+              </Collapse>
 
-              <label style={{ ...S.label, marginTop:16 }}>License for my reports</label>
+              <Collapse T={T} title="License for my reports" summary={licenseInfo(defLicense).short}>
               <div style={{ fontSize:12, color:T.dim, lineHeight:1.5, marginBottom:8 }}>
                 The starting license for reports you upload from now on. "All rights reserved" is the default. You can change the license on any report from its own page, and existing reports keep theirs.
               </div>
-              <LicenseSelect T={T} value={defLicense} disabled={busy} onChange={saveDefLicense} style={{ fontSize:13, padding:'8px 10px' }} />
+              <LicenseSelect T={T} block value={defLicense} disabled={busy} onChange={saveDefLicense} style={{ fontSize:13, padding:'8px 10px' }} />
               <div style={{ marginTop:8 }}>
                 <button style={S.btn()} disabled={busy} onClick={applyLicenseAll}>Apply to all my existing reports</button>
               </div>
+              </Collapse>
 
-              <div style={{ height:1, background:T.border, margin:'18px 0 4px' }} />
-
-              <label style={S.label}>Your data</label>
+              <Collapse T={T} title="Your data" summary="Export or delete your account">
               <div style={{ fontSize:12.5, color:T.dim, lineHeight:1.5, marginBottom:10 }}>
                 Download everything we hold about your account, or permanently delete your account.
               </div>
@@ -660,6 +679,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 {' · '}
                 <a href="/terms" target="_blank" rel="opener" style={{ color:T.accent, textDecoration:'none' }}>Terms</a>
               </div>
+              </Collapse>
             </>
           )}
         </div>
