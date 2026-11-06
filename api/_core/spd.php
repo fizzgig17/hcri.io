@@ -156,7 +156,7 @@ function calc_rf_rg(array $spd, float $cct, array $instrumentMeta=[]): array {
 
     // ── Build reference illuminant SPD ────────────────────────────────────────
 
-    $__Tr = max(1667.0, min(25000.0, $cct));
+    $__Tr = max(1000.0, min(25000.0, $cct));
 
     // TM-30 / CIE reference: Planckian <=4000K, CIE daylight >=5000K, blend between (each normalised to 1 at 560nm before blending).
 
@@ -1338,7 +1338,7 @@ function calc_cri(array $spd, float $cct): array {
 
     $TCS = get_tcs_reflectances();
 
-    $Tref = max(1667.0, min(25000.0, $cct));
+    $Tref = max(1000.0, min(25000.0, $cct));
 
     // CIE 13.3: Planckian reference below 5000K, CIE daylight at/above 5000K.
 
@@ -1514,6 +1514,14 @@ function _planck_uv_hires(float $Tk): array {
 
 function calc_cct_duv_hires(array $wls, array $vals): array {
 
+    // Coarse (>=2.5 nm) data: integrate it as measured. Re-sampling a narrow peak to 1 nm shifts xy slightly,
+    // and very warm / narrow-band sources are hypersensitive to that (CCT and Duv moved by ~20 K / 0.001).
+    $__n=count($wls);
+    if($__n>1 && ($wls[$__n-1]-$wls[0])/($__n-1) >= 2.5){
+        $__s=spd_to_xyz(interpolate_spd($wls,$vals)); $__xy=xyz_to_xy($__s); $__c=calc_cct_duv($__xy['x'],$__xy['y']);
+        return ['x'=>$__xy['x'],'y'=>$__xy['y'],'cct'=>$__c['cct'],'duv'=>$__c['duv']];
+    }
+
     $xy=_xy_hires($wls,$vals); $x=$xy['x'];$y=$xy['y']; $d=-2*$x+12*$y+3; $u=4*$x/$d;$v=6*$y/$d;
 
     $seed=calc_cct($x,$y); $seed=max(1100.0,min(24000.0,$seed)); $bestT=$seed;$bestD2=INF;
@@ -1572,7 +1580,7 @@ function calc_cri_hires(array $wls, array $vals, float $cct): array {
 
     $test=[]; for($i=0;$i<401;$i++){ $test[]=_spd_interp_at($wls,$vals,(float)(380+$i)); }
 
-    $Tref=max(1667.0,min(25000.0,$cct));
+    $Tref=max(1000.0,min(25000.0,$cct));
 
     $ref=$Tref>=5000.0?_daylight1nm($Tref):_blackbody1nm($Tref);
 
