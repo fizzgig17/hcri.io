@@ -150,7 +150,7 @@ if (!empty($r['spd_data'])) {
 
     $out += spd_ler_fields($pairs); // LER, from the full stored spectrum
     require_once __DIR__ . '/_core/user_prefs.php';
-    $out['rawDownload'] = false; // share-link pages are for logged-out visitors: raw data is never offered there
+    $out['license'] = report_license((int)($r['id'] ?? 0)); $out['rawDownload'] = false; // share-link pages are for logged-out visitors: raw data is never offered there
 
     $out['wls']  = is_array($pairs) ? array_column($pairs, 0) : null;
 

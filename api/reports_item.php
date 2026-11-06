@@ -371,7 +371,7 @@ function fmt(array $r, bool $spd): array {
 
     if (!empty($r['spd_data'])) $out += spd_ler_fields(json_decode($r['spd_data'], true)); // LER, from the full stored spectrum
     require_once __DIR__ . '/_core/user_prefs.php';
-    $out['rawDownload'] = report_allows_download((int)($r['id'] ?? 0)); // the owner switched on raw-data download for this report
+    $out['license'] = report_license((int)($r['id'] ?? 0)); $out['rawDownload'] = report_allows_download((int)($r['id'] ?? 0)); // the owner switched on raw-data download for this report
 
     if ($spd && !empty($r['spd_data'])) {
 
@@ -408,6 +408,14 @@ if ($m === 'PATCH') {
 
     $b = body();
 
+    if (array_key_exists('license', $b)) {
+        get_report($db, $id, $user['id']); // ownership check
+        require_once __DIR__ . '/_core/user_prefs.php';
+        user_prefs_ensure($db);
+        $lic = license_clean($b['license']);
+        $db->prepare('UPDATE reports SET license=? WHERE id=? AND user_id=?')->execute([$lic, $id, $user['id']]);
+        json_out(['ok' => true, 'license' => $lic]);
+    }
     if (array_key_exists('allowDownload', $b)) {
         get_report($db, $id, $user['id']); // ownership check
         require_once __DIR__ . '/_core/user_prefs.php';

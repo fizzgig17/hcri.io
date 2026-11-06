@@ -302,6 +302,7 @@ function admin_report_payload(PDO $db, int $rid): ?array {
         'leds'         => report_leds_get($db, $rid),
         'isPublic'     => !empty($row['is_public']),
         'allowDownload'=> !empty($row['allow_download']),
+        'license'      => (function($v){ require_once __DIR__ . '/_core/user_prefs.php'; return license_clean((string)$v); })($row['license'] ?? ''),
     ];
     if (!empty($row['spd_data'])) {
         $pairs       = json_decode($row['spd_data'], true);
@@ -326,6 +327,7 @@ if ($m === 'PATCH' && preg_match('#^/reports/([A-Za-z0-9]+)$#', $path, $rm)) {
     if (array_key_exists('label', $b))        { $sets[] = 'label=?';        $params[] = trim((string)$b['label']); }
     if (array_key_exists('notes', $b))        { $sets[] = 'notes=?';        $params[] = (string)$b['notes']; }
     if (array_key_exists('isPublic', $b))     { $sets[] = 'is_public=?';   $params[] = $b['isPublic'] ? 1 : 0; }
+    if (array_key_exists('license', $b)) { require_once __DIR__ . '/_core/user_prefs.php'; user_prefs_ensure($db); $sets[] = 'license=?'; $params[] = license_clean($b['license']); }
     if (array_key_exists('allowDownload', $b)) { require_once __DIR__ . '/_core/user_prefs.php'; user_prefs_ensure($db); $sets[] = 'allow_download=?'; $params[] = $b['allowDownload'] ? 1 : 0; }
     if ($sets) { $params[] = $rid; $db->prepare('UPDATE reports SET '.implode(',', $sets).' WHERE id=?')->execute($params); }
     $hasLeds = isset($b['leds']) && is_array($b['leds']);

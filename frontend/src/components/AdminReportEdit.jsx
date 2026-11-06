@@ -14,6 +14,7 @@ import LedGroupsEditor from './LedGroupsEditor.jsx';
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 import { RawDataPanel } from './ReportCharts.jsx';
+import LicenseSelect from './LicenseSelect.jsx';
 
 async function adminFetch(path, opts = {}) {
   const res = await fetch(`${basePath()}index.php/api/admin${path}`, {
@@ -54,6 +55,7 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
   const [msg, setMsg] = useState('');
   const [excluded, setExcluded] = useState(() => !(report && report.isPublic));
   const [allowDl, setAllowDl] = useState(() => !!(report && report.allowDownload));
+  const [lic, setLic] = useState(() => (report && report.license) || '');
 
   useEffect(() => {
     setLabel((report && report.label) || '');
@@ -61,6 +63,7 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
     setCats(initCats());
     setExcluded(!(report && report.isPublic));
     setAllowDl(!!(report && report.allowDownload));
+    setLic((report && report.license) || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report && report.id]);
 
@@ -78,7 +81,7 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
       const r = await adminFetch(`/reports/${report.id}`, {
         method: 'PATCH',
         // LED brand / LED / CCT are saved as LED groups by the editor below, not through the per-kind chips.
-        body: JSON.stringify({ label, notes, categories: Object.fromEntries(Object.entries(cats).filter(([k]) => !LED_IDS.includes(k))), isPublic: !excluded, allowDownload: allowDl }),
+        body: JSON.stringify({ label, notes, categories: Object.fromEntries(Object.entries(cats).filter(([k]) => !LED_IDS.includes(k))), isPublic: !excluded, allowDownload: allowDl, license: lic }),
       });
       setMsg('Saved ✓');
       if (onSaved) onSaved(r);
@@ -283,10 +286,13 @@ export default function AdminReportEdit({ report, T: t, onSaved }) {
           Allow raw data download
         </span>
       </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13, fontFamily: 'monospace', color: t.dim }}>
+        License <LicenseSelect T={t} value={lic} onChange={setLic} style={{ fontSize: 13, padding: '8px 10px' }} />
+      </div>
       {report && report.wls && (
         <div style={{ marginBottom: 14 }}>
           {/* Admins can always download the raw data here, whatever the report's own switch says. */}
-          <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={t} />
+          <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} license={lic} C={t} />
         </div>
       )}
       <button

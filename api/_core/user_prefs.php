@@ -22,6 +22,35 @@ function user_prefs_ensure(PDO $db): void {
     if (!isset($have['allow_download'])) {
         $db->exec('ALTER TABLE reports ADD COLUMN allow_download TINYINT(1) NOT NULL DEFAULT 0');
     }
+    if (!isset($have['license'])) {
+        $db->exec("ALTER TABLE reports ADD COLUMN license VARCHAR(16) NOT NULL DEFAULT ''");
+    }
+    $uh = [];
+    foreach ($db->query('SHOW COLUMNS FROM users')->fetchAll() as $c) $uh[$c['Field']] = true;
+    if (!isset($uh['reports_license'])) {
+        $db->exec("ALTER TABLE users ADD COLUMN reports_license VARCHAR(16) NOT NULL DEFAULT ''");
+    }
+}
+
+// Licenses a report can carry. '' = none chosen = all rights reserved.
+const REPORT_LICENSES = ['', 'cc0', 'by', 'by-sa', 'by-nc', 'by-nd', 'by-nc-sa', 'by-nc-nd'];
+function license_clean($v): string {
+    $v = is_string($v) ? strtolower(trim($v)) : '';
+    return in_array($v, REPORT_LICENSES, true) ? $v : '';
+}
+function report_license(int $reportId): string {
+    try {
+        $db = get_db(); user_prefs_ensure($db);
+        $q = $db->prepare('SELECT license FROM reports WHERE id=?'); $q->execute([$reportId]);
+        return license_clean((string)$q->fetchColumn());
+    } catch (\Throwable $e) { return ''; }
+}
+function user_default_license(int $userId): string {
+    try {
+        $db = get_db(); user_prefs_ensure($db);
+        $q = $db->prepare('SELECT reports_license FROM users WHERE id=?'); $q->execute([$userId]);
+        return license_clean((string)$q->fetchColumn());
+    } catch (\Throwable $e) { return ''; }
 }
 
 function user_allows_download(int $userId): bool {
@@ -50,9 +79,15 @@ function report_allows_download(int $reportId): bool {
 
 // Call right after a report row is created: it starts with the owner's default.
 function report_apply_download_default(int $reportId, int $userId): void {
-    if ($reportId <= 0 || !user_allows_download($userId)) return;
+    if ($reportId <= 0) return;
     try {
         $db = get_db();
-        $db->prepare('UPDATE reports SET allow_download=1 WHERE id=? AND user_id=?')->execute([$reportId, $userId]);
+        if (user_allows_download($userId)) {
+            $db->prepare('UPDATE reports SET allow_download=1 WHERE id=? AND user_id=?')->execute([$reportId, $userId]);
+        }
+        $lic = user_default_license($userId);
+        if ($lic !== '') {
+            $db->prepare('UPDATE reports SET license=? WHERE id=? AND user_id=?')->execute([$lic, $reportId, $userId]);
+        }
     } catch (\Throwable $e) {}
 }

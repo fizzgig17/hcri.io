@@ -51,6 +51,8 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getToken } from '../lib/api';
+import LicenseSelect from './LicenseSelect.jsx';
+import { licenseInfo } from '../lib/licenses.js';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { fmtTZ } from '../lib/tz';
@@ -675,6 +677,9 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
   const [rawLocal, setRawOn] = useState(null);
   const rawOn = rawLocal !== null ? rawLocal : !!(report && report.rawDownload);
   const [rawSaving, setRawSaving] = useState(false);
+  const [licLocal, setLicLocal] = useState(null); // null = follow the report data
+  const [licSaving, setLicSaving] = useState(false);
+  const licNow = licLocal !== null ? licLocal : (report && report.license) || '';
   const [shareBusy, setShareBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   usePanelBackClose(helpOpen, () => setHelpOpen(false));
@@ -696,6 +701,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
     setShareToken(report?.shareToken || null);
     setIsPublic(report?.isPublic || false);
     setRawOn(null);
+    setLicLocal(null);
   }, [report?.id]);
 
   if (!report) {
@@ -1053,6 +1059,21 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                     </span>
                   </label>
                 )}
+                {!isShared && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 18 }}>
+                    <span style={{ fontSize: 12, color: U.dim, fontFamily: 'monospace' }}>{licSaving ? 'Saving…' : 'License'}</span>
+                    <LicenseSelect T={U} value={licNow} disabled={licSaving}
+                      onChange={async (v) => { setLicSaving(true); try { await saveMeta({ license: v }); setLicLocal(v); } catch {} finally { setLicSaving(false); } }} />
+                  </span>
+                )}
+              </div>
+            )}
+
+            {(isGuest || isShared) && report?.id && licNow && (
+              <div style={{ padding: '6px 22px', borderBottom: `1px solid ${U.border}`, background: U.surface, fontSize: 12, fontFamily: 'monospace', color: U.dim }}>
+                License: {licenseInfo(licNow).url
+                  ? <a href={licenseInfo(licNow).url} target="_blank" rel="noopener noreferrer" style={{ color: U.accent }}>{licenseInfo(licNow).short}</a>
+                  : licenseInfo(licNow).short}
               </div>
             )}
 
@@ -1164,7 +1185,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
 
                 {rawOn && !!getToken() && (
                   <div style={{ padding: '0 14px 40px' }}>
-                    <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />
+                    <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} license={licLocal !== null ? licLocal : report.license} C={U} />
                   </div>
                 )}
 
@@ -1221,7 +1242,7 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                   <CESBars rfBins={rfBins} rfSamples={report.rfSamples} sampleHues={report.sampleHues} theme={T} />
                 </div>
 
-                {rawOn && !!getToken() && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
+                {rawOn && !!getToken() && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} license={licLocal !== null ? licLocal : report.license} C={U} />}
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>

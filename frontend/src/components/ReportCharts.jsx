@@ -14,6 +14,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import HelpTip from './HelpTip.jsx';
+import { licenseInfo } from '../lib/licenses.js';
 
 // Approximate color for a hue angle (degrees), used to tint each of the
 // 16 hue-bin bars / 99 CES-sample bars by its own hue.
@@ -207,7 +208,7 @@ export function CESBars({ rfBins, rfSamples, sampleHues, theme: T = {}, noHelp }
 // RawDataPanel: a collapsible section listing the instrument's raw header
 // key/value pairs and the full wavelength/intensity table, with a button
 // to download both as a CSV. Renders nothing if there's neither.
-export function RawDataPanel({ headers, wls, vals, label, C: T, isMobile }) {
+export function RawDataPanel({ headers, wls, vals, label, license, C: T, isMobile }) {
   const [open, setOpen] = useState(false);
   const entries = headers && typeof headers === 'object' ? Object.entries(headers) : [];
   const hasSpectral = Array.isArray(wls) && Array.isArray(vals) && wls.length > 0;
@@ -217,6 +218,8 @@ export function RawDataPanel({ headers, wls, vals, label, C: T, isMobile }) {
     ev?.stopPropagation?.();
     const name = (label || 'spectral_data').replace(/[^a-zA-Z0-9_-]/g, '_');
     const lines = [];
+    const lic = licenseInfo(license);
+    lines.push('# License,' + lic.short + (lic.url ? ' ' + lic.url : ''));
     entries.forEach(([k, v]) => lines.push('# ' + k + ',' + v));
     lines.push('Wavelength (nm),Intensity');
     if (hasSpectral) for (let i = 0; i < wls.length; i++) lines.push(wls[i] + ',' + vals[i]);

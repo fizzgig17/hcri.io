@@ -8,6 +8,7 @@
 // setting, a timezone picker, GDPR-style data export/account deletion, and
 // share-link management, none of which existed before.
 
+import LicenseSelect from './LicenseSelect.jsx';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { api, setToken } from '../lib/api';
@@ -178,6 +179,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
 
   const [reportsDefaultPrivate, setReportsDefaultPrivate] = useState(!!(user && user.reportsDefaultPrivate));
   const [allowDownload, setAllowDownload] = useState(!!(user && user.reportsAllowDownload));
+  const [defLicense, setDefLicense] = useState((user && user.reportsLicense) || '');
   const [viewExplore, setViewExplore]     = useState(user && user.viewExplore === 'all' ? 'all' : 'cards');
   const [viewMyReports, setViewMyReports] = useState(user && user.viewMyReports === 'all' ? 'all' : 'cards');
   const [timezone, setTimezone]           = useState((user && user.timezone) || 'America/New_York');
@@ -190,6 +192,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .then(d => {
         if (d && typeof d.reportsDefaultPrivate === 'boolean') setReportsDefaultPrivate(d.reportsDefaultPrivate);
         if (d && typeof d.reportsAllowDownload === 'boolean') setAllowDownload(d.reportsAllowDownload);
+        if (d && typeof d.reportsLicense === 'string') setDefLicense(d.reportsLicense);
         if (d && d.timezone) setTimezone(d.timezone);
       })
       .catch(() => {});
@@ -200,6 +203,20 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .then(d => setShareTokens((d && d.tokens) || []))
       .catch(() => {});
   }, []);
+
+  async function saveDefLicense(val) {
+    setBusy(true); clearNotice();
+    try {
+      const r = await api.post('/auth/profile', { action: 'reports_license', value: val });
+      setDefLicense(r.reportsLicense || '');
+      notify('Default license saved. It applies to reports you upload from now on.');
+      onUserUpdate && onUserUpdate({ ...user, reportsLicense: r.reportsLicense || '' });
+    } catch (x) {
+      notify((x && x.message) || 'Failed to save', false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveAllowDownload(val) {
     setBusy(true); clearNotice();
@@ -532,6 +549,12 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
+
+              <label style={{ ...S.label, marginTop:16 }}>License for my reports</label>
+              <div style={{ fontSize:12, color:T.dim, lineHeight:1.5, marginBottom:8 }}>
+                The starting license for reports you upload from now on. "All rights reserved" is the default. You can change the license on any report from its own page, and existing reports keep theirs.
+              </div>
+              <LicenseSelect T={T} value={defLicense} disabled={busy} onChange={saveDefLicense} style={{ fontSize:13, padding:'8px 10px' }} />
 
               <div style={{ height:1, background:T.border, margin:'18px 0 4px' }} />
 
