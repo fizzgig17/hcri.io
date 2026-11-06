@@ -1222,6 +1222,8 @@ export default function ReportDetail({ report, allReports = [], isGuest = false,
                 </div>
 
                 {rawOn && !!getToken() && <RawDataPanel headers={report.rawHeaders} wls={report.wls} vals={report.vals} label={report.label} C={U} />}
+                {/* TEMP-DIAG (remove): admin-only readout while chasing the missing raw-data bar */}
+                {isAdmin && <div style={{ padding: '6px 22px', fontSize: 11, fontFamily: 'monospace', color: U.dim }}>diag raw: rawOn={String(rawOn)} rawLocal={String(rawLocal)} report.rawDownload={String(report.rawDownload)} token={String(!!getToken())} wls={String((report.wls||[]).length)} hdr={String(!!report.rawHeaders)} id={String(report.id)}</div>}
 
                 <FlickerSection report={report} T={T} canEdit={!isGuest && !isShared} />
               </>
