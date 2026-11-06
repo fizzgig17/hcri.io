@@ -5,6 +5,7 @@
 // own chart. Upload a CSV (first column minutes, one column per light) or delete curves. Curves are private to you.
 // History: a light's page is `?explore=runtime&rt=<id>`, so Back and refresh work like the rest of the app.
 
+import { redirectCmpToShared } from '../lib/runtimeLink.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
@@ -371,7 +372,7 @@ export default function RuntimeTab({ T, isAdmin }) {
     if (!list || !comparing) return;
     const ok = sel.filter((id) => list.some((c) => c.id === id));
     if (ok.length !== sel.length) setSel(ok);
-    if (ok.length < 2) setComparing(false);
+    if (ok.length < 2) { setComparing(false); redirectCmpToShared(); }  // not your lights: open the public comparison page
   }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const sc = scroller();

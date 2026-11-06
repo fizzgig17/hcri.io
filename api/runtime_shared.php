@@ -22,16 +22,16 @@ $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
 if (rl_count('runtime_shared', $ip, 60) > 120) json_error('Too many requests, try again in a minute', 429);
 rl_hit('runtime_shared', $ip, 60);
 
-$toks = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_GET['t'] ?? ''))), 'runtime_valid_share_token')));
+$toks = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_GET['t'] ?? ''))), fn($t) => runtime_valid_share_token($t) || runtime_curve_valid_id($t))));
 if (!$toks) json_error('No valid share token', 400);
 $toks = array_slice($toks, 0, 12);
 
 $db = get_db();
 runtime_curves_ensure($db);
-$s = $db->prepare('SELECT label, group_name, unit, interval_s, points, payload, meta, temps FROM runtime_curves WHERE share_token = ?');
+$s = $db->prepare('SELECT label, group_name, unit, interval_s, points, payload, meta, temps FROM runtime_curves WHERE share_token = ? OR curve_id = ? LIMIT 1');
 $items = [];
 foreach ($toks as $t) {
-    $s->execute([$t]);
+    $s->execute([$t, $t]);
     $r = $s->fetch();
     if (!$r) continue;
     $v = json_decode((string)$r['payload'], true);
