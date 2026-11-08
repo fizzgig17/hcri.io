@@ -192,6 +192,8 @@ if ($uri === '/privacy' || $uri === '/privacy.html' || $uri === '/terms' || $uri
 if (str_starts_with($uri, '/api/')) {
     require_once __DIR__ . '/api/_core/rate_limit.php';
     if (($rg = hcri_rate_group($uri)) !== null) hcri_rate_limit($rg, $uri);
+    require_once __DIR__ . '/api/_core/api_log.php';
+    hcri_api_log_start($uri);
 
     if (preg_match('#^/api/auth/(login|register|me|reset_request|reset_confirm|resend_verification)$#', $uri, $m)) {
 

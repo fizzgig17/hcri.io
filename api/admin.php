@@ -24,6 +24,19 @@ $m     = $_SERVER['REQUEST_METHOD'];
 $uri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $path = preg_replace('#^.*?/api/admin#', '', $uri);
 // POST /api/admin/categories/rename — { id, value }
+// Latest API requests by signed-in accounts (see _core/api_log.php).
+if ($m === 'GET' && $path === '/api_log') {
+    require_once __DIR__ . '/_core/api_log.php';
+    try {
+        hcri_api_log_ensure($db);
+        $rows = $db->query('SELECT l.id, l.ts, l.user_id, l.method, l.path, l.status, u.name, u.email FROM api_log l LEFT JOIN users u ON u.id = l.user_id ORDER BY l.id DESC LIMIT ' . HCRI_API_LOG_KEEP)->fetchAll();
+    } catch (\Throwable $e) { $rows = []; }
+    json_out(['keep' => HCRI_API_LOG_KEEP, 'entries' => array_map(fn($r) => [
+        'id' => (int)$r['id'], 'ts' => (int)$r['ts'], 'userId' => (int)$r['user_id'], 'user' => (string)($r['name'] ?: $r['email'] ?: ('user ' . $r['user_id'])),
+        'email' => (string)($r['email'] ?? ''), 'method' => $r['method'], 'url' => $r['path'], 'status' => (int)$r['status'],
+    ], $rows)]);
+}
+
 if ($m === 'POST' && $path === '/categories/rename') {
     $b = body();
     $id = (int)($b['id'] ?? 0);

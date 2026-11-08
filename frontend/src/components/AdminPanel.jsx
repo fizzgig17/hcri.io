@@ -35,6 +35,7 @@ import { useTheme } from '../lib/ThemeContext.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
 import AdminFeatured from './AdminFeatured.jsx';
 import AdminNotices from './AdminNotices.jsx';
+import AdminApiLog from './AdminApiLog.jsx';
 import AdminCats from './AdminCats.jsx';
 import AdminReportModal from './AdminReportModal.jsx';
 import CreateUserModal from './CreateUserModal.jsx';
@@ -261,6 +262,7 @@ export default function AdminPanel({ onClose, me }) {
           <AdminCats theme={t} />
           <AdminNotices theme={t} />
           <AdminFeatured theme={t} />
+          <AdminApiLog theme={t} />
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.dim, fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
