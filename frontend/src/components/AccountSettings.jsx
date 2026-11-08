@@ -367,7 +367,10 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
     input: { width:'100%', background:T.surface, border:`1px solid ${T.border}`, color:T.text, borderRadius:5, padding:'8px 10px', fontSize:13, fontFamily:'monospace', boxSizing:'border-box', marginBottom:12 },
     btn: (kind = 'primary') => ({
       width:'100%', padding:9, borderRadius:5, border:'none', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:'monospace',
-      background: kind === 'primary' ? T.accent : T.surface, color: kind === 'primary' ? '#000' : T.dim, opacity: busy ? 0.5 : 1,
+      background: kind === 'primary' ? T.accent : kind === 'good' ? `${T.good}22` : kind === 'bad' ? `${T.bad}22` : T.surface,
+      color: kind === 'primary' ? '#000' : kind === 'good' ? T.good : kind === 'bad' ? T.bad : T.dim,
+      border: kind === 'good' ? `1px solid ${T.good}` : kind === 'bad' ? `1px solid ${T.bad}` : 'none',
+      opacity: busy ? 0.5 : 1,
     }),
     notice: ok => ({ padding:'8px 12px', borderRadius:5, fontSize:12, marginBottom:12, background: ok ? `${T.good}18` : `${T.bad}18`, color: ok ? T.good : T.bad, border:`1px solid ${ok ? T.good + '40' : T.bad + '40'}` }),
   };
@@ -583,13 +586,13 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 </span>
               </label>
               <div style={{ marginTop:8, display:'flex', gap:8, flexWrap:'wrap' }}>
-                <button style={S.btn()} disabled={busy}
+                <button style={{ ...S.btn('good'), flex:1, minWidth:180 }} disabled={busy}
                   onClick={() => applyAll('apply_explore_all',
                     'Make ALL of your existing reports public in Explore? Anyone can then find them. This replaces the setting on each report.',
                     'All your reports are now public in Explore', false)}>
                   Make all my existing reports public
                 </button>
-                <button style={S.btn()} disabled={busy}
+                <button style={{ ...S.btn('bad'), flex:1, minWidth:180 }} disabled={busy}
                   onClick={() => applyAll('apply_explore_all',
                     'Remove ALL of your existing reports from Explore? Anyone who only found them there will no longer see them. Share links keep working.',
                     'All your reports are now excluded from Explore', true)}>
@@ -611,13 +614,13 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 </span>
               </label>
               <div style={{ marginTop:8, display:'flex', gap:8, flexWrap:'wrap' }}>
-                <button style={S.btn()} disabled={busy}
+                <button style={{ ...S.btn('good'), flex:1, minWidth:180 }} disabled={busy}
                   onClick={() => applyAll('apply_download_all',
                     'Turn raw data download ON for ALL of your existing reports? Signed-in viewers will be able to download their data. This replaces the setting on each report.',
                     'Raw data download is on for all your reports', true)}>
                   Turn on for all my existing reports
                 </button>
-                <button style={S.btn()} disabled={busy}
+                <button style={{ ...S.btn('bad'), flex:1, minWidth:180 }} disabled={busy}
                   onClick={() => applyAll('apply_download_all',
                     'Turn raw data download OFF for ALL of your existing reports? This replaces the setting on each report.',
                     'Raw data download is off for all your reports', false)}>
