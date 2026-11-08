@@ -221,11 +221,11 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       .catch(() => {});
   }, []);
 
-  async function applyAll(action, confirmText, doneText) {
+  async function applyAll(action, confirmText, doneText, value) {
     if (!window.confirm(confirmText)) return;
     setBusy(true); clearNotice();
     try {
-      const r = await api.post('/auth/profile', { action });
+      const r = await api.post('/auth/profile', value === undefined ? { action } : { action, value });
       notify(`${doneText} (${r.count} report${r.count === 1 ? '' : 's'}).`);
     } catch (x) {
       notify((x && x.message) || 'Failed to apply', false);
@@ -582,14 +582,18 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   </div>
                 </span>
               </label>
-              <div style={{ marginTop:8 }}>
+              <div style={{ marginTop:8, display:'flex', gap:8, flexWrap:'wrap' }}>
                 <button style={S.btn()} disabled={busy}
                   onClick={() => applyAll('apply_explore_all',
-                    reportsDefaultPrivate
-                      ? 'Remove ALL of your existing reports from Explore? Anyone who only found them there will no longer see them. Share links keep working.'
-                      : 'Make ALL of your existing reports public in Explore? Anyone can then find them. This replaces the setting on each report.',
-                    reportsDefaultPrivate ? 'All your reports are now excluded from Explore' : 'All your reports are now public in Explore')}>
-                  {reportsDefaultPrivate ? 'Exclude all my existing reports from Explore' : 'Make all my existing reports public'}
+                    'Make ALL of your existing reports public in Explore? Anyone can then find them. This replaces the setting on each report.',
+                    'All your reports are now public in Explore', false)}>
+                  Make all my existing reports public
+                </button>
+                <button style={S.btn()} disabled={busy}
+                  onClick={() => applyAll('apply_explore_all',
+                    'Remove ALL of your existing reports from Explore? Anyone who only found them there will no longer see them. Share links keep working.',
+                    'All your reports are now excluded from Explore', true)}>
+                  Exclude all my existing reports from Explore
                 </button>
               </div>
               </Collapse>
@@ -602,18 +606,22 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                 <span style={{ fontSize:13.5, color:T.text, lineHeight:1.5 }}>
                   Allow raw data download on my new reports
                   <div style={{ fontSize:12, color:T.dim, marginTop:4 }}>
-                    On by default. This is only the starting value for reports you upload from now on; you can switch any report on or off from its own page, and existing reports keep their current setting. When a report has it on, signed-in users who can view it (including public reports in Explore) see a Raw Instrument Data section with a CSV download of the instrument's headers and full spectrum. That makes your measurements much easier to copy in bulk: automated scrapers and other sites can collect, republish or reuse them, and once someone has a copy, turning this off won't take it back. Leave it off unless you want your data to be reusable.
+                    On by default. This is only the starting value for reports you upload from now on; you can switch any report on or off from its own page, and existing reports keep their current setting. When a report has it on, signed-in users who can view it (including public reports in Explore) see a Raw Instrument Data section with a CSV download of the instrument's headers and full spectrum. That makes your measurements much easier to copy in bulk: automated scrapers and other sites can collect, republish or reuse them, and once someone has a copy, turning this off won't take it back. Turn it off if you don't want your data to be reusable.
                   </div>
                 </span>
               </label>
-              <div style={{ marginTop:8 }}>
+              <div style={{ marginTop:8, display:'flex', gap:8, flexWrap:'wrap' }}>
                 <button style={S.btn()} disabled={busy}
                   onClick={() => applyAll('apply_download_all',
-                    allowDownload
-                      ? 'Turn raw data download ON for ALL of your existing reports? Signed-in viewers will be able to download their data. This replaces the setting on each report.'
-                      : 'Turn raw data download OFF for ALL of your existing reports? This replaces the setting on each report.',
-                    allowDownload ? 'Raw data download is on for all your reports' : 'Raw data download is off for all your reports')}>
-                  {allowDownload ? 'Turn on for all my existing reports' : 'Turn off for all my existing reports'}
+                    'Turn raw data download ON for ALL of your existing reports? Signed-in viewers will be able to download their data. This replaces the setting on each report.',
+                    'Raw data download is on for all your reports', true)}>
+                  Turn on for all my existing reports
+                </button>
+                <button style={S.btn()} disabled={busy}
+                  onClick={() => applyAll('apply_download_all',
+                    'Turn raw data download OFF for ALL of your existing reports? This replaces the setting on each report.',
+                    'Raw data download is off for all your reports', false)}>
+                  Turn off for all my existing reports
                 </button>
               </div>
               </Collapse>
