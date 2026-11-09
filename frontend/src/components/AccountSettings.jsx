@@ -356,9 +356,9 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
     overlay: { position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
     modal: { background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, width:'100%', maxWidth: tab === 'history' ? 640 : 400, maxHeight:'calc(100dvh - 32px)', display:'flex', flexDirection:'column', fontFamily:'monospace', overflow:'hidden' },
     header: { padding:'14px 18px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'space-between' },
-    tabs: { display:'flex', borderBottom:`1px solid ${T.border}` },
+    tabs: { display:'flex', borderBottom:`1px solid ${T.border}`, overflowX:'auto', flexShrink:0, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' },
     tab: active => ({
-      flex:1, padding:'9px 4px', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:0.8,
+      flex:'1 0 auto', padding:'11px 12px', whiteSpace:'nowrap', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:0.8,
       border:'none', cursor:'pointer', fontFamily:'monospace',
       background: active ? `${T.accent}18` : 'none', color: active ? T.accent : T.dim,
       borderBottom: active ? `2px solid ${T.accent}` : '2px solid transparent',
@@ -398,7 +398,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
             ['history', 'App history'],
             ['shares', 'Links'],
           ].map(([key, label]) => (
-            <button key={key} style={S.tab(tab === key)} onClick={() => { setTab(key); clearNotice(); }}>{label}</button>
+            <button key={key} style={S.tab(tab === key)} onClick={(e) => { setTab(key); clearNotice(); e.currentTarget.scrollIntoView?.({ inline:'center', block:'nearest', behavior:'smooth' }); }}>{label}</button>
           ))}
         </div>
 
