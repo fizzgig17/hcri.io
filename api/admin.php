@@ -37,6 +37,12 @@ if ($m === 'GET' && $path === '/api_log') {
     ], $rows)]);
 }
 
+// GET /api/admin/users/:id/app_history — a user's backed-up Companion app history (same shape as /api/account/app_history).
+if ($m === 'GET' && preg_match('#^/users/(\d+)/app_history$#', $path, $ah)) {
+    require_once __DIR__ . '/_core/companion_backup.php';
+    companion_backup_respond($db, (int)$ah[1]);
+}
+
 if ($m === 'POST' && $path === '/categories/rename') {
     $b = body();
     $id = (int)($b['id'] ?? 0);

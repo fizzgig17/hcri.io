@@ -1,0 +1,315 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Temp Logger (infrared) — hCRI Companion</title>
+<meta name="description" content="Build a multi-point infrared temperature logger with a Raspberry Pi Pico, MLX90614 sensors and a TCA9548A multiplexer: wiring, firmware and data format.">
+<link rel="canonical" href="https://www.hcri.io/companion/templog/">
+<script>
+  (function(){
+    try {
+      var t = localStorage.getItem('hcri_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root{
+    --bg:#060a0f; --surface:#0a1628; --surface2:#0b1929; --border:#2d3645;
+    --text:#e8f4ff; --dim:#7aaccc; --accent:#00d4ff; --accent-dim:rgba(0,212,255,.14);
+    --good:#3dff9a; --warn:#ffcc33; --bad:#ff4466;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef2f7; --surface:#ffffff; --surface2:#dce6f0; --border:rgba(40,90,160,0.25);
+    --text:#0d1f30; --dim:#2a5070; --accent:#005baa; --accent-dim:rgba(0,91,170,.14);
+    --good:#0a6e2e; --warn:#8a5a00; --bad:#aa1133;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box}
+  html,body{background:var(--bg);transition:background-color .15s,color .15s}
+  body{
+    margin:0; color:var(--text); line-height:1.6;
+    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    padding-inline:16px;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  img,svg{max-width:100%}
+  code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:.92em;color:var(--text)}
+
+  header.top{
+    display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between;
+    padding-block:18px; border-bottom:1px solid var(--border); max-width:1080px;margin:0 auto;
+  }
+  .brand{font-size:19px;font-weight:900;letter-spacing:.2px;display:flex;align-items:baseline;gap:8px}
+  .brand .dot{color:var(--accent)}
+  .brand .tag{
+    font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.4px;
+    border:1px solid var(--border);border-radius:999px;padding:2px 8px;
+  }
+  nav.links{display:flex;gap:18px;font-size:13px;flex-wrap:wrap;align-items:center}
+  nav.links a{color:var(--dim)}
+  nav.links a:hover{color:var(--text)}
+  .btn-sm{
+    display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;
+    border:1.5px solid color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-dim);color:var(--accent);
+    border-radius:7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .btn-sm:hover{background:color-mix(in srgb,var(--accent) 22%,transparent);text-decoration:none}
+  .btn-sm svg{width:14px;height:14px}
+
+  .page{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:230px 1fr;gap:48px;padding-block:36px 72px}
+  @media (max-width:860px){ .page{grid-template-columns:1fr} }
+
+  nav.toc{position:sticky;top:20px;align-self:start;font-size:12.5px;max-height:calc(100vh - 40px);overflow:auto}
+  @media (max-width:860px){ nav.toc{position:static;max-height:none;border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface)} }
+  nav.toc .toc-title{color:var(--dim);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:sec}
+  nav.toc li{counter-increment:sec;margin-bottom:7px}
+  nav.toc li a{color:var(--dim);display:block}
+  nav.toc li a:hover{color:var(--text)}
+  nav.toc li a::before{content:counter(sec) '. ';color:var(--accent);font-weight:700}
+
+  main{min-width:0}
+  .doc-title{font-size:clamp(26px,4vw,36px);margin:0 0 6px;letter-spacing:-.01em}
+  .doc-meta{color:var(--dim);font-size:12.5px;margin-bottom:38px}
+  .doc-meta a{color:var(--dim)}
+
+  section{padding-block:30px;border-top:1px solid var(--border)}
+  section:first-of-type{border-top:none;padding-top:0}
+  h2{font-size:21px;margin:0 0 14px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px}
+  h2 .num{color:var(--accent);font-size:15px;font-weight:700}
+  h3{font-size:15px;margin:22px 0 8px}
+  p{margin:0 0 12px;font-size:13.5px}
+  p.dim{color:var(--dim)}
+  ul,ol{margin:0 0 12px;padding-left:22px;font-size:13.5px}
+  li{margin-bottom:6px}
+  .lede{color:var(--dim);font-size:14.5px;max-width:68ch}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;margin:14px 0;
+  }
+  .card h4{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;font-size:13px;color:var(--dim)}
+  .card.tip h4{color:var(--good)}
+  .card.warn h4{color:var(--warn)}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--dim);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+  td code{font-size:12px}
+
+  .steps{list-style:none;margin:0;padding:0;counter-reset:step}
+  .steps li{
+    counter-increment:step;position:relative;padding-left:40px;margin-bottom:16px;font-size:13.5px;
+  }
+  .steps li::before{
+    content:counter(step);position:absolute;left:0;top:-1px;
+    width:26px;height:26px;border-radius:50%;border:1.5px solid color-mix(in srgb,var(--accent) 40%,transparent);
+    color:var(--accent);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;
+  }
+  .steps li strong{display:block;margin-bottom:2px}
+  .steps li span{color:var(--dim)}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .chip{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600}
+
+  footer{border-top:1px solid var(--border);padding-block:24px;max-width:1080px;margin:0 auto;font-size:12.5px;color:var(--dim)}
+  footer a{color:var(--dim)}
+  footer a:hover{color:var(--accent)}
+
+  @media print{
+    nav.toc, header .links, .btn-sm, .no-print{display:none!important}
+    :root{ --bg:#fff; --surface:#fff; --surface2:#f3f3f3; --border:#ccc; --text:#111; --dim:#555; --accent:#1a4fb4; color-scheme: light; }
+    body{padding:0}
+    .page{display:block;max-width:none;padding:0}
+    header.top{max-width:none}
+    section{break-inside:avoid-page;border-top:1px solid #ccc}
+    h2{break-after:avoid}
+    a{color:#1a4fb4;text-decoration:underline}
+    .card{break-inside:avoid-page}
+  }
+
+  /* Floating back-to-top arrow -- same treatment as the main Companion
+     page (see companion/index.html), hidden on print via .no-print above. */
+  #back-to-top{
+    position:fixed; right:18px; bottom:calc(18px + env(safe-area-inset-bottom,0px));
+    width:40px; height:40px; border-radius:50%;
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; visibility:hidden; transform:translateY(8px);
+    transition:opacity .2s,transform .2s,visibility .2s,background-color .15s,border-color .15s;
+    box-shadow:0 2px 10px rgba(0,0,0,.25); z-index:50;
+  }
+  #back-to-top.visible{opacity:1; visibility:visible; transform:translateY(0)}
+  #back-to-top:hover{background:var(--accent-dim); border-color:var(--accent); color:var(--accent)}
+  #back-to-top svg{width:18px;height:18px}
+</style>
+<link rel="stylesheet" href="/assets/site-pages.css">
+<script defer src="/assets/site-pages.js"></script>
+</head><body>
+
+<header class="top">
+  <div class="brand"><span>hCRI<span class="dot">.io</span></span> <span style="font-weight:600;color:var(--dim)">Companion</span>
+    <span class="tag">TKLamp logger</span>
+  </div>
+  <nav class="links">
+    <a href="../">← Companion home</a>
+    <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a>
+    <a href="../manual/">Manual</a>
+    <button id="theme-toggle" type="button" title="Toggle light/dark" aria-label="Toggle light/dark theme" style="background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;color:var(--text);padding:0">🌙</button>
+  </nav>
+</header>
+<div class="bar"></div>
+
+<div class="page">
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#what">What it is</a></li>
+      <li><a href="#parts">Parts</a></li>
+      <li><a href="#wiring">Wiring</a></li>
+      <li><a href="#lasers">Aiming lasers</a></li>
+      <li><a href="#firmware">Install the firmware</a></li>
+      <li><a href="#data">What it sends</a></li>
+      <li><a href="#emissivity">Emissivity</a></li>
+      <li><a href="#status">Status and next steps</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <h1 class="doc-title">Temp Logger (infrared)</h1>
+    <div class="doc-meta">Started November 1, 2026 · Raspberry Pi Pico · <a href="pico/main.py" download>Download main.py</a> · <a href="logger/">Web logger</a></div>
+
+    <section id="what">
+      <h2><span class="num">01</span> What it is</h2>
+      <p class="lede">Three non-contact thermometers (MLX90614, the GY-906 board) read the temperature of up to three spots on a light at once, for example the head, the body and the tailcap, once a second. A Raspberry Pi Pico reads them and sends the numbers over its USB cable. The logger on your computer records them, draws the chart, and can send them to hCRI.io to watch live, the same way the TKLamp logger works.</p>
+      <p class="dim">This page covers the hardware and the Pico firmware, which is the first step. The logger, the Companion app screen and the hCRI.io pages come next (see <a href="#status">Status</a>).</p>
+    </section>
+
+    <section id="parts">
+      <h2><span class="num">02</span> Parts</h2>
+      <table>
+        <tr><th>Part</th><th>Used for</th></tr>
+        <tr><td>Raspberry Pi Pico (RP2040, USB-C)</td><td>Reads the sensors and talks to the computer over USB.</td></tr>
+        <tr><td>3 x GY-906 board with MLX90614ESF-DCI</td><td>The infrared thermometers. They all have the same I2C address (0x5A).</td></tr>
+        <tr><td>TCA9548A I2C multiplexer board</td><td>Lets the Pico talk to one sensor at a time, so the three identical addresses do not clash. Nothing has to be reprogrammed.</td></tr>
+        <tr><td>650 nm 5 mW laser modules (5 V)</td><td>Red dots that show where each sensor is looking. See <a href="#lasers">Aiming lasers</a>.</td></tr>
+        <tr><td>Pico screw-terminal shield, WAGO 221 connectors</td><td>Power and ground distribution without soldering.</td></tr>
+        <tr><td>JST-XH 4-pin and 2-pin connector sets</td><td>Detachable sensor cables (3.3 V, GND, SDA, SCL) and laser cables.</td></tr>
+        <tr><td>Slide switches</td><td>Laser on/off.</td></tr>
+        <tr><td>28 AWG wire, ABS junction box, rubber grommets, step drill bit</td><td>Case with cable exits.</td></tr>
+      </table>
+    </section>
+
+    <section id="wiring">
+      <h2><span class="num">03</span> Wiring</h2>
+      <table>
+        <tr><th>From</th><th>To</th></tr>
+        <tr><td>Pico 3V3 (pin 36)</td><td>TCA9548A VIN (and all sensor VIN through the multiplexer board's 3.3 V, or from the shield's 3V3 rail)</td></tr>
+        <tr><td>Pico GND</td><td>TCA9548A GND and every sensor GND</td></tr>
+        <tr><td>Pico GP4 (pin 6)</td><td>TCA9548A SDA</td></tr>
+        <tr><td>Pico GP5 (pin 7)</td><td>TCA9548A SCL</td></tr>
+        <tr><td>TCA9548A SD0 / SC0</td><td>Sensor 1 SDA / SCL</td></tr>
+        <tr><td>TCA9548A SD1 / SC1</td><td>Sensor 2 SDA / SCL</td></tr>
+        <tr><td>TCA9548A SD2 / SC2</td><td>Sensor 3 SDA / SCL</td></tr>
+        <tr><td>TCA9548A A0, A1, A2, RST</td><td>Leave open (the multiplexer then answers at address 0x70).</td></tr>
+      </table>
+      <p><strong>One sensor only?</strong> Skip the multiplexer for now: connect the sensor straight to the Pico (VIN to 3V3 OUT, GND to a GND pin, SDA to GP4, SCL to GP5). The firmware (2026.11.01.2 and later) notices there is no multiplexer and reads that sensor as sensor 1. When you add the multiplexer later, move the sensor to SD0/SC0; the firmware switches by itself and needs no change.</p>
+      <p>Keep the sensor cables short (under about 50 cm) and use the 3.3 V supply, not 5 V, for the sensors and multiplexer. The sensors are SMBus parts: the firmware runs the bus at 100 kHz. The GY-906 and multiplexer boards usually carry their own pull-up resistors, so no extra ones are needed.</p>
+    </section>
+
+    <section id="lasers">
+      <h2><span class="num">04</span> Aiming lasers</h2>
+      <p>Each sensor looks at a small spot. A laser module fixed beside it shows where. Wire each laser (red = +, blue = &minus;) to the Pico's <strong>VBUS</strong> (5 V from the USB cable) through a slide switch, and to GND. They are not controlled by the firmware, so the switch is the only control.</p>
+      <p><strong>Safety.</strong> 650 nm at 5 mW is a class 3R laser: never point it at a person or an animal, or at a shiny surface that could reflect it into an eye. Switch the lasers off for the measurement, since they only show where to aim. The dot sits a little to one side of the sensor's own view, so at short distance the spot is slightly offset from the dot.</p>
+    </section>
+
+    <section id="firmware">
+      <h2><span class="num">05</span> Install the firmware</h2>
+      <ol class="steps">
+        <li><strong>Put MicroPython on the Pico</strong><span>Hold the BOOTSEL button while plugging in the USB cable. A drive called RPI-RP2 appears. Download the Raspberry Pi Pico UF2 from <a href="https://micropython.org/download/RPI_PICO/" target="_blank" rel="noopener">micropython.org</a> and drop it on that drive. It restarts by itself. This is done once.</span></li>
+        <li><strong>Copy main.py to the Pico</strong><span>Download <a href="pico/main.py" download>main.py</a>. In Thonny (thonny.org, set the interpreter to MicroPython (Raspberry Pi Pico)), open the file and use File &rarr; Save as &rarr; Raspberry Pi Pico, naming it <code>main.py</code>. Unplug and plug the Pico back in: it starts by itself every time it gets power.</span></li>
+        <li><strong>Check it</strong><span>Open Thonny's shell, or any serial terminal on the Pico's port. You should see a line like <code># hCRI temp logger 2026.11.01.1 sensors=111 emis=1.00,1.00,1.00</code> and then a line of numbers every second. <code>sensors=111</code> means all three were found; a 0 marks one that is missing.</span></li>
+      </ol>
+    </section>
+
+    <section id="data">
+      <h2><span class="num">06</span> What it sends</h2>
+      <p>One text line a second:</p>
+      <p><code>T,12.0,24.31,25.02,26.10,23.50,23.60,23.40</code></p>
+      <table>
+        <tr><th>Field</th><th>Meaning</th></tr>
+        <tr><td>T</td><td>Marks a reading. Lines starting with # are messages.</td></tr>
+        <tr><td>12.0</td><td>Seconds since the Pico started.</td></tr>
+        <tr><td>next three</td><td>Object temperature of sensors 1, 2, 3 in &deg;C (after the emissivity setting).</td></tr>
+        <tr><td>last three</td><td>Temperature of each sensor's own chip in &deg;C (ambient at the sensor).</td></tr>
+      </table>
+      <p>An empty field means that sensor did not answer. Commands you can type back: <code>?</code> shows the status line, and <code>E 2 0.9</code> sets sensor 2's emissivity to 0.9.</p>
+    </section>
+
+    <section id="emissivity">
+      <h2><span class="num">07</span> Emissivity</h2>
+      <p>An infrared thermometer assumes the surface is a perfect radiator (emissivity 1). Anodized aluminum, plastic and paint are lower, and bare shiny metal is much lower, so the raw number reads too cold. Set each sensor's emissivity with the <code>E</code> command; the Pico remembers it and corrects the reading, using the sensor's own temperature for the light reflected off the surface. Typical values: anodized or painted aluminum about 0.85 to 0.95, black plastic about 0.95, bare polished metal 0.1 to 0.3 (these read poorly; put a bit of matte tape on the spot and measure that).</p>
+    </section>
+
+    <section id="status">
+      <h2><span class="num">08</span> Status and next steps</h2>
+      <ul>
+        <li><strong>Done:</strong> the Pico firmware and this build guide. The firmware's checksum, conversion and emissivity maths are tested on a computer; it has not been run on the hardware yet.</li>
+        <li><strong>Web logger:</strong> <a href="logger/">open the logger</a> in Chrome or Edge. It connects to the Pico over USB, shows each sensor and a live chart, records to a CSV file, lets you name the sensors and set each one's emissivity, and has a Simulate button to try it with no hardware.</li>
+        <li><strong>Next:</strong> a Python logger; upload and live link on hCRI.io (Runtime and Live station); then a Companion app screen.</li>
+      </ul>
+    </section>
+
+    <section id="troubleshooting">
+      <h2><span class="num">09</span> Troubleshooting</h2>
+      <table>
+        <tr><th>Symptom</th><th>Try</th></tr>
+        <tr><td>sensors=000</td><td>Check 3.3 V, GND, SDA (GP4) and SCL (GP5) to the multiplexer, and that the multiplexer's address pins are open (address 0x70).</td></tr>
+        <tr><td>One sensor is empty, the others work</td><td>Check that sensor's SDA/SCL are on the matching SDn/SCn pair, and its cable.</td></tr>
+        <tr><td>Readings jump or read -273</td><td>Shorten the cable, and keep it away from the laser and USB wires.</td></tr>
+        <tr><td>The Pico does not start by itself</td><td>The file must be named exactly <code>main.py</code> on the Pico.</td></tr>
+        <tr><td>Reads far too cold on metal</td><td>See Emissivity: shiny metal needs tape or a coating.</td></tr>
+      </table>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  TKLamp Live Logger · <a href="../">Companion home</a> · <a href="../manual/">Manual</a> · <a href="https://hcri.io" target="_blank" rel="noopener">hCRI.io ↗</a><br>© 2026 fizzgig · Bridge firmware is GPLv3. The ColorMunki driver code is derived from ArgyllCMS (AGPL-3.0) · <a href="https://github.com/fizzgig17/hcri-esp32-bridge" target="_blank" rel="noopener">Source ↗</a>
+</footer>
+
+<button id="back-to-top" class="no-print" type="button" title="Back to top" aria-label="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+<script>
+  (function(){
+    var btn = document.getElementById('back-to-top');
+    function sync(){
+      if (window.scrollY > 400) btn.classList.add('visible');
+      else btn.classList.remove('visible');
+    }
+    sync();
+    window.addEventListener('scroll', sync, { passive: true });
+    btn.addEventListener('click', function(){
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  })();
+</script>
+<script>
+  (function(){
+    var btn = document.getElementById('theme-toggle');
+    var html = document.documentElement;
+    function sync(){ btn.textContent = html.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'; }
+    sync();
+    btn.addEventListener('click', function(){
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('hcri_theme', next); } catch (e) {}
+      sync();
+    });
+  })();
+</script>
+</body></html>
