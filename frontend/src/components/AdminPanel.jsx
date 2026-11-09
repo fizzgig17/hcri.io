@@ -71,6 +71,7 @@ export default function AdminPanel({ onClose, me }) {
   const [stats, setStats] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userReports, setUserReports] = useState([]);
+  const [reportsHidden, setReportsHidden] = useState(false);   // collapse the Saved Reports list
   const [histFor, setHistFor] = useState(null);   // user id whose app history is open
   const [reportsLoading, setReportsLoading] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
@@ -381,10 +382,13 @@ export default function AdminPanel({ onClose, me }) {
                   </div>
                 )}
 
-                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700, marginBottom: 10 }}>
-                  Saved Reports ({userReports.length})
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700 }}>
+                    Saved Reports ({userReports.length})
+                  </div>
+                  <button onClick={() => setReportsHidden((h) => !h)} style={S.btn()}>{reportsHidden ? 'Show' : 'Hide'}</button>
                 </div>
-                {reportsLoading ? (
+                {reportsHidden ? null : reportsLoading ? (
                   <div style={{ color: t.dim, fontSize: 13 }}>Loading reports…</div>
                 ) : userReports.length === 0 ? (
                   <div style={{ color: t.dim, fontSize: 13, fontStyle: 'italic' }}>No saved reports</div>
