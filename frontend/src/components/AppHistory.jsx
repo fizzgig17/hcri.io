@@ -33,6 +33,7 @@ function Spectrum({ points, o }) {
 const fmt = (v, d = 0) => (v === null || v === undefined || Number.isNaN(v) ? '–' : Number(v).toFixed(d));
 
 export default function AppHistory({ theme: o, userId = null }) {
+  const canDelete = !userId;   // only people can delete their own history; admins just view
   const [items, setItems] = useState([]);
   const [next, setNext] = useState(null);
   const [total, setTotal] = useState(0);
@@ -76,6 +77,19 @@ export default function AppHistory({ theme: o, userId = null }) {
     }
   };
 
+  const remove = (it) => {
+    if (!window.confirm(`Delete “${it.label || 'this item'}” from your backed-up history? This removes it from hCRI.io only; reports you uploaded are not affected. This cannot be undone.`)) return;
+    fetch(`${base}/${encodeURIComponent(it.id)}`, { method: 'DELETE', headers })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) { setErr(d.error); return; }
+        setItems((cur) => cur.filter((x) => x.id !== it.id));
+        setTotal((n) => Math.max(0, n - 1));
+        setOpen(null);
+      })
+      .catch(() => setErr('Could not delete'));
+  };
+
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return items;
@@ -91,7 +105,7 @@ export default function AppHistory({ theme: o, userId = null }) {
       <div style={{ fontSize: 12, color: o.dim, marginBottom: 10, lineHeight: 1.5 }}>
         {userId ? 'This user’s' : 'Your'} hCRI Companion history, as backed up to {userId ? 'their' : 'your'} account: <b style={{ color: o.text }}>{total}</b> item{total === 1 ? '' : 's'} (the account keeps up to {maxPer.toLocaleString()}).
         The app itself shows only its latest 100 readings, but backed-up readings stay here after they scroll off the app.
-        {!userId && ' Only you can see this page.'}
+        {!userId && ' Only you can see this page, and only you can delete items from it: the Companion app can never remove anything stored here.'}
       </div>
       <input
         value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter loaded items by name, device, LED or category"
@@ -141,6 +155,11 @@ export default function AppHistory({ theme: o, userId = null }) {
                   {it.leds?.length > 0 && <div style={kv}>LED: <span style={{ color: o.text }}>{it.leds.join(' · ')}</span></div>}
                   {it.categories && Object.keys(it.categories).length > 0 && (
                     <div style={kv}>{Object.entries(it.categories).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(' · ')}</div>
+                  )}
+                  {canDelete && (
+                    <div>
+                      <button onClick={() => remove(it)} style={{ background: 'none', border: `1px solid ${o.bad}`, color: o.bad, borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'monospace' }}>Delete from my history</button>
+                    </div>
                   )}
                   {it.hasSpectrum && (spectra[it.id] ? <Spectrum points={spectra[it.id]} o={o} /> : <div style={kv}>Loading spectrum…</div>)}
                 </div>

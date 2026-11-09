@@ -6,7 +6,8 @@ declare(strict_types=1);
 //
 //   GET  /api/v1/backup?after=<cursor>&limit=25   -> {"items":[{"id","savedAt","reading":{...}}], "next":"<cursor>"|null, "total":N}
 //   POST /api/v1/backup  {"items":[{"id":"...","savedAt":1760000000000,"reading":{...}}]}   -> {"saved":N}
-//   POST /api/v1/backup  {"delete":["id", ...]}                                           -> {"deleted":N}
+//   (The app can never delete backed-up items: a {"delete":[...]} request is accepted but ignored. Only the signed-in
+//    person can delete them, from their App history page on hCRI.io.)
 //
 // What is stored is private to the token's owner: it is not a report and never appears on any public page.
 // Items are upserted by id, so repeating a request is harmless (the app retries until it succeeds).
@@ -66,14 +67,9 @@ rl_hit('cbackup', (string)$uid, 60);
 $b = body();
 
 if (isset($b['delete']) && is_array($b['delete'])) {
-    $n = 0;
-    $del = $db->prepare('DELETE FROM companion_backups WHERE user_id = ? AND item_id = ?');
-    foreach (array_slice($b['delete'], 0, 200) as $id) {
-        if (!companion_backup_valid_id($id)) continue;
-        $del->execute([$uid, $id]);
-        $n += $del->rowCount();
-    }
-    json_out(['deleted' => $n]);
+    // Deliberately a no-op (answered 200 so older app versions don't retry forever): the app must never be able
+    // to remove what is stored on the server.
+    json_out(['deleted' => 0, 'ignored' => count($b['delete'])]);
 }
 
 if (!isset($b['items']) || !is_array($b['items'])) json_error('Send {"items":[...]} or {"delete":[...]}', 400);
