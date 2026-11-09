@@ -354,7 +354,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
 
   const S = {
     overlay: { position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
-    modal: { background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, width:'100%', maxWidth:400, fontFamily:'monospace', overflow:'hidden' },
+    modal: { background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, width:'100%', maxWidth: tab === 'history' ? 640 : 400, maxHeight:'calc(100dvh - 32px)', display:'flex', flexDirection:'column', fontFamily:'monospace', overflow:'hidden' },
     header: { padding:'14px 18px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'space-between' },
     tabs: { display:'flex', borderBottom:`1px solid ${T.border}` },
     tab: active => ({
@@ -363,7 +363,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
       background: active ? `${T.accent}18` : 'none', color: active ? T.accent : T.dim,
       borderBottom: active ? `2px solid ${T.accent}` : '2px solid transparent',
     }),
-    body: { padding:18 },
+    body: { padding:18, overflowY:'auto', minHeight:0, flex:'1 1 auto', WebkitOverflowScrolling:'touch' },
     label: { fontSize:11, color:T.dim, textTransform:'uppercase', letterSpacing:1, fontWeight:700, display:'block', marginBottom:5 },
     input: { width:'100%', background:T.surface, border:`1px solid ${T.border}`, color:T.text, borderRadius:5, padding:'8px 10px', fontSize:13, fontFamily:'monospace', boxSizing:'border-box', marginBottom:12 },
     btn: (kind = 'primary') => ({
