@@ -24,6 +24,16 @@ function maybe_json(mixed $v): mixed {
     return json_last_error() === JSON_ERROR_NONE ? $d : $v;
 }
 
+// ── DELETE /api/account/app_history/<item id> ────────────────────────────────
+// The signed-in person removes one backed-up item from their own App history. (Only the person themselves, here --
+// the Companion app and the API token can never delete backed-up items.)
+if (preg_match('#^/app_history/([A-Za-z0-9._-]{1,64})$#', $path, $ahm)) {
+    method('DELETE');
+    $del = $db->prepare('DELETE FROM companion_backups WHERE user_id = ? AND item_id = ?');
+    $del->execute([$uid, $ahm[1]]);
+    json_out(['deleted' => $del->rowCount()]);
+}
+
 // ── GET /api/account/app_history ─────────────────────────────────────────────
 // The signed-in person's own backed-up Companion app history (readings and flickers), newest first.
 //   ?after=<cursor>&limit=50   page through it;   ?spectrum=<item id>   one reading's spectrum for the chart.
