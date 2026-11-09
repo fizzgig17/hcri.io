@@ -71,8 +71,9 @@ export default function AdminPanel({ onClose, me }) {
   const [stats, setStats] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userReports, setUserReports] = useState([]);
-  const [reportsHidden, setReportsHidden] = useState(false);   // collapse the Saved Reports list
-  const [histFor, setHistFor] = useState(null);   // user id whose app history is open
+  const [reportsHidden, setReportsHidden] = useState(true);   // Saved Reports list collapsed by default
+  const [histFor, setHistFor] = useState(null);   // user id whose app history is open (null = collapsed)
+  const [histTotal, setHistTotal] = useState(null); // number of backed-up app-history items for the selected user
   const [reportsLoading, setReportsLoading] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -166,6 +167,8 @@ export default function AdminPanel({ onClose, me }) {
   async function selectUser(u) {
     setSelectedUser(u);
     setReportsLoading(true);
+    setHistFor(null); setReportsHidden(true); setHistTotal(null);
+    adminFetch(`/users/${u.id}/app_history?limit=1`).then((d) => setHistTotal(d.total ?? 0)).catch(() => setHistTotal(0));
     try {
       setUserReports(await adminFetch(`/users/${u.id}/reports`));
     } catch (e) {
@@ -433,14 +436,16 @@ export default function AdminPanel({ onClose, me }) {
                   </table>
                 )}
 
-                <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700 }}>App history</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '22px 0 10px' }}>
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700 }}>
+                    App history{histTotal === null ? '' : ` (${histTotal})`}
+                  </div>
                   <button onClick={() => setHistFor(histFor === u.id ? null : u.id)} style={S.btn()}>
                     {histFor === u.id ? 'Hide' : 'Show'}
                   </button>
                 </div>
                 {histFor === u.id && (
-                  <div style={{ marginTop: 10 }}>
+                  <div>
                     <AppHistory theme={t} userId={u.id} />
                   </div>
                 )}
