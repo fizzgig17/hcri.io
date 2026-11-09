@@ -36,6 +36,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import AdminFeatured from './AdminFeatured.jsx';
 import AdminNotices from './AdminNotices.jsx';
 import AdminApiLog from './AdminApiLog.jsx';
+import AppHistory from './AppHistory.jsx';
 import AdminCats from './AdminCats.jsx';
 import AdminReportModal from './AdminReportModal.jsx';
 import CreateUserModal from './CreateUserModal.jsx';
@@ -70,6 +71,7 @@ export default function AdminPanel({ onClose, me }) {
   const [stats, setStats] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userReports, setUserReports] = useState([]);
+  const [histFor, setHistFor] = useState(null);   // user id whose app history is open
   const [reportsLoading, setReportsLoading] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -425,6 +427,18 @@ export default function AdminPanel({ onClose, me }) {
                       ))}
                     </tbody>
                   </table>
+                )}
+
+                <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700 }}>App history</div>
+                  <button onClick={() => setHistFor(histFor === u.id ? null : u.id)} style={S.btn()}>
+                    {histFor === u.id ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {histFor === u.id && (
+                  <div style={{ marginTop: 10 }}>
+                    <AppHistory theme={t} userId={u.id} />
+                  </div>
                 )}
               </>
             ) : (

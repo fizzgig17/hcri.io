@@ -24,6 +24,15 @@ function maybe_json(mixed $v): mixed {
     return json_last_error() === JSON_ERROR_NONE ? $d : $v;
 }
 
+// ── GET /api/account/app_history ─────────────────────────────────────────────
+// The signed-in person's own backed-up Companion app history (readings and flickers), newest first.
+//   ?after=<cursor>&limit=50   page through it;   ?spectrum=<item id>   one reading's spectrum for the chart.
+if ($path === '/app_history') {
+    method('GET');
+    require_once __DIR__ . '/_core/companion_backup.php';
+    companion_backup_respond($db, $uid);
+}
+
 // ── GET /api/account/export ──────────────────────────────────────────────────
 // Right of access + data portability: everything we hold tied to this account,
 // as a machine-readable JSON download. Excludes the password hash.

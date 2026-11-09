@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { api, setToken } from '../lib/api';
 import { setTZ } from '../lib/tz';
+import AppHistory from './AppHistory.jsx';
 
 // ── API token management (bundle: `ApiTokens`) ─────────────────────────────
 // Rendered inside the "API" tab of AccountSettings below. theme is passed
@@ -394,6 +395,7 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
             ['display', 'Display'],
             ['privacy', 'Privacy'],
             ['api', 'API'],
+            ['history', 'App history'],
             ['shares', 'Links'],
           ].map(([key, label]) => (
             <button key={key} style={S.tab(tab === key)} onClick={() => { setTab(key); clearNotice(); }}>{label}</button>
@@ -491,6 +493,8 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
           )}
 
           {tab === 'api' && <ApiTokens theme={T} onClose={onClose} />}
+
+          {tab === 'history' && <AppHistory theme={T} />}
 
           {tab === 'display' && (
             <>
