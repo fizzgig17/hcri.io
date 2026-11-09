@@ -10,7 +10,7 @@
 
 import LicenseSelect from './LicenseSelect.jsx';
 import { licenseInfo } from '../lib/licenses.js';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import { api, setToken } from '../lib/api';
 import { setTZ } from '../lib/tz';
@@ -180,6 +180,19 @@ function Collapse({ T, title, summary, children, open: startOpen = false }) {
 export default function AccountSettings({ user, onClose, onUserUpdate }) {
   const { theme: T } = useTheme();
   const [tab, setTab] = useState('password');
+  // Tab bar scroll indicators: a fade + arrow on whichever side has more tabs hidden.
+  const tabsRef = useRef(null);
+  const [tabEdge, setTabEdge] = useState({ left: false, right: false });
+  const updateTabEdge = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    setTabEdge({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+  }, []);
+  useEffect(() => {
+    updateTabEdge();
+    window.addEventListener('resize', updateTabEdge);
+    return () => window.removeEventListener('resize', updateTabEdge);
+  }, [updateTabEdge, tab]);
   const [shareTokens, setShareTokens] = useState([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNoticeState] = useState(null); // { text, ok }
@@ -387,7 +400,8 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.dim, fontSize:20, cursor:'pointer', lineHeight:1 }}>✕</button>
         </div>
 
-        <div style={S.tabs}>
+        <div style={{ position:'relative', flexShrink:0 }}>
+        <div ref={tabsRef} onScroll={updateTabEdge} style={S.tabs}>
           {[
             ['password', 'Password'],
             ['email', 'Email'],
@@ -400,6 +414,15 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
           ].map(([key, label]) => (
             <button key={key} style={S.tab(tab === key)} onClick={(e) => { setTab(key); clearNotice(); e.currentTarget.scrollIntoView?.({ inline:'center', block:'nearest', behavior:'smooth' }); }}>{label}</button>
           ))}
+        </div>
+        {['left','right'].map(side => tabEdge[side] && (
+          <div key={side} aria-hidden="true" style={{
+            position:'absolute', top:0, bottom:1, [side]:0, width:30, pointerEvents:'none',
+            display:'flex', alignItems:'center', justifyContent: side === 'left' ? 'flex-start' : 'flex-end',
+            background:`linear-gradient(to ${side === 'left' ? 'right' : 'left'}, ${T.surface2} 35%, transparent)`,
+            color:T.accent, fontSize:18, fontWeight:700, padding:'0 4px', boxSizing:'border-box',
+          }}>{side === 'left' ? '‹' : '›'}</div>
+        ))}
         </div>
 
         <div style={S.body}>
