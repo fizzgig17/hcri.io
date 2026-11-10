@@ -138,3 +138,83 @@ function companion_backup_respond(PDO $db, int $uid): never {
     }
     json_out(companion_backup_page($db, $uid, (int)($_GET['limit'] ?? 50), (string)($_GET['after'] ?? '')));
 }
+
+// ── Actions on the signed-in person's own backed-up items (website only; the app/API token can never do these) ──
+
+/** Deletes the given item ids from one user's backup. Returns how many were removed. */
+function companion_backup_delete_items(PDO $db, int $uid, array $ids): int {
+    $del = $db->prepare('DELETE FROM companion_backups WHERE user_id = ? AND item_id = ?');
+    $n = 0;
+    foreach (array_slice($ids, 0, 500) as $id) {
+        if (!companion_backup_valid_id($id)) continue;
+        $del->execute([$uid, $id]);
+        $n += $del->rowCount();
+    }
+    return $n;
+}
+
+/** Changes one item's title (the "label" in its stored payload). Returns the new label, or null if there is no such item. */
+function companion_backup_rename_item(PDO $db, int $uid, string $id, string $label): ?string {
+    $label = mb_substr(trim($label), 0, 200);
+    $s = $db->prepare('SELECT payload FROM companion_backups WHERE user_id = ? AND item_id = ?');
+    $s->execute([$uid, $id]);
+    $raw = $s->fetchColumn();
+    if ($raw === false) return null;
+    $p = json_decode((string)$raw, true);
+    if (!is_array($p)) return null;
+    $p['label'] = $label;
+    $json = json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) return null;
+    $db->prepare('UPDATE companion_backups SET payload = ? WHERE user_id = ? AND item_id = ?')->execute([$json, $uid, $id]);
+    return $label;
+}
+
+/**
+ * Turns backed-up readings into website reports (same path as an upload from the app: the stored spectrum becomes a CSV
+ * that goes through ingest_spd_upload). Items that already have a report, flickers, and readings without a spectrum are
+ * skipped. The new report id is written back into the item so History shows it as uploaded.
+ * Returns one result per id: ['id', 'status' => 'converted'|'already'|'skipped'|'error', 'reportId'?, 'isPublic'?, 'message'?].
+ */
+function companion_backup_convert_items(PDO $db, int $uid, array $ids): array {
+    require_once __DIR__ . '/ingest.php';
+    require_once __DIR__ . '/public_id.php';
+    $out = [];
+    $sel = $db->prepare('SELECT payload FROM companion_backups WHERE user_id = ? AND item_id = ?');
+    foreach (array_slice($ids, 0, 25) as $id) {
+        if (!companion_backup_valid_id($id)) continue;
+        if (str_starts_with($id, 'fl_')) { $out[] = ['id' => $id, 'status' => 'skipped', 'message' => 'Flickers cannot be converted to reports']; continue; }
+        $sel->execute([$uid, $id]);
+        $raw = $sel->fetchColumn();
+        $p = $raw === false ? null : json_decode((string)$raw, true);
+        if (!is_array($p)) { $out[] = ['id' => $id, 'status' => 'error', 'message' => 'Not found']; continue; }
+        if (!empty($p['reportId'])) { $out[] = ['id' => $id, 'status' => 'already', 'reportId' => (string)$p['reportId'], 'isPublic' => isset($p['reportIsPublic']) ? (bool)$p['reportIsPublic'] : null]; continue; }
+        $res = is_array($p['result'] ?? null) ? $p['result'] : [];
+        $spec = is_array($res['spectrum'] ?? null) ? $res['spectrum'] : [];
+        $lines = ['Model,' . preg_replace('/[\r\n,]+/', ' ', (string)($res['deviceName'] ?? 'HPCS-330P'))];
+        $pts = [];
+        foreach ($spec as $pt) {
+            if (is_array($pt) && isset($pt['nm'], $pt['value']) && is_numeric($pt['nm']) && is_numeric($pt['value'])) $pts[] = [(float)$pt['nm'], (float)$pt['value']];
+        }
+        if (count($pts) < 10) { $out[] = ['id' => $id, 'status' => 'skipped', 'message' => 'No spectrum stored for this reading']; continue; }
+        $lines[] = 'StartTestWave,' . $pts[0][0];
+        $lines[] = 'EndTestWave,' . $pts[count($pts) - 1][0];
+        foreach ($pts as [$nm, $v]) $lines[] = $nm . ',' . $v;
+        $tmp = tempnam(sys_get_temp_dir(), 'hcri_cb_');
+        file_put_contents($tmp, implode("\n", $lines));
+        try {
+            $label = trim((string)($p['label'] ?? '')) ?: 'App reading';
+            $r = ingest_spd_upload($db, $uid, $tmp, 'reading.csv', $label, true);
+            @unlink($tmp);
+            $pid = hcri_pid($db, (int)$r['id']);
+            $p['reportId'] = $pid;
+            $p['reportIsPublic'] = !empty($r['isPublic']);
+            $json = json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($json !== false) $db->prepare('UPDATE companion_backups SET payload = ? WHERE user_id = ? AND item_id = ?')->execute([$json, $uid, $id]);
+            $out[] = ['id' => $id, 'status' => 'converted', 'reportId' => $pid, 'isPublic' => !empty($r['isPublic'])];
+        } catch (\Throwable $e) {
+            @unlink($tmp);
+            $out[] = ['id' => $id, 'status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+    return $out;
+}

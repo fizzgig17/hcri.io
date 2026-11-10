@@ -24,14 +24,34 @@ function maybe_json(mixed $v): mixed {
     return json_last_error() === JSON_ERROR_NONE ? $d : $v;
 }
 
-// ── DELETE /api/account/app_history/<item id> ────────────────────────────────
-// The signed-in person removes one backed-up item from their own App history. (Only the person themselves, here --
-// the Companion app and the API token can never delete backed-up items.)
+// ── Actions on the signed-in person's own backed-up app history (website only -- the Companion app and API tokens can
+//    never delete, rename or convert anything stored here) ────────────────────────────────────────────────────────
+//   DELETE /app_history/<id>            remove one item
+//   POST   /app_history/delete  {ids}   remove several
+//   PATCH  /app_history/<id>  {label}   change an item's title
+//   POST   /app_history/convert {ids}   turn readings into website reports (max 25 per request)
+if ($path === '/app_history/delete') {
+    method('POST');
+    require_once __DIR__ . '/_core/companion_backup.php';
+    $b = body();
+    json_out(['deleted' => companion_backup_delete_items($db, $uid, is_array($b['ids'] ?? null) ? $b['ids'] : [])]);
+}
+if ($path === '/app_history/convert') {
+    method('POST');
+    require_once __DIR__ . '/_core/companion_backup.php';
+    $b = body();
+    json_out(['results' => companion_backup_convert_items($db, $uid, is_array($b['ids'] ?? null) ? $b['ids'] : [])]);
+}
 if (preg_match('#^/app_history/([A-Za-z0-9._-]{1,64})$#', $path, $ahm)) {
-    method('DELETE');
-    $del = $db->prepare('DELETE FROM companion_backups WHERE user_id = ? AND item_id = ?');
-    $del->execute([$uid, $ahm[1]]);
-    json_out(['deleted' => $del->rowCount()]);
+    method('DELETE', 'PATCH');
+    require_once __DIR__ . '/_core/companion_backup.php';
+    if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+        $b = body();
+        $label = companion_backup_rename_item($db, $uid, $ahm[1], (string)($b['label'] ?? ''));
+        if ($label === null) json_error('Not found', 404);
+        json_out(['label' => $label]);
+    }
+    json_out(['deleted' => companion_backup_delete_items($db, $uid, [$ahm[1]])]);
 }
 
 // ── GET /api/account/app_history ─────────────────────────────────────────────
