@@ -171,7 +171,7 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
   };
   const sortByDate = async () => { try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: [...R].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)).map((x) => x.id) })); onChanged(); } catch (e) { setErr(e.message); } };
   // The normal compare page for this light's readings (private ones carry their share token in a shared link).
-  const compareHref = `?compare=${R.slice(-12).map((r) => (pub && !r.isPublic && r.token ? `${r.id}.${r.token}` : r.id)).join(',')}`;
+  const compareHref = `?compare=${R.slice(-12).map((r) => (pub && !r.isPublic && r.token ? `${r.id}.${r.token}` : r.id)).join(',')}${pub ? '' : `&from=light-${id}`}`;
   const bigDef = big && METRICS.find((m) => m[0] === big);
 
   return (

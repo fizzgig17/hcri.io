@@ -1066,7 +1066,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       closedUrl: fromLightId ? lightUrl : base,
     };
   });
-  usePanelBackClose(comparing, () => setComparing(false));
+  usePanelBackClose(comparing, () => { if (fromLightId) { window.location.href = lightUrl; return; } setComparing(false); });
   // The comparison's Share Card and its opened-report overlay close with the browser Back button too.
   usePanelBackClose(!!cmpCardUrl, () => setCmpCardUrl(null));
   usePanelBackClose(!!cmpFull, () => setCmpFull(null));
@@ -2148,7 +2148,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           {cmpView !== 'photo' && (
             <button onClick={showCompareShareCard} style={btn()} title="Show a shareable card">Share Card</button>
           )}
-          <button onClick={() => setComparing(false)} style={btn()}>← Back</button>
+          <button onClick={() => { if (fromLightId) { window.location.href = lightUrl; return; } setComparing(false); }} style={btn()}>{fromLightId ? '← Back to light' : '← Back'}</button>
         </div>
       </div>
 
