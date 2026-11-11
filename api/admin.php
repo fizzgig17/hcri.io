@@ -437,10 +437,14 @@ if ($m === 'GET' && $section === '/users' && $userId === null) {
         }
         foreach ($sum as $u => $t) $avgScore[$u] = round($t / $cnt[$u], 1);
     } catch (\Throwable $e) {}
+    // Folders each user has made (My Reports folders).
+    $folderCnt = [];
+    try { foreach ($db->query('SELECT user_id, COUNT(*) AS n FROM folders GROUP BY user_id')->fetchAll() as $x) $folderCnt[(int)$x['user_id']] = (int)$x['n']; } catch (\Throwable $e) {}
     json_out(array_map(fn($r) => [
         'id'            => (int)$r['id'],
         'name'          => $r['name'],
         'email'         => $r['email'],
+        'folderCount'   => $folderCnt[(int)$r['id']] ?? 0,
         'isAdmin'       => (bool)$r['is_admin'],
         'isSuper'       => (bool)($r['is_super_admin'] ?? 0),
         'disabled'      => (bool)($r['disabled'] ?? 0),
