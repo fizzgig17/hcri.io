@@ -134,15 +134,28 @@ function lights_suggest(PDO $db, int $uid, array $ids): array {
         if ($title !== '') { $titles[] = $title; $parts[$title] = ['brand' => $lb, 'model' => $lm]; }
         $labels[] = (string)$r['label'];
     }
+    // The report titles are what the user actually wrote, so they lead: the part every title shares, cut back to a whole word, with
+    // the differing tail ("- M1", "- Turbo", "after 10 min") dropped. Category values are only used when they agree with it.
+    $pre = $labels ? $labels[0] : '';
+    foreach ($labels as $l) { while ($pre !== '' && stripos($l, $pre) !== 0) $pre = mb_substr($pre, 0, -1); }
+    $isSep = fn($c) => $c === '' || preg_match('/[\s\-–—_:,.()\/|]/u', $c);
+    foreach ($labels as $l) {   // do not stop in the middle of a word
+        while ($pre !== '' && mb_strlen($l) > mb_strlen($pre) && !$isSep(mb_substr($l, mb_strlen($pre), 1)) && !$isSep(mb_substr($pre, -1))) $pre = mb_substr($pre, 0, -1);
+    }
+    $pre = trim($pre, " \t-–—_:,.(|/");
+    if (count($labels) === 1 || mb_strlen($pre) < 3) $pre = $labels ? trim(preg_replace('/\s*[-–—(|].*$/u', '', $labels[0]) ?? $labels[0], " \t") : '';
+
     if ($titles) {
         $cnt = array_count_values($titles); arsort($cnt);
         $best = (string)array_key_first($cnt);
-        return ['name' => $best, 'brand' => $parts[$best]['brand'], 'model' => $parts[$best]['model']];
+        $b = $parts[$best]['brand']; $m = $parts[$best]['model'];
+        $agrees = count($cnt) === 1 && ($b === '' || stripos($pre, $b) !== false);
+        if ($pre === '') return ['name' => $best, 'brand' => $b, 'model' => $m];
+        if ($agrees) {
+            // Same light by title and by category: add the LED details the title does not already carry.
+            $extra = trim(preg_replace('/^.*? · /u', '', $best, 1));
+            return ['name' => $pre . (strpos($best, ' · ') !== false && stripos($pre, $extra) === false ? ' · ' . $extra : ''), 'brand' => $b, 'model' => $m];
+        }
     }
-    // No categories: the longest prefix every title shares, cut back to a whole word without trailing separators.
-    $pre = $labels ? $labels[0] : '';
-    foreach ($labels as $l) { while ($pre !== '' && stripos($l, $pre) !== 0) $pre = mb_substr($pre, 0, -1); }
-    $pre = trim(preg_replace('/[\s\-–—_:,.(]+\S{0,2}$/u', '', $pre) ?? $pre, " \t-–—_:,.(");
-    if (count($labels) === 1 || mb_strlen($pre) < 3) $pre = $labels ? trim(preg_replace('/\s*[-–—(].*$/u', '', $labels[0]) ?? $labels[0]) : '';
     return ['name' => $pre, 'brand' => '', 'model' => ''];
 }
