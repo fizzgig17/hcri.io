@@ -18,9 +18,11 @@
 //   GET  /api/admin/categories/dupes            -- { groups }
 //   GET  /api/admin/categories/case_prefs       -- { prefs }
 //   POST /api/admin/categories/normalize        -- { kind, case, dryRun, remember }
+//   GET  /api/admin/category_requests           -- pending suggestions from users, grouped by kind + value
+//   POST /api/admin/category_requests/resolve   -- { kind, value, action: 'approve'|'reject', newValue? }
 
 import { useState, useEffect, useRef } from 'react';
-import { basePath, getToken } from '../lib/api';
+import { basePath, getToken, api } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -62,6 +64,9 @@ export default function AdminCats({ theme: o }) {
   const [, setDupInfo] = useState(null);
   const [loadedSel, setLoadedSel] = useState({});
   const fileRef = useRef(null);
+  const [reqs, setReqs] = useState([]);          // pending suggestions from users
+  const [reqEdit, setReqEdit] = useState({});    // `${kind}|${value}` -> corrected spelling before approving
+  const [reqBusy, setReqBusy] = useState('');
 
   const auth = () => ({ Authorization: `Bearer ${getToken()}` });
   const lab = (k) => {
@@ -87,8 +92,22 @@ export default function AdminCats({ theme: o }) {
       });
   };
 
+  const loadReqs = () => api.get('/admin/category_requests').then((d) => setReqs(d.items || [])).catch(() => {});
+  const resolveReq = async (r, action) => {
+    const key = `${r.kind}|${r.value}`;
+    const nv = (reqEdit[key] ?? r.value).trim();
+    if (action === 'approve' && !nv) return;
+    setReqBusy(key);
+    try {
+      await api.post('/admin/category_requests/resolve', { kind: r.kind, value: r.value, action, newValue: nv });
+      await loadReqs();
+      if (action === 'approve') load();
+    } catch (e) { setErr(e.message || 'Could not update the suggestion'); }
+    setReqBusy('');
+  };
+
   useEffect(() => {
-    if (open) load();
+    if (open) { load(); loadReqs(); }
   }, [open]);
 
   useEffect(() => {
@@ -450,6 +469,35 @@ export default function AdminCats({ theme: o }) {
   ) : (
     <div>
       {err && <div style={{ color: o.bad, fontSize: 12, marginBottom: 10 }}>{err}</div>}
+      {reqs.length > 0 && (
+        <div style={{ border: `1px solid ${o.accent}66`, borderRadius: 8, padding: 12, marginBottom: 14, background: `${o.accent}0d` }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: o.accent, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+            Suggestions ({reqs.length})
+          </div>
+          {reqs.map((r) => {
+            const key = `${r.kind}|${r.value}`;
+            const dis = reqBusy === key;
+            return (
+              <div key={key} style={{ borderTop: `1px solid ${o.border}`, padding: '8px 0', fontFamily: 'monospace' }}>
+                <div style={{ fontSize: 11, color: o.dim, marginBottom: 4 }}>
+                  {lab(r.kind)} · {r.count} request{r.count === 1 ? '' : 's'}{r.users.length ? ` · ${r.users.slice(0, 3).join(', ')}${r.users.length > 3 ? '…' : ''}` : ''}
+                </div>
+                {r.notes.map((n, i) => <div key={i} style={{ fontSize: 11, color: o.dim, fontStyle: 'italic', marginBottom: 4, wordBreak: 'break-word' }}>“{n}”</div>)}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <input
+                    value={reqEdit[key] ?? r.value}
+                    onChange={(ev) => setReqEdit((st) => ({ ...st, [key]: ev.target.value }))}
+                    title="Fix the spelling or case before approving"
+                    style={{ flex: '1 1 160px', minWidth: 0, background: o.bg, border: `1px solid ${o.border}`, borderRadius: 6, padding: '6px 8px', color: o.text, fontSize: 13, fontFamily: 'monospace' }}
+                  />
+                  <button disabled={dis} onClick={() => resolveReq(r, 'approve')} style={{ background: `${o.accent}20`, border: `1px solid ${o.accent}`, color: o.accent, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+                  <button disabled={dis} onClick={() => resolveReq(r, 'reject')} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.dim, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>Reject</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
         <div
           style={{

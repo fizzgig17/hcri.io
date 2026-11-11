@@ -24,7 +24,7 @@ import { useState, useEffect, useRef } from 'react';
 import { flushSync, createPortal } from 'react-dom';
 import { api } from '../lib/api';
 import { useTheme } from '../lib/ThemeContext.jsx';
-import { FeedbackModal as RequestValueModal } from './AuthScreen';
+import SuggestCategory from './SuggestCategory.jsx';
 import usePanelBackClose from '../hooks/usePanelBackClose';
 import LedGroupsEditor, { ledsFromReport } from './LedGroupsEditor.jsx';
 
@@ -158,8 +158,8 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
       if (vv) { vv.removeEventListener('resize', schedule); vv.removeEventListener('scroll', schedule); }
     };
   }, [openK, vals]);
-  const [reqOpen, setReqOpen] = useState(false);
-  usePanelBackClose(reqOpen, () => setReqOpen(false));
+  const [suggest, setSuggest] = useState(null);   // { kind, value } while the "Suggest a new entry" dialog is open
+  usePanelBackClose(!!suggest, () => setSuggest(null));
 
   useEffect(() => { setVals(initVals()); }, [report && report.id]);
 
@@ -438,6 +438,13 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
                   : (
                     <div style={{ padding: '8px 12px', fontSize: 12, color: o.dim, fontFamily: 'monospace' }}>
                       {avail.length ? 'No matches' : 'No more options'}
+                      <button
+                        type="button"
+                        onMouseDown={(ev) => { ev.preventDefault(); setSuggest({ kind: k, value: draft[k] || '' }); }}
+                        style={{ display: 'block', marginTop: 6, background: 'none', border: 'none', padding: 0, color: o.accent, fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        Suggest {draft[k] ? `“${draft[k]}”` : 'a new entry'} →
+                      </button>
                     </div>
                   )}
               </div>
@@ -500,7 +507,16 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
                   {it.value}
                 </div>
               )) : (
-                <div style={{ padding: '12px', fontSize: 13, color: o.dim, fontFamily: 'monospace' }}>{avail.length ? 'No matches' : 'No more options'}</div>
+                <div style={{ padding: '12px', fontSize: 13, color: o.dim, fontFamily: 'monospace' }}>
+                  {avail.length ? 'No matches' : 'No more options'}
+                  <button
+                    type="button"
+                    onClick={() => { const v = draft[k] || ''; close(); setSuggest({ kind: k, value: v }); }}
+                    style={{ display: 'block', marginTop: 8, background: 'none', border: 'none', padding: 0, color: o.accent, fontSize: 13, fontFamily: 'monospace', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    Suggest {draft[k] ? `“${draft[k]}”` : 'a new entry'} →
+                  </button>
+                </div>
               )}
             </div>
           </div>,
@@ -509,7 +525,7 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
       })()}
       <button
         type="button"
-        onClick={() => setReqOpen(true)}
+        onClick={() => setSuggest({ kind: '', value: '' })}
         style={{
           display: 'inline-block',
           marginTop: 10,
@@ -524,9 +540,9 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
           cursor: 'pointer',
         }}
       >
-        Don't see your light, LED, or optic? Request it →
+        Don't see your light, LED, or optic? Suggest a new entry →
       </button>
-      {reqOpen && <RequestValueModal onClose={() => setReqOpen(false)} />}
+      {suggest && <SuggestCategory kind={suggest.kind} value={suggest.value} isGuest={isGuest} onClose={() => setSuggest(null)} />}
     </div>
   );
 }
