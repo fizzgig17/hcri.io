@@ -39,14 +39,15 @@ const ALL_KINDS = [
   ['current', 'Current (A)'],
 ];
 
-export default function CategoryEditor({ report, isGuest, kinds }) {
+export default function CategoryEditor({ report, isGuest, kinds, lightId }) {
   const { theme: o } = useTheme();
   // `kinds` (optional list of kind ids) limits the editor to those fields, e.g. the quick-edit dialog on report cards.
   // The three LED kinds (brand, LED, CCT) are edited together as LED groups by LedGroupsEditor, so each LED keeps its own
   // values paired; everything else stays a per-kind field.
   const LED_KIND_IDS = ['led_brand', 'led_model', 'led_cct'];
-  const showLeds = !kinds || LED_KIND_IDS.some((k) => kinds.includes(k));
-  const KINDS = (kinds ? ALL_KINDS.filter(([k]) => kinds.includes(k)) : ALL_KINDS).filter(([k]) => !LED_KIND_IDS.includes(k));
+  // A light (lightId) keeps its LED kinds as plain fields like the others; a reading edits them as LED groups.
+  const showLeds = !lightId && (!kinds || LED_KIND_IDS.some((k) => kinds.includes(k)));
+  const KINDS = (kinds ? ALL_KINDS.filter(([k]) => kinds.includes(k)) : ALL_KINDS).filter(([k]) => !!lightId || !LED_KIND_IDS.includes(k));
 
   const curValues = (k) =>
     ((report && report.categories && report.categories[k]) || [])
@@ -171,7 +172,9 @@ export default function CategoryEditor({ report, isGuest, kinds }) {
   const persist = async (k, list) => {
     setBusy(k);
     try {
-      const res = await api.post('/categories/assign', { reportId: report.id, kind: k, values: list });
+      const res = lightId
+        ? await api.post(`/lights/${lightId}/categories`, { kind: k, values: list })
+        : await api.post('/categories/assign', { reportId: report.id, kind: k, values: list });
       const saved = res && res.categories ? res.categories : list.map((v) => ({ value: v }));
       if (report.categories) report.categories[k] = saved;
       setVals((v) => ({ ...v, [k]: saved.map((c) => c.value) }));

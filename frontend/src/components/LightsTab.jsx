@@ -7,7 +7,9 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api, basePath } from '../lib/api';
+import CategoryEditor from './CategoryEditor.jsx';
 
+const LIGHT_KINDS = ['light_brand', 'light_model', 'led_brand', 'led_model', 'led_cct', 'optic'];
 export const METRICS = [
   ['cct', 'CCT', 0, 'K'], ['duv', 'Duv', 4, ''], ['ra', 'Ra', 1, ''], ['r9', 'R9', 1, ''],
   ['rf', 'Rf', 0, ''], ['rg', 'Rg', 0, ''], ['lux', 'Lux', 0, ''],
@@ -17,13 +19,6 @@ const fmtD = (v, d = 0) => (v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '
 const when = (s) => { const d = new Date(String(s).replace(' ', 'T') + 'Z'); return isNaN(d) ? s : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 const epoch = (s) => { const t = new Date(String(s).replace(' ', 'T') + 'Z').getTime(); return isNaN(t) ? 0 : t; };
 const PALETTE = ['#4ea1ff', '#f5a623', '#7ed957', '#e66ba8', '#a98bff', '#37c6c0', '#ff7b54', '#c0c84a'];
-
-// x positions for the chosen axis: 'time' (real timestamps), 'order' (reading 1, 2, 3…), 'elapsed' (minutes since the first reading).
-function xs(readings, axis) {
-  if (axis === 'order') return readings.map((_, i) => i);
-  const t0 = readings.length ? epoch(readings[0].createdAt) : 0;
-  return readings.map((r) => (epoch(r.createdAt) - t0) / (axis === 'elapsed' ? 60000 : 1));
-}
 
 export function Sparkline({ values, x, color, w = 110, h = 28, onDot, big = false, dec = 0, T }) {
   const pts = values.map((v, i) => [x ? x[i] : i, v]).filter((p) => p[1] != null);
@@ -95,14 +90,11 @@ const btnS = (T, kind) => ({ background: kind === 'primary' ? T.accent : 'none',
 const inputS = (T) => ({ width: '100%', boxSizing: 'border-box', background: T.bg || T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: '7px 9px', color: T.text, fontSize: 13, fontFamily: 'monospace' });
 
 const FIELDS = [['brand', 'Light brand'], ['model', 'Light model'], ['led_brand', 'LED brand'], ['led_model', 'LED model'], ['optic', 'Optic']];
-const fromLight = (l) => ({ name: l.name || '', brand: l.brand || '', model: l.model || '', led_brand: l.ledBrand || '', led_model: l.ledModel || '', optic: l.optic || '', notes: l.notes || '' });
+const fromLight = (l) => ({ name: l.name || '', notes: l.notes || '' });
 function LightFields({ v, set, T, autoFocus }) {
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <input autoFocus={autoFocus} placeholder="Name" value={v.name} maxLength={160} onChange={(e) => set({ ...v, name: e.target.value })} style={inputS(T)} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-        {FIELDS.map(([k, lab]) => <input key={k} placeholder={lab} aria-label={lab} title={lab} value={v[k] || ''} maxLength={120} onChange={(e) => set({ ...v, [k]: e.target.value })} style={inputS(T)} />)}
-      </div>
       {'notes' in v && <textarea placeholder="Notes" value={v.notes} rows={2} onChange={(e) => set({ ...v, notes: e.target.value })} style={inputS(T)} />}
     </div>
   );
@@ -144,15 +136,17 @@ function LightCard({ light, T, onOpen, checked, onCheck }) {
 }
 
 // ── Detail ───────────────────────────────────────────────────────────────────
+const urlTokens = () => { try { return new URLSearchParams(window.location.search).get('t') || ''; } catch { return ''; } };
+
 function LightDetail({ id, T, onBack, onChanged, pub }) {
-  const base = pub ? `/lights/public/${id}` : `/lights/${id}`;
+  const tk = urlTokens();
+  const base = pub ? `/lights/public/${id}${tk ? `?tokens=${encodeURIComponent(tk)}` : ''}` : `/lights/${id}`;
   const [light, setLight] = useState(null);
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(null);
   const [sharing, setSharing] = useState(false);
   const [big, setBig] = useState(null);      // metric key being enlarged
-  const [axis, setAxis] = useState('time');
-  const [labelEdit, setLabelEdit] = useState({});
+    const [labelEdit, setLabelEdit] = useState({});
   const cardRefs = useRef({});
 
   const load = useCallback(() => api.get(base).then(setLight).catch((e) => setErr(e.message)), [base]);
@@ -169,20 +163,30 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
   };
   const remove = async (r) => { if (!window.confirm('Remove this reading from the light? The report itself is kept.')) return; await api.del(`/lights/${id}/reports/${r.id}`); load(); onChanged(); };
   const saveLabel = async (r) => { const v = labelEdit[r.id]; if (v == null) return; await api.patch(`/lights/${id}/reports/${r.id}`, { label: v }); setLabelEdit((c) => { const n = { ...c }; delete n[r.id]; return n; }); load(); };
+  const move = async (i, d) => {
+    const ids = R.map((x) => x.id); const j = i + d;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: ids })); onChanged(); } catch (e) { setErr(e.message); }
+  };
+  const sortByDate = async () => { try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: [...R].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)).map((x) => x.id) })); onChanged(); } catch (e) { setErr(e.message); } };
+  // The normal compare page for this light's readings (private ones carry their share token in a shared link).
+  const compareHref = `?compare=${R.slice(-12).map((r) => (pub && !r.isPublic && r.token ? `${r.id}.${r.token}` : r.id)).join(',')}`;
   const bigDef = big && METRICS.find((m) => m[0] === big);
-  const X = xs(R, axis);
 
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
         {onBack && <button onClick={onBack} style={btnS(T)}>← All lights</button>}
-        {(pub || light.isPublic) ? <button onClick={() => setSharing(true)} style={btnS(T, 'primary')}>Share</button> : <span style={{ fontSize: 11, color: T.dim }}>Make at least one reading public to share this light.</span>}
+        {R.length > 1 && <a href={compareHref} style={{ ...btnS(T), textDecoration: 'none', display: 'inline-block' }}>Compare readings</a>}
+        <button onClick={() => setSharing(true)} style={btnS(T, 'primary')}>Share</button>
       </div>
-      {sharing && <ShareLightsModal T={T} ids={[light.id]} onClose={() => setSharing(false)} />}
+      {sharing && <ShareLightsModal T={T} ids={[light.id]} owner={!pub} hasPrivate={!pub && R.some((r) => !r.isPublic)} onClose={() => setSharing(false)} />}
       <div style={{ ...box(T), marginBottom: 14 }}>
         {edit ? (
           <div style={{ display: 'grid', gap: 8 }}>
             <LightFields v={edit} set={setEdit} T={T} />
+            <CategoryEditor key={light.id} lightId={light.id} kinds={LIGHT_KINDS} report={{ id: light.id, categories: light.categories }} isGuest={false} />
             <div style={{ display: 'flex', gap: 8 }}><button onClick={saveEdit} style={btnS(T, 'primary')}>Save</button><button onClick={() => setEdit(null)} style={btnS(T)}>Cancel</button></div>
           </div>
         ) : (
@@ -205,7 +209,7 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
       {R.length === 0 ? <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>No readings in this light yet.</div> : (
         <>
           <div style={{ fontSize: 12, color: T.dim, marginBottom: 6 }}>
-            Headline is the latest reading ({when(light.latest.createdAt)}). Tap a trend to enlarge it.{pub ? ' Only public readings are shown.' : (light.isPublic ? ' This light is public; others see only its public readings.' : ' This light is private: none of its readings is public.')}
+            Headline is the last reading in the order below. Tap a trend to enlarge it.{pub ? ' Only public readings are shown.' : (light.isPublic ? ' This light is public; others see only its public readings.' : ' This light is private: none of its readings is public.')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8, marginBottom: 14 }}>
             {METRICS.filter(([k]) => light.stats[k]).map(([k, lab, d, unit], i) => {
@@ -224,29 +228,33 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
           {bigDef && (
             <div style={{ ...box(T), marginBottom: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{bigDef[1]} trend <span style={{ color: T.dim, fontWeight: 400 }}>· tap a dot to jump to that reading</span></div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[['time', 'Time'], ['order', 'Reading #'], ['elapsed', 'Elapsed min']].map(([a, lab]) => (
-                    <button key={a} onClick={() => setAxis(a)} style={{ ...btnS(T), padding: '3px 8px', fontWeight: axis === a ? 700 : 400, borderColor: axis === a ? T.accent : T.border }}>{lab}</button>
-                  ))}
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{bigDef[1]} trend <span style={{ color: T.dim, fontWeight: 400 }}>· in the order of the readings below; tap a dot to jump to that reading</span></div>
               </div>
-              <FitChart big values={light.series[big]} x={X} color={PALETTE[METRICS.findIndex((m) => m[0] === big) % PALETTE.length]} dec={bigDef[2]} onDot={jump} T={T} />
+              <FitChart big values={light.series[big]} color={PALETTE[METRICS.findIndex((m) => m[0] === big) % PALETTE.length]} dec={bigDef[2]} onDot={jump} T={T} />
             </div>
           )}
           <SpectraOverlay readings={R} T={T} />
-          <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 8 }}>Readings ({R.length})</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>Readings ({R.length}) <span style={{ color: T.dim, fontWeight: 400 }}>{pub ? '' : '· this order is the trend order'}</span></div>
+            {!pub && R.length > 1 && <button onClick={sortByDate} style={btnS(T)}>Sort by date</button>}
+          </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {R.map((r, i) => (
               <div key={r.id} ref={(el) => { cardRefs.current[r.id] = el; }} style={{ ...box(T, { padding: 10 }), borderRadius: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
                   <div style={{ fontSize: 13, color: T.text, fontWeight: 700 }}>
                     <span style={{ color: T.dim, fontWeight: 400 }}>#{i + 1} </span>
-                    <a href={`?explore${pub ? "" : "=mine"}&rid=${r.id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
+                    <a href={pub ? (r.isPublic ? `?report=${r.id}` : `?share=${r.token}`) : `?explore=mine&rid=${r.id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
                     {!pub && !r.isPublic && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>private</span>}
                     {r.linkLabel && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>{r.linkLabel}</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: T.dim }}>{when(r.createdAt)}</div>
+                  <div style={{ fontSize: 11, color: T.dim, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {when(r.createdAt)}
+                    {!pub && R.length > 1 && <>
+                      <button disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up" title="Move earlier in the trend order" style={{ ...btnS(T), padding: '2px 8px', opacity: i === 0 ? 0.35 : 1 }}>↑</button>
+                      <button disabled={i === R.length - 1} onClick={() => move(i, 1)} aria-label="Move down" title="Move later in the trend order" style={{ ...btnS(T), padding: '2px 8px', opacity: i === R.length - 1 ? 0.35 : 1 }}>↓</button>
+                    </>}
+                  </div>
                 </div>
                 <div style={{ fontSize: 12, color: T.text, margin: '4px 0' }}>
                   {METRICS.filter(([k]) => r[k] != null).map(([k, lab, d, unit]) => `${lab} ${fmtN(r[k], d)}${unit ? ' ' + unit : ''}`).join(' · ')}
@@ -304,10 +312,11 @@ function CompareLights({ ids, T, onBack, pub }) {
   const [err, setErr] = useState('');
   const [metric, setMetric] = useState('cct');
   const [sharing, setSharing] = useState(false);
-  useEffect(() => { Promise.all(ids.map((i) => api.get(pub ? `/lights/public/${i}` : `/lights/${i}`))).then(setLights).catch((e) => setErr(e.message)); }, [ids.join(',')]); // eslint-disable-line
+  useEffect(() => { Promise.all(ids.map((i) => api.get(pub ? `/lights/public/${i}${urlTokens() ? `?tokens=${encodeURIComponent(urlTokens())}` : ''}` : `/lights/${i}`))).then(setLights).catch((e) => setErr(e.message)); }, [ids.join(',')]); // eslint-disable-line
   if (err) return <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>;
   if (!lights) return <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>;
-  const shareIds = lights.filter((l) => pub || l.isPublic).map((l) => l.id);
+  const shareIds = lights.map((l) => l.id);
+  const anyPrivate = !pub && lights.some((l) => l.readings.some((r) => !r.isPublic));
   const metrics = METRICS.filter(([k]) => lights.some((l) => l.stats[k]));
   const md = METRICS.find((m) => m[0] === metric) || METRICS[0];
   const spd = lights.map((l, i) => ({ l, i, r: [...l.readings].reverse().find((x) => x.spd && x.spd.length) })).filter((x) => x.r);
@@ -320,9 +329,9 @@ function CompareLights({ ids, T, onBack, pub }) {
     <div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
         {onBack && <button onClick={onBack} style={btnS(T)}>← All lights</button>}
-        {shareIds.length > 0 ? <button onClick={() => setSharing(true)} style={btnS(T, 'primary')}>Share</button> : <span style={{ fontSize: 11, color: T.dim }}>None of these lights is public, so there is nothing to share.</span>}
+        <button onClick={() => setSharing(true)} style={btnS(T, 'primary')}>Share</button>
       </div>
-      {sharing && <ShareLightsModal T={T} ids={shareIds} onClose={() => setSharing(false)} />}
+      {sharing && <ShareLightsModal T={T} ids={shareIds} owner={!pub} hasPrivate={anyPrivate} onClose={() => setSharing(false)} />}
       <div style={{ fontSize: 16, fontWeight: 700, color: T.white || T.text, marginBottom: 4 }}>Compare lights ({lights.length})</div>
       <div style={{ fontSize: 12, color: T.dim, marginBottom: 10 }}>Each light is represented by its latest reading; trends run in reading order.</div>
       <div style={{ overflowX: 'auto', marginBottom: 14 }}>
@@ -368,10 +377,21 @@ function CompareLights({ ids, T, onBack, pub }) {
 
 
 // ── Share card: one card for a light or for a comparison (the same image the link preview uses) ───────────────────────────────
-export function ShareLightsModal({ T, ids, onClose }) {
+export function ShareLightsModal({ T, ids, owner, hasPrivate, onClose }) {
   const list = ids.join(',');
-  const url = `${window.location.origin}${window.location.pathname}?lights=${list}`;
-  const img = `${basePath()}index.php/api/og/lights.png?l=${list}&t=${Date.now()}`;
+  const [include, setInclude] = useState(true);     // include private readings, through the same share tokens a shared report uses
+  const [toks, setToks] = useState(owner ? null : urlTokens());
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!owner) return;
+    if (!hasPrivate || !include) { setToks(''); return; }
+    setToks(null);
+    Promise.all(ids.map((i) => api.post(`/lights/${i}/share_tokens`, {}))).then((rs) => setToks(rs.flatMap((r) => r.tokens).join(','))).catch((e) => setErr(e.message));
+  }, [include, owner, hasPrivate, list]); // eslint-disable-line
+  const ready = toks !== null;
+  const tq = toks ? `&t=${toks}` : '';
+  const url = `${window.location.origin}${window.location.pathname}?lights=${list}${tq}`;
+  const img = `${basePath()}index.php/api/og/lights.png?l=${list}${tq}`;
   const [copied, setCopied] = useState(false);
   const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { window.prompt('Copy this link', url); } };
   return (
@@ -381,10 +401,18 @@ export function ShareLightsModal({ T, ids, onClose }) {
           <div style={{ fontWeight: 700, color: T.white || T.text }}>Share {ids.length === 1 ? 'light' : `comparison of ${ids.length} lights`}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.dim, fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
-        <img src={img} alt="Share card" style={{ width: '100%', borderRadius: 8, border: `1px solid ${T.border}`, display: 'block', marginBottom: 10, background: '#0d1117', aspectRatio: '1200 / 630' }} />
-        <div style={{ fontSize: 11, color: T.dim, marginBottom: 8 }}>Anyone with the link sees public readings only. This card is also the preview that appears when the link is posted.</div>
+        {err && <div style={{ color: T.bad, fontSize: 12, marginBottom: 8 }}>{err}</div>}
+        {ready ? <img key={img} src={img} alt="Share card" style={{ width: '100%', borderRadius: 8, border: `1px solid ${T.border}`, display: 'block', marginBottom: 10, background: '#0d1117', aspectRatio: '1200 / 630' }} />
+          : <div style={{ aspectRatio: '1200 / 630', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.dim, fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 10 }}>Preparing…</div>}
+        {owner && hasPrivate && (
+          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: T.text, marginBottom: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={include} onChange={(e) => setInclude(e.target.checked)} style={{ accentColor: T.accent, marginTop: 2 }} />
+            <span>Include private readings. Each gets a share link, the same as a shared report, so anyone with this link can see (and open) them. Untick to share public readings only.</span>
+          </label>
+        )}
+        <div style={{ fontSize: 11, color: T.dim, marginBottom: 8 }}>The preview is also what shows when the link is posted.</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={copy} style={btnS(T, 'primary')}>{copied ? 'Copied ✓' : '🔗 Copy link'}</button>
+          <button disabled={!ready} onClick={copy} style={btnS(T, 'primary')}>{copied ? 'Copied ✓' : '🔗 Copy link'}</button>
           <a href={img} download="hcri-lights.png" style={{ ...btnS(T), textDecoration: 'none', display: 'inline-block' }}>↓ Download card</a>
           <a href={url} target="_blank" rel="noreferrer" style={{ ...btnS(T), textDecoration: 'none', display: 'inline-block' }}>Open link</a>
         </div>
@@ -409,7 +437,7 @@ export default function LightsTab({ T }) {
   const [pick, setPick] = useState([]);       // light ids ticked for Compare
   const [comparing, setComparing] = useState(false);
   const [pub, setPub] = useState(() => { try { return new URLSearchParams(window.location.search).get('scope') === 'public'; } catch { return false; } });
-  const blank = { name: '', brand: '', model: '', led_brand: '', led_model: '', optic: '', notes: '' };
+  const blank = { name: '', notes: '' };
   const [draft, setDraft] = useState(blank);
 
   const load = useCallback(() => { setLights(null); return api.get(pub ? '/lights/public' : '/lights').then((d) => { setLights(d); setErr(''); }).catch((e) => setErr(e.message)); }, [pub]);
@@ -464,31 +492,29 @@ export default function LightsTab({ T }) {
 // ── "Add to light" modal, used from My Reports ───────────────────────────────
 export function AddToLightModal({ T, reportIds, onClose, onDone }) {
   const [lights, setLights] = useState(null);
-  const [draft, setDraft] = useState({ name: '', brand: '', model: '', led_brand: '', led_model: '', optic: '' });
+  const [name, setName] = useState('');
+  const [sug, setSug] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [done, setDone] = useState(null);     // { id, name } of the light just made or added to, so it can be opened straight away
-  const [sugShown, setSugShown] = useState(false);
+  const [done, setDone] = useState(null);     // the light just made or added to: { id, name, categories }
   useEffect(() => { api.get('/lights').then(setLights).catch((e) => setMsg(e.message)); }, []);
-  // Suggested details: light brand + model, then LED brand, LED model and CCT, with anything after those (e.g. "- Turbo") dropped.
-  useEffect(() => {
-    api.post('/lights/suggest', { reportIds }).then((d) => {
-      if (!d.name) return;
-      setSugShown(true);
-      setDraft((cur) => cur.name ? cur : { name: d.name, brand: d.brand || '', model: d.model || '', led_brand: d.ledBrand || '', led_model: d.ledModel || '', optic: d.optic || '' });
-    }).catch(() => {});
-  }, []); // eslint-disable-line
+  // Suggested name and categories from the selected readings: light brand + model, then LED brand, LED model and CCT, with anything
+  // after those (e.g. "- Turbo") dropped. The categories are applied to the new light and can then be edited like a reading's.
+  useEffect(() => { api.post('/lights/suggest', { reportIds }).then((d) => { if (d.name) { setSug(d); setName((c) => c || d.name); } }).catch(() => {}); }, []); // eslint-disable-line
   const addTo = async (l) => {
     setBusy(true);
-    try { const d = await api.post(`/lights/${l.id}/reports`, { reportIds }); setMsg(`Added ${d.added} reading${d.added === 1 ? '' : 's'} to “${l.name}”${d.added < reportIds.length ? ` (${reportIds.length - d.added} already there)` : ''}.`); setDone({ id: l.id, name: l.name }); onDone && onDone(); }
+    try { const d = await api.post(`/lights/${l.id}/reports`, { reportIds }); setMsg(`Added ${d.added} reading${d.added === 1 ? '' : 's'} to “${l.name}”${d.added < reportIds.length ? ` (${reportIds.length - d.added} already there)` : ''}.`); setDone({ id: l.id, name: l.name, categories: d.light.categories, edit: false }); onDone && onDone(); }
     catch (e) { setMsg(e.message); }
     setBusy(false);
   };
   const createAndAdd = async () => {
-    if (!draft.name.trim()) return;
+    if (!name.trim()) return;
     setBusy(true);
-    try { const l = await api.post('/lights', { ...draft, name: draft.name.trim(), reportIds }); setMsg(`Created “${l.name}” with ${l.count} reading${l.count === 1 ? '' : 's'}.`); setDone({ id: l.id, name: l.name }); onDone && onDone(); }
-    catch (e) { setMsg(e.message); }
+    try {
+      const same = sug && name.trim() === sug.name;
+      const l = await api.post('/lights', { name: name.trim(), reportIds, categories: same ? sug.categories : {} });
+      setMsg(`Created “${l.name}” with ${l.count} reading${l.count === 1 ? '' : 's'}.`); setDone({ id: l.id, name: l.name, categories: l.categories, edit: true }); onDone && onDone();
+    } catch (e) { setMsg(e.message); }
     setBusy(false);
   };
   const openHref = done ? `${window.location.pathname}?explore=lights&light=${done.id}` : '#';
@@ -501,10 +527,14 @@ export function AddToLightModal({ T, reportIds, onClose, onDone }) {
         </div>
         {msg && <div style={{ fontSize: 12, color: T.good || T.accent, marginBottom: 8 }}>{msg}</div>}
         {done ? (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <a href={openHref} style={{ ...btnS(T, 'primary'), textDecoration: 'none', display: 'inline-block' }}>Open “{done.name}”</a>
-            <button onClick={onClose} style={btnS(T)}>Close</button>
-          </div>
+          <>
+            <div style={{ fontSize: 11, color: T.dim, marginBottom: 6 }}>Light details (brand, model, LED, optic) work like a reading's. Pick from the lists or request a new entry.</div>
+            <CategoryEditor key={done.id} lightId={done.id} kinds={LIGHT_KINDS} report={{ id: done.id, categories: done.categories }} isGuest={false} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <a href={openHref} style={{ ...btnS(T, 'primary'), textDecoration: 'none', display: 'inline-block' }}>Open “{done.name}”</a>
+              <button onClick={onClose} style={btnS(T)}>Close</button>
+            </div>
+          </>
         ) : (
           <>
             <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
@@ -516,9 +546,9 @@ export function AddToLightModal({ T, reportIds, onClose, onDone }) {
                 ))}
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 4 }}>Or create a new light</div>
-            {sugShown && <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Suggested from the selected reports; edit anything you like.</div>}
-            <LightFields v={draft} set={setDraft} T={T} />
-            <button disabled={busy || !draft.name.trim()} onClick={createAndAdd} style={{ ...btnS(T, 'primary'), marginTop: 8, opacity: draft.name.trim() ? 1 : 0.5 }}>Create light</button>
+            {sug && <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Suggested from the selected readings; edit the name if you like.</div>}
+            <input placeholder="Name" value={name} maxLength={160} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createAndAdd(); }} style={inputS(T)} />
+            <button disabled={busy || !name.trim()} onClick={createAndAdd} style={{ ...btnS(T, 'primary'), marginTop: 8, opacity: name.trim() ? 1 : 0.5 }}>Create light</button>
           </>
         )}
       </div>

@@ -48,22 +48,25 @@ $entries = array_slice(array_filter(array_map('intval', explode(',', $raw))), 0,
 if (!$entries) ogc_fallback();
 
 $db   = get_db();
-$reps = [];
+require_once __DIR__ . '/_core/lights.php';
+lights_ensure($db);
+$tokens = lights_parse_tokens($db, (string)($_GET['t'] ?? ''));   // share tokens of private readings carried by the link
+$reps = []; $names = []; $totals = [];
 foreach ($entries as $lid) {
     try {
-        $ls = $db->prepare('SELECT l.* FROM lights l WHERE l.id = ? AND EXISTS (SELECT 1 FROM light_reports lr JOIN reports r ON r.id = lr.report_id WHERE lr.light_id = l.id AND r.is_public = 1)');
-        $ls->execute([$lid]);
+        $ls = $db->prepare('SELECT * FROM lights WHERE id = ?'); $ls->execute([$lid]);
         $l = $ls->fetch();
         if (!$l) continue;
-        $rs = $db->prepare('SELECT r.cct, r.spd_data FROM light_reports lr JOIN reports r ON r.id = lr.report_id WHERE lr.light_id = ? AND r.is_public = 1 ORDER BY r.created_at DESC, r.id DESC');
-        $rs->execute([$lid]);
-        $rows = $rs->fetchAll();
-        $rep = null;
-        foreach ($rows as $row) {
-            $pairs = json_decode((string)$row['spd_data'], true);
-            if (is_array($pairs) && count($pairs) >= 2) { $rep = ['label' => $l['name'], 'cct' => $row['cct'] !== null ? (int)$row['cct'] : null, 'wls' => array_column($pairs, 0), 'vals' => array_column($pairs, 1), 'count' => count($rows)]; break; }
+        $rd = array_values(array_filter(lights_readings($db, $lid, true, true, $tokens), fn($r) => !empty($r['spd']) && count($r['spd']) >= 2));
+        $all = lights_readings($db, $lid, false, true, $tokens);
+        if (!$all) continue;
+        $names[] = $l['name']; $totals[] = count($all);
+        if (count($entries) === 1) {   // a single light: its readings overlaid (the comparison chart)
+            foreach (array_slice($rd, 0, 10) as $r) $reps[] = ['label' => $r['label'], 'cct' => $r['cct'] !== null ? (int)$r['cct'] : null, 'wls' => array_column($r['spd'], 0), 'vals' => array_column($r['spd'], 1), 'count' => 1];
+        } elseif ($rd) {
+            $r = end($rd);
+            $reps[] = ['label' => $l['name'], 'cct' => $r['cct'] !== null ? (int)$r['cct'] : null, 'wls' => array_column($r['spd'], 0), 'vals' => array_column($r['spd'], 1), 'count' => count($all)];
         }
-        if ($rep) $reps[] = $rep;
     } catch (\Throwable $e) {}
 }
 if (count($reps) < 1) ogc_fallback();
@@ -126,12 +129,12 @@ $rrect = function ($x0, $y0, $x1, $y1, $rad, $fill, $border) use ($im) {
 $PAD = 56;
 
 // ── Title: the same card for one light (its name + reading count) or a comparison of several ───────────────────────────────────
-$single = count($reps) === 1;
-$ttl = $single ? (string)$reps[0]['label'] : 'Light comparison';
+$single = count($names) === 1;
+$ttl = $single ? (string)$names[0] : 'Light comparison';
 if (mb_strlen($ttl) > 34) $ttl = mb_substr($ttl, 0, 33) . '…';
 $text(42, $PAD, $PAD - 6, $TEXT, $F_WORK_B, $ttl);
-$nr = array_sum(array_column($reps, 'count'));
-$cntLbl = $single ? ('(' . $reps[0]['count'] . ' reading' . ($reps[0]['count'] === 1 ? '' : 's') . ')') : ('(' . count($reps) . ' lights · ' . $nr . ' readings)');
+$nr = array_sum($totals);
+$cntLbl = $single ? ('(' . $nr . ' reading' . ($nr === 1 ? '' : 's') . ')') : ('(' . count($names) . ' lights · ' . $nr . ' readings)');
 $text(22, $PAD + $textw(42, $F_WORK_B, $ttl) + 16, $PAD + 9, $DIM, $F_WORK_R, $cntLbl);
 
 // ── Legend (wraps; up to 2 rows) ─────────────────────────────────────────────
@@ -145,7 +148,7 @@ foreach ($reps as $i => $rep) {
     $c   = $rgb($col[0], $col[1], $col[2]);
     $lab = (string)$rep['label'];
     if (mb_strlen($lab) > 22) $lab = mb_substr($lab, 0, 21) . '…';
-    $lab .= '  ' . $rep['count'] . ' reading' . ($rep['count'] === 1 ? '' : 's');
+    if (!$single) $lab .= '  ' . $rep['count'] . ' reading' . ($rep['count'] === 1 ? '' : 's');
     if ($rep['cct'] !== null) $lab .= '  ' . $rep['cct'] . 'K';
     $itemW = 16 + 9 + $textw(18, $F_MONO_R, $lab) + 26;
     if ($lx + $itemW > $right && $lx > $PAD) { $lx = $PAD; $ly += $lineH; }

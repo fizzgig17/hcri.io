@@ -32,10 +32,13 @@ if (preg_match('#^/public(?:/(\d+))?$#', $path, $pp)) {
     $sql = 'SELECT l.*, u.name AS owner_name FROM lights l LEFT JOIN users u ON u.id = l.user_id
              WHERE EXISTS (SELECT 1 FROM light_reports lr JOIN reports r ON r.id = lr.report_id WHERE lr.light_id = l.id AND r.is_public = 1)';
     if (!empty($pp[1])) {
-        $s = $db->prepare($sql . ' AND l.id = ?'); $s->execute([(int)$pp[1]]);
+        $tk = lights_parse_tokens($db, (string)($_GET['tokens'] ?? ''));
+        // Visible when a reading is public, or when the link carries a valid share token for one of its private readings.
+        $s = $db->prepare('SELECT l.*, u.name AS owner_name FROM lights l LEFT JOIN users u ON u.id = l.user_id WHERE l.id = ?'); $s->execute([(int)$pp[1]]);
         $l = $s->fetch();
         if (!$l) json_error('Not found', 404);
-        $o = lights_summary($db, $l, true, true);
+        $o = lights_summary($db, $l, true, true, $tk);
+        if ((int)$o['count'] === 0) json_error('Not found', 404);
         $o['owner'] = $hid[(int)$l['user_id']] ?? ($l['owner_name'] ?: 'user');
         json_out($o);
     }
@@ -65,6 +68,7 @@ if ($path === '') {
         $id = (int)$db->lastInsertId();
         $ids = array_filter(array_map(fn($k) => hcri_rid($db, $k), (array)(body()['reportIds'] ?? [])));
         if ($ids) lights_attach($db, $uid, $id, $ids);
+        foreach ((array)(body()['categories'] ?? []) as $k => $vals) if (in_array($k, LIGHT_CAT_KINDS, true) && is_array($vals)) lights_set_categories($db, $id, $k, $vals);
         json_out(lights_summary($db, lights_owned($db, $uid, $id), true), 201);
     }
     json_error('Method not allowed', 405);
@@ -75,19 +79,33 @@ if ($path === '/suggest' && $m === 'POST') {
     json_out(lights_suggest($db, $uid, $ids));
 }
 
-if (!preg_match('#^/(\d+)(?:/reports(?:/([A-Za-z0-9]+))?)?$#', $path, $pm)) json_error('Not found', 404);
+if (!preg_match('#^/(\d+)(?:/(categories|share_tokens)|/reports(?:/([A-Za-z0-9]+))?)?$#', $path, $pm)) json_error('Not found', 404);
 $lid = (int)$pm[1];
 $light = lights_owned($db, $uid, $lid);
 if (!$light) json_error('Not found', 404);
+$sub = $pm[2] ?? '';
+if ($sub === 'categories' && $m === 'POST') {
+    $kind = (string)(body()['kind'] ?? '');
+    if (!in_array($kind, LIGHT_CAT_KINDS, true)) json_error('Invalid category kind', 400);
+    json_out(['categories' => lights_set_categories($db, $lid, $kind, (array)(body()['values'] ?? []))]);
+}
+if ($sub === 'share_tokens' && $m === 'POST') {   // a share token for every private reading, so a link can carry them like a shared report
+    $s = $db->prepare('SELECT r.id FROM light_reports lr JOIN reports r ON r.id = lr.report_id WHERE lr.light_id = ? AND r.is_public = 0 AND r.user_id = ?');
+    $s->execute([$lid, $uid]);
+    $out = [];
+    foreach ($s->fetchAll(PDO::FETCH_COLUMN) as $rid) $out[] = hcri_pid($db, (int)$rid) . '.' . lights_report_token($db, (int)$rid);
+    json_out(['tokens' => $out]);
+}
+if ($sub !== '') json_error('Method not allowed', 405);
 $isReports = (bool)preg_match('#/reports#', $path);
-$rkey = $pm[2] ?? '';
+$rkey = $pm[3] ?? '';
 
 if (!$isReports) {
     if ($m === 'GET') json_out(lights_summary($db, $light, true));
     if ($m === 'PATCH') {
         $c = lights_clean(body(), $light);
         if ($c['name'] === '') json_error("'name' cannot be empty");
-        $db->prepare('UPDATE lights SET name=?,brand=?,model=?,led_brand=?,led_model=?,optic=?,notes=? WHERE id=?')->execute([$c['name'], $c['brand'], $c['model'], $c['led_brand'], $c['led_model'], $c['optic'], $c['notes'], $lid]);
+        $db->prepare('UPDATE lights SET name=?,notes=? WHERE id=?')->execute([$c['name'], $c['notes'], $lid]);
         json_out(lights_summary($db, lights_owned($db, $uid, $lid), true));
     }
     if ($m === 'DELETE') {   // only the grouping goes; the readings themselves are never touched
@@ -106,6 +124,12 @@ if ($rkey === '') {
     json_out(['added' => $added, 'light' => lights_summary($db, $light, true)]);
 }
 
+if ($rkey === 'order' && $m === 'POST') {   // the readings' order within the light; it is also the trend order
+    $ids = array_values(array_filter(array_map(fn($k) => hcri_rid($db, $k), (array)(body()['reportIds'] ?? []))));
+    $up = $db->prepare('UPDATE light_reports SET pos = ? WHERE light_id = ? AND report_id = ?');
+    foreach ($ids as $i => $rid) $up->execute([$i + 1, $lid, $rid]);
+    json_out(lights_summary($db, $light, true));
+}
 $rid = hcri_rid($db, $rkey);
 if (!$rid) json_error('Not found', 404);
 if ($m === 'DELETE') {
@@ -126,7 +150,8 @@ function lights_attach(PDO $db, int $uid, int $lid, array $ids): int {
     $own = $db->prepare("SELECT id FROM reports WHERE user_id=? AND id IN ($in)");
     $own->execute([$uid, ...$ids]);
     $n = 0;
-    $ins = $db->prepare('INSERT IGNORE INTO light_reports(light_id,report_id) VALUES(?,?)');
-    foreach ($own->fetchAll(PDO::FETCH_COLUMN) as $rid) { $ins->execute([$lid, (int)$rid]); $n += $ins->rowCount(); }
+    $mx = $db->prepare('SELECT COALESCE(MAX(pos),0) FROM light_reports WHERE light_id=?'); $mx->execute([$lid]); $pos = (int)$mx->fetchColumn();
+    $ins = $db->prepare('INSERT IGNORE INTO light_reports(light_id,report_id,pos) VALUES(?,?,?)');
+    foreach ($own->fetchAll(PDO::FETCH_COLUMN) as $rid) { $ins->execute([$lid, (int)$rid, $pos + 1]); if ($ins->rowCount()) { $pos++; $n++; } }
     return $n;
 }
