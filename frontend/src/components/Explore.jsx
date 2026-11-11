@@ -1052,14 +1052,18 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   // claimPanel's comment in panelHistory.js for why closing a RESTORED
   // report (one the page loaded with already, not one opened by a click
   // in this session) rewrites the URL instead of calling history.back().
-  usePanelBackClose(!!ee, () => F(null), () => {
-    const base = exploreTabUrl(tab);
+  // A reading opened from a light (?from=light-ID) goes back to that light, not to the report list. Read once on load: the report's
+  // own URL is rewritten below and would otherwise lose it.
+  const [fromLightId] = useState(() => { try { const m = /^light-(\d+)$/.exec(new URLSearchParams(window.location.search).get('from') || ''); return m ? m[1] : ''; } catch { return ''; } });
+  const lightUrl = `${typeof window !== 'undefined' ? window.location.pathname : ''}?explore=lights&light=${fromLightId}`;
+  usePanelBackClose(!!ee, () => { if (fromLightId) { window.location.href = lightUrl; return; } F(null); }, () => {
+    const base = exploreTabUrl(tab) + (fromLightId ? '&from=light-' + fromLightId : '');
     const rid = ee && ee.id;
     return {
       state: { hcri: 1, view: 'explore', etab: tab, rid },
       url: base + '&rid=' + rid,
       closedState: { hcri: 1, view: 'explore', etab: tab },
-      closedUrl: base,
+      closedUrl: fromLightId ? lightUrl : base,
     };
   });
   usePanelBackClose(comparing, () => setComparing(false));
@@ -1802,10 +1806,8 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   // browser back button via usePanelBackClose below -- both just flip `ee`
   // back to null; back-button support owns the actual history navigation,
   // see the comment on that hook call).
-  // A reading opened from a light (?from=light-ID) goes back to that light, not to the report list.
-  const fromLightId = (() => { try { const m = /^light-(\d+)$/.exec(new URLSearchParams(window.location.search).get('from') || ''); return m ? m[1] : ''; } catch { return ''; } })();
   const goBackFromReport = () => {
-    if (fromLightId) { window.location.href = `${window.location.pathname}?explore=lights&light=${fromLightId}`; return; }
+    if (fromLightId) { window.location.href = lightUrl; return; }
     F(null);
     L(k);
   };
