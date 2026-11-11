@@ -95,14 +95,17 @@ const btnS = (T, kind) => ({ background: kind === 'primary' ? T.accent : 'none',
 const inputS = (T) => ({ width: '100%', boxSizing: 'border-box', background: T.bg || T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: '7px 9px', color: T.text, fontSize: 13, fontFamily: 'monospace' });
 
 // ── Overview card (list) ─────────────────────────────────────────────────────
-function LightCard({ light, T, onOpen }) {
+function LightCard({ light, T, onOpen, checked, onCheck }) {
   const l = light.latest;
   return (
-    <div onClick={onOpen} style={{ ...box(T), cursor: 'pointer' }}>
+    <div onClick={onOpen} style={{ ...box(T), cursor: 'pointer', borderColor: checked ? T.accent : T.border }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-        <div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <input type="checkbox" checked={!!checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label="Select to compare" style={{ accentColor: T.accent, width: 18, height: 18, marginTop: 2, cursor: 'pointer' }} />
+          <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.white || T.text }}>{light.name}</div>
           <div style={{ fontSize: 11, color: T.dim }}>{[light.brand, light.model].filter(Boolean).join(' · ') || 'No brand / model'}</div>
+          </div>
         </div>
         <div style={{ fontSize: 11, color: T.dim, textAlign: 'right' }}>{light.count} reading{light.count === 1 ? '' : 's'}{l ? <><br />latest {when(l.createdAt)}</> : null}</div>
       </div>
@@ -244,12 +247,106 @@ function LightDetail({ id, T, onBack, onChanged }) {
   );
 }
 
+
+// ── Compare lights ───────────────────────────────────────────────────────────
+function MultiTrend({ lights, metric, dec, T }) {
+  const ref = useRef(null);
+  const [w, setW] = useState(560);
+  useEffect(() => { const el = ref.current; if (!el) return; const f = () => setW(Math.max(260, Math.floor(el.clientWidth))); f(); const ro = new ResizeObserver(f); ro.observe(el); return () => ro.disconnect(); }, []);
+  const h = 200, padL = 40, padR = 8, padT = 10, padB = 20;
+  const series = lights.map((l) => l.series[metric].map((v, i) => [i + 1, v]).filter((p) => p[1] != null));
+  const all = series.flat();
+  if (!all.length) return <div style={{ fontSize: 12, color: T.dim }}>No {metric} data.</div>;
+  const xmax = Math.max(...all.map((p) => p[0])), xmin = 1;
+  let ymin = Math.min(...all.map((p) => p[1])), ymax = Math.max(...all.map((p) => p[1]));
+  if (ymax === ymin) { ymax += 1; ymin -= 1; }
+  const sx = (v) => padL + (xmax === xmin ? (w - padL - padR) / 2 : ((v - xmin) / (xmax - xmin)) * (w - padL - padR));
+  const sy = (v) => padT + (1 - (v - ymin) / (ymax - ymin)) * (h - padT - padB);
+  return (
+    <div ref={ref} style={{ width: '100%' }}>
+      <svg width={w} height={h} style={{ display: 'block' }}>
+        {[ymin, (ymin + ymax) / 2, ymax].map((v, i) => (<g key={i}><line x1={padL} x2={w - padR} y1={sy(v)} y2={sy(v)} stroke={T.border} /><text x={padL - 4} y={sy(v) + 4} textAnchor="end" fontSize="10" fill={T.dim}>{v.toFixed(dec)}</text></g>))}
+        <text x={w / 2} y={h - 4} textAnchor="middle" fontSize="10" fill={T.dim}>reading #</text>
+        {series.map((pts, li) => (
+          <g key={li}>
+            <path d={pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join(' ')} fill="none" stroke={PALETTE[li % PALETTE.length]} strokeWidth="2" />
+            {pts.map((p, i) => <circle key={i} cx={sx(p[0])} cy={sy(p[1])} r="3.5" fill={PALETTE[li % PALETTE.length]}><title>{lights[li].name} #{p[0]}: {p[1].toFixed(dec)}</title></circle>)}
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function CompareLights({ ids, T, onBack }) {
+  const [lights, setLights] = useState(null);
+  const [err, setErr] = useState('');
+  const [metric, setMetric] = useState('cct');
+  useEffect(() => { Promise.all(ids.map((i) => api.get(`/lights/${i}`))).then(setLights).catch((e) => setErr(e.message)); }, [ids.join(',')]); // eslint-disable-line
+  if (err) return <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>;
+  if (!lights) return <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>;
+  const metrics = METRICS.filter(([k]) => lights.some((l) => l.stats[k]));
+  const md = METRICS.find((m) => m[0] === metric) || METRICS[0];
+  const spd = lights.map((l, i) => ({ l, i, r: [...l.readings].reverse().find((x) => x.spd && x.spd.length) })).filter((x) => x.r);
+  const W = 520, H = 170, p = { l: 8, r: 8, t: 8, b: 20 };
+  const all = spd.flatMap((x) => x.r.spd.map((q) => q[0]));
+  const lo = Math.min(...all), hi = Math.max(...all);
+  const sx = (w) => p.l + ((w - lo) / (hi - lo || 1)) * (W - p.l - p.r);
+  const sy = (v) => p.t + (1 - v) * (H - p.t - p.b);
+  return (
+    <div>
+      <button onClick={onBack} style={{ ...btnS(T), marginBottom: 12 }}>← All lights</button>
+      <div style={{ fontSize: 16, fontWeight: 700, color: T.white || T.text, marginBottom: 4 }}>Compare lights ({lights.length})</div>
+      <div style={{ fontSize: 12, color: T.dim, marginBottom: 10 }}>Each light is represented by its latest reading; trends run in reading order.</div>
+      <div style={{ overflowX: 'auto', marginBottom: 14 }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 12, minWidth: '100%' }}>
+          <thead><tr>
+            <th style={{ textAlign: 'left', padding: '6px 8px', color: T.dim }}></th>
+            {lights.map((l, i) => (<th key={l.id} style={{ textAlign: 'right', padding: '6px 8px', color: T.text, borderBottom: `2px solid ${PALETTE[i % PALETTE.length]}`, whiteSpace: 'nowrap' }}>{l.name}<div style={{ fontWeight: 400, color: T.dim, fontSize: 10 }}>{l.count} reading{l.count === 1 ? '' : 's'}</div></th>))}
+          </tr></thead>
+          <tbody>
+            {metrics.map(([k, lab, d, unit]) => (
+              <tr key={k} style={{ borderTop: `1px solid ${T.border}` }}>
+                <td style={{ padding: '6px 8px', color: T.dim }}>{lab}{unit ? ` (${unit})` : ''}</td>
+                {lights.map((l) => { const s = l.stats[k]; return (
+                  <td key={l.id} style={{ padding: '6px 8px', textAlign: 'right', color: T.text, whiteSpace: 'nowrap' }}>
+                    {s ? <>{fmtN(s.latest, d)}<div style={{ fontSize: 10, color: T.dim }}>{s.n > 1 ? `${fmtN(s.min, d)}–${fmtN(s.max, d)} · ${fmtD(s.change, d)}` : ''}</div></> : '–'}
+                  </td>); })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {spd.length > 0 && (
+        <div style={{ ...box(T), marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 6 }}>Spectra <span style={{ color: T.dim, fontWeight: 400 }}>(latest reading of each light, normalised)</span></div>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+            {spd.map((x) => <path key={x.l.id} d={x.r.spd.map((q, i) => `${i ? 'L' : 'M'}${sx(q[0]).toFixed(1)},${sy(q[1]).toFixed(1)}`).join(' ')} fill="none" stroke={PALETTE[x.i % PALETTE.length]} strokeWidth="2" />)}
+            {[400, 500, 600, 700].filter((w) => w >= lo && w <= hi).map((w) => <text key={w} x={sx(w)} y={H - 5} fontSize="10" textAnchor="middle" fill={T.dim}>{w}</text>)}
+          </svg>
+        </div>
+      )}
+      <div style={{ ...box(T), marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+          {metrics.map(([k, lab]) => <button key={k} onClick={() => setMetric(k)} style={{ ...btnS(T), padding: '3px 9px', borderColor: metric === k ? T.accent : T.border, fontWeight: metric === k ? 700 : 400 }}>{lab}</button>)}
+        </div>
+        <MultiTrend lights={lights} metric={md[0]} dec={md[2]} T={T} />
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: T.text }}>
+        {lights.map((l, i) => <span key={l.id}><span style={{ color: PALETTE[i % PALETTE.length] }}>■</span> {l.name}</span>)}
+      </div>
+    </div>
+  );
+}
+
 // ── The tab ──────────────────────────────────────────────────────────────────
 export default function LightsTab({ T }) {
   const [lights, setLights] = useState(null);
   const [err, setErr] = useState('');
   const [open, setOpen] = useState(() => { try { const v = new URLSearchParams(window.location.search).get('light'); return v ? parseInt(v, 10) || null : null; } catch { return null; } });
   const [creating, setCreating] = useState(false);
+  const [pick, setPick] = useState([]);       // light ids ticked for Compare
+  const [comparing, setComparing] = useState(false);
   const [draft, setDraft] = useState({ name: '', brand: '', model: '', notes: '' });
 
   const load = useCallback(() => api.get('/lights').then((d) => { setLights(d); setErr(''); }).catch((e) => setErr(e.message)), []);
@@ -261,6 +358,7 @@ export default function LightsTab({ T }) {
     try { const l = await api.post('/lights', draft); setCreating(false); setDraft({ name: '', brand: '', model: '', notes: '' }); await load(); go(l.id); } catch (e) { setErr(e.message); }
   };
 
+  if (comparing) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><CompareLights ids={pick} T={T} onBack={() => setComparing(false)} /></div>;
   if (open) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><LightDetail id={open} T={T} onBack={() => go(null)} onChanged={load} /></div>;
   return (
     <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}>
@@ -282,8 +380,15 @@ export default function LightsTab({ T }) {
       {!lights && !err && <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>}
       {lights && lights.length === 0 && !creating && <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>No lights yet. Create one, or select reports in My Reports and choose “Add to light”.</div>}
       <div style={{ display: 'grid', gap: 10 }}>
-        {(lights || []).map((l) => <LightCard key={l.id} light={l} T={T} onOpen={() => go(l.id)} />)}
+        {(lights || []).map((l) => <LightCard key={l.id} light={l} T={T} onOpen={() => go(l.id)} checked={pick.includes(l.id)} onCheck={() => setPick((c) => c.includes(l.id) ? c.filter((x) => x !== l.id) : [...c, l.id].slice(-8))} />)}
       </div>
+      {pick.length > 0 && (
+        <div style={{ position: 'sticky', bottom: 12, marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 6px 24px rgba(0,0,0,0.45)' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.text, flex: 1 }}>{pick.length} selected</span>
+          <button onClick={() => setPick([])} style={btnS(T)}>Clear</button>
+          <button disabled={pick.length < 2} onClick={() => setComparing(true)} style={{ ...btnS(T, 'primary'), opacity: pick.length < 2 ? 0.5 : 1 }}>Compare →</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -294,7 +399,10 @@ export function AddToLightModal({ T, reportIds, onClose, onDone }) {
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [sug, setSug] = useState(null);
   useEffect(() => { api.get('/lights').then(setLights).catch((e) => setMsg(e.message)); }, []);
+  // Suggested title: light brand + model, then LED brand + model + CCT, with anything after those (e.g. "- Turbo") dropped.
+  useEffect(() => { api.post('/lights/suggest', { reportIds }).then((d) => { setSug(d); setNewName((cur) => cur || d.name || ''); }).catch(() => {}); }, []); // eslint-disable-line
   const addTo = async (l) => {
     setBusy(true);
     try { const d = await api.post(`/lights/${l.id}/reports`, { reportIds }); setMsg(`Added ${d.added} reading${d.added === 1 ? '' : 's'} to “${l.name}”${d.added < reportIds.length ? ` (${reportIds.length - d.added} already there)` : ''}.`); onDone && onDone(); }
@@ -304,7 +412,8 @@ export function AddToLightModal({ T, reportIds, onClose, onDone }) {
   const createAndAdd = async () => {
     if (!newName.trim()) return;
     setBusy(true);
-    try { const l = await api.post('/lights', { name: newName.trim(), reportIds }); setMsg(`Created “${l.name}” with ${l.count} reading${l.count === 1 ? '' : 's'}.`); setNewName(''); onDone && onDone(); }
+    try { const same = sug && newName.trim() === sug.name;
+      const l = await api.post('/lights', { name: newName.trim(), brand: same ? sug.brand : '', model: same ? sug.model : '', reportIds }); setMsg(`Created “${l.name}” with ${l.count} reading${l.count === 1 ? '' : 's'}.`); setNewName(''); onDone && onDone(); }
     catch (e) { setMsg(e.message); }
     setBusy(false);
   };
@@ -324,6 +433,7 @@ export function AddToLightModal({ T, reportIds, onClose, onDone }) {
               </button>
             ))}
         </div>
+        {sug && sug.name && <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Suggested name from the selected reports (edit it if you like):</div>}
         <div style={{ display: 'flex', gap: 6 }}>
           <input placeholder="New light name" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createAndAdd(); }} style={inputS(T)} />
           <button disabled={busy || !newName.trim()} onClick={createAndAdd} style={btnS(T, 'primary')}>Create</button>

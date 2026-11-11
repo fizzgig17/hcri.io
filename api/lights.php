@@ -43,6 +43,11 @@ if ($path === '') {
     json_error('Method not allowed', 405);
 }
 
+if ($path === '/suggest' && $m === 'POST') {
+    $ids = array_values(array_filter(array_map(fn($k) => hcri_rid($db, $k), (array)(body()['reportIds'] ?? []))));
+    json_out(lights_suggest($db, $uid, $ids));
+}
+
 if (!preg_match('#^/(\d+)(?:/reports(?:/([A-Za-z0-9]+))?)?$#', $path, $pm)) json_error('Not found', 404);
 $lid = (int)$pm[1];
 $light = lights_owned($db, $uid, $lid);

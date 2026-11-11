@@ -106,3 +106,43 @@ function lights_summary(PDO $db, array $l, bool $detail): array {
     else foreach ($out['latest'] ? [0] : [] as $_) { unset($out['latest']['spd']); }
     return $out;
 }
+
+/**
+ * Suggest a name (and brand / model) for a light made from these reports: light brand, light model, then LED brand, LED model and
+ * CCT, dropping anything else a report title carries after them ("... - Turbo", "after 10 min"). The most common title among the
+ * reports wins; reports without categories fall back to the part of the report titles they all share.
+ */
+function lights_suggest(PDO $db, int $uid, array $ids): array {
+    $ids = array_values(array_unique(array_map('intval', $ids)));
+    if (!$ids) return ['name' => '', 'brand' => '', 'model' => ''];
+    require_once __DIR__ . '/categories.php';
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $q = $db->prepare("SELECT id,label FROM reports WHERE user_id=? AND id IN ($in)");
+    $q->execute([$uid, ...$ids]);
+    $rows = $q->fetchAll();
+    $titles = []; $parts = []; $labels = [];
+    foreach ($rows as $r) {
+        $c = report_categories_map($db, (int)$r['id']);
+        $v = fn($k) => implode('/', array_map(fn($x) => $x['value'], $c[$k] ?? []));
+        $lb = $v('light_brand'); $lm = $v('light_model');
+        $led = trim(implode(' ', array_filter([$v('led_brand'), $v('led_model')])));
+        $cct = $v('led_cct');
+        if ($cct !== '' && !preg_match('/k\s*$/i', $cct)) $cct .= 'K';
+        $t = trim(implode(' ', array_filter([$lb, $lm])));
+        $l2 = trim(implode(' ', array_filter([$led, $cct])));
+        $title = trim($t . ($t !== '' && $l2 !== '' ? ' · ' : '') . $l2);
+        if ($title !== '') { $titles[] = $title; $parts[$title] = ['brand' => $lb, 'model' => $lm]; }
+        $labels[] = (string)$r['label'];
+    }
+    if ($titles) {
+        $cnt = array_count_values($titles); arsort($cnt);
+        $best = (string)array_key_first($cnt);
+        return ['name' => $best, 'brand' => $parts[$best]['brand'], 'model' => $parts[$best]['model']];
+    }
+    // No categories: the longest prefix every title shares, cut back to a whole word without trailing separators.
+    $pre = $labels ? $labels[0] : '';
+    foreach ($labels as $l) { while ($pre !== '' && stripos($l, $pre) !== 0) $pre = mb_substr($pre, 0, -1); }
+    $pre = trim(preg_replace('/[\s\-–—_:,.(]+\S{0,2}$/u', '', $pre) ?? $pre, " \t-–—_:,.(");
+    if (count($labels) === 1 || mb_strlen($pre) < 3) $pre = $labels ? trim(preg_replace('/\s*[-–—(].*$/u', '', $labels[0]) ?? $labels[0]) : '';
+    return ['name' => $pre, 'brand' => '', 'model' => ''];
+}
