@@ -145,6 +145,8 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(null);
   const [sharing, setSharing] = useState(false);
+  const [drag, setDrag] = useState(null);   // drag-to-reorder: { from, over }
+  const dragRef = useRef(null);
   const [big, setBig] = useState(null);      // metric key being enlarged
     const [labelEdit, setLabelEdit] = useState({});
   const cardRefs = useRef({});
@@ -168,6 +170,31 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
     if (j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
     try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: ids })); onChanged(); } catch (e) { setErr(e.message); }
+  };
+  const saveOrder = async (ids) => { try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: ids })); onChanged(); } catch (e) { setErr(e.message); } };
+  // Drag to reorder (mouse and touch): press the ⠿ handle, drag over another reading, release.
+  const overAt = (y) => { let o = R.length; for (let k = 0; k < R.length; k++) { const el = cardRefs.current[R[k].id]; if (!el) continue; const b = el.getBoundingClientRect(); if (y < b.top + b.height / 2) { o = k; break; } } return o; };
+  const scroller = (el) => { for (let n = el && el.parentElement; n; n = n.parentElement) { const oy = getComputedStyle(n).overflowY; if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n; } return null; };
+  const dragStart = (e, i) => {
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    dragRef.current = { from: i, over: i };
+    setDrag({ from: i, over: i });
+  };
+  const dragMove = (e) => {
+    const d = dragRef.current; if (!d) return;
+    const over = overAt(e.clientY);
+    if (over !== d.over) { d.over = over; setDrag({ from: d.from, over }); }
+    const sc = scroller(cardRefs.current[R[d.from].id]); const top = sc ? sc.getBoundingClientRect().top : 0; const bot = sc ? sc.getBoundingClientRect().bottom : window.innerHeight;   // scroll while near an edge
+    const dy = e.clientY < top + 50 ? -14 : e.clientY > bot - 50 ? 14 : 0;
+    if (dy) { if (sc) sc.scrollBy(0, dy); else window.scrollBy(0, dy); }
+  };
+  const dragEnd = () => {
+    const d = dragRef.current; dragRef.current = null; setDrag(null);
+    if (!d || d.over === d.from || d.over === d.from + 1) return;
+    const ids = R.map((x) => x.id); const [moved] = ids.splice(d.from, 1);
+    ids.splice(d.over > d.from ? d.over - 1 : d.over, 0, moved);
+    saveOrder(ids);
   };
   const sortByDate = async () => { try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: [...R].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)).map((x) => x.id) })); onChanged(); } catch (e) { setErr(e.message); } };
   // The normal compare page for this light's readings (private ones carry their share token in a shared link).
@@ -240,9 +267,11 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {R.map((r, i) => (
-              <div key={r.id} ref={(el) => { cardRefs.current[r.id] = el; }} style={{ ...box(T, { padding: 10 }), borderRadius: 8 }}>
+              <div key={r.id} ref={(el) => { cardRefs.current[r.id] = el; }} style={{ ...box(T, { padding: 10 }), borderRadius: 8, opacity: drag && drag.from === i ? 0.45 : 1, boxShadow: drag && drag.over === i && drag.over !== drag.from && drag.over !== drag.from + 1 ? `0 -3px 0 0 ${T.accent}` : (drag && drag.over === R.length && i === R.length - 1 && drag.from !== R.length - 1 ? `0 3px 0 0 ${T.accent}` : 'none') }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
                   <div style={{ fontSize: 13, color: T.text, fontWeight: 700 }}>
+                    {!pub && R.length > 1 && <span role="button" aria-label="Drag to reorder" title="Drag to reorder" onPointerDown={(e) => dragStart(e, i)} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={dragEnd}
+                      style={{ cursor: 'grab', touchAction: 'none', userSelect: 'none', padding: '4px 8px 4px 0', marginRight: 2, color: T.dim, fontSize: 16, lineHeight: 1 }}>⠿</span>}
                     <span style={{ color: T.dim, fontWeight: 400 }}>#{i + 1} </span>
                     <a href={pub ? (r.isPublic ? `?report=${r.id}` : `?share=${r.token}`) : `?explore=mine&rid=${r.id}&from=light-${id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
                     {!pub && !r.isPublic && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>private</span>}
