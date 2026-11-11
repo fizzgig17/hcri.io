@@ -244,7 +244,7 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
                   <div style={{ fontSize: 13, color: T.text, fontWeight: 700 }}>
                     <span style={{ color: T.dim, fontWeight: 400 }}>#{i + 1} </span>
-                    <a href={pub ? (r.isPublic ? `?report=${r.id}` : `?share=${r.token}`) : `?explore=mine&rid=${r.id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
+                    <a href={pub ? (r.isPublic ? `?report=${r.id}` : `?share=${r.token}`) : `?explore=mine&rid=${r.id}&from=light-${id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
                     {!pub && !r.isPublic && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>private</span>}
                     {r.linkLabel && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>{r.linkLabel}</span>}
                   </div>

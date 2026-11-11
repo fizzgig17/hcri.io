@@ -1802,7 +1802,10 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   // browser back button via usePanelBackClose below -- both just flip `ee`
   // back to null; back-button support owns the actual history navigation,
   // see the comment on that hook call).
+  // A reading opened from a light (?from=light-ID) goes back to that light, not to the report list.
+  const fromLightId = (() => { try { const m = /^light-(\d+)$/.exec(new URLSearchParams(window.location.search).get('from') || ''); return m ? m[1] : ''; } catch { return ''; } })();
   const goBackFromReport = () => {
+    if (fromLightId) { window.location.href = `${window.location.pathname}?explore=lights&light=${fromLightId}`; return; }
     F(null);
     L(k);
   };
@@ -2039,7 +2042,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   const detailToolbar = (
     <div style={{ background: r.surface2, borderBottom: `1px solid ${r.border}`, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
       <button onClick={goBackFromReport} style={btn()}>
-        {tab === 'myreports' ? (folderSel != null ? `← Back to ${(folders.find((fo) => fo.id === folderSel) || {}).name || 'Folder'}` : '← Back to My Reports') : '← Back to Explore'}
+        {fromLightId ? '← Back to light' : tab === 'myreports' ? (folderSel != null ? `← Back to ${(folders.find((fo) => fo.id === folderSel) || {}).name || 'Folder'}` : '← Back to My Reports') : '← Back to Explore'}
       </button>
       {folderMenu}
       {!o && !ePin && !eOpen && (
