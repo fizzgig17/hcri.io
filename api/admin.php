@@ -5,6 +5,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/category_requests.php';
 require_once __DIR__ . '/_core/report_leds.php';
 require_once __DIR__ . '/_core/categories_csv.php';
 require_once __DIR__ . '/_core/public_id.php';
@@ -54,6 +55,17 @@ if ($m === 'POST' && $path === '/categories/rename') {
     catch (\Throwable $e) { json_error($e->getMessage(), 400); }
 }
 // ── Category management ───────────────────────────────────────────────────────
+// GET /api/admin/category_requests — pending suggestions for new category values, grouped by kind + value.
+if ($m === 'GET' && $path === '/category_requests') {
+    json_out(['items' => category_requests_pending($db)]);
+}
+// POST /api/admin/category_requests/resolve — { kind, value, action: 'approve'|'reject', newValue? }
+if ($m === 'POST' && $path === '/category_requests/resolve') {
+    $b = body();
+    try { json_out(category_requests_resolve($db, (int)$admin["id"], (string)($b['kind'] ?? ''), (string)($b['value'] ?? ''), (string)($b['action'] ?? ''), isset($b['newValue']) ? (string)$b['newValue'] : null)); }
+    catch (InvalidArgumentException $e) { json_error($e->getMessage(), 400); }
+}
+
 // GET /api/admin/categories — every value, grouped by kind, with usage counts.
 if ($m === 'GET' && $path === '/categories') {
     json_out(all_categories($db, true));

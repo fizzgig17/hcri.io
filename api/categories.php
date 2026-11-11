@@ -5,6 +5,7 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/categories.php';
+require_once __DIR__ . '/_core/category_requests.php';
 require_once __DIR__ . '/_core/report_leds.php';
 require_once __DIR__ . '/_core/public_id.php';
 
@@ -21,6 +22,18 @@ $path = preg_replace('#^.*?/api/categories#', '', $uri);   // '' | '/assign'
 // ── GET /api/categories — all values grouped by kind (for the dropdowns) ──────
 if ($m === 'GET' && ($path === '' || $path === '/')) {
     json_out(all_categories($db, false));
+}
+
+// ── POST /api/categories/suggest — anyone signed in can suggest a new value for a list ──────────────────
+// body: { kind, value, note? }.  An admin reviews it (Admin > Categories > Suggestions).
+if ($m === 'POST' && $path === '/suggest') {
+    $b = body();
+    try { json_out(category_request_submit($db, $user['id'], (string)($b['kind'] ?? ''), (string)($b['value'] ?? ''), (string)($b['note'] ?? ''))); }
+    catch (InvalidArgumentException $e) { json_error($e->getMessage(), 400); }
+}
+// ── GET /api/categories/suggestions — the signed-in person's own suggestions and their status ──────────
+if ($m === 'GET' && $path === '/suggestions') {
+    json_out(['items' => category_requests_mine($db, $user['id'])]);
 }
 
 // ── POST /api/categories — create (or fetch) a value within a kind ────────────

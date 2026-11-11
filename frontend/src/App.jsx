@@ -63,7 +63,7 @@ import { LiveView } from './components/LiveStation';
 
 export default function App() {
   const { theme: T, themeName, toggleTheme } = useTheme();
-  const { user, checking, tryAutoLogin, login, register, logout } = useAuth();
+  const { user, checking, tryAutoLogin, reviewLogin, login, register, logout } = useAuth();
 
   // Keep the shared tz helper (used by fmtTZ() across report views) in
   // sync with whatever timezone the logged-in user has set.
@@ -139,7 +139,25 @@ export default function App() {
   // Auto-login on mount; also force Explore open if the URL path itself
   // ends in /explore (a plain reload of that path with no query string).
   useEffect(() => {
-    tryAutoLogin();
+    // An emailed category-suggestion link (?catreview=<one-time token>&kind=&value=) signs the site owner in and opens
+    // Admin > Categories on that suggestion (Explore picks the hand-off up from sessionStorage).
+    const qs = new URLSearchParams(window.location.search);
+    const rt = qs.get('catreview');
+    if (rt) {
+      const clean = window.location.pathname;
+      reviewLogin(rt)
+        .then(() => {
+          try { sessionStorage.setItem('hcri_cat_review', JSON.stringify({ kind: qs.get('kind') || '', value: qs.get('value') || '' })); } catch (e) {}
+          try { window.history.replaceState({ hcri: 1, view: 'explore', etab: 'myreports' }, '', clean + '?explore=mine'); } catch (e) {}
+          setExploreOpen(true);
+        })
+        .catch(() => {
+          try { window.history.replaceState({}, '', clean); } catch (e) {}
+          tryAutoLogin();
+        });
+    } else {
+      tryAutoLogin();
+    }
     if (window.location.pathname.endsWith('/explore')) setExploreOpen(true);
   }, []);
 

@@ -195,7 +195,7 @@ if (str_starts_with($uri, '/api/')) {
     require_once __DIR__ . '/api/_core/api_log.php';
     hcri_api_log_start($uri);
 
-    if (preg_match('#^/api/auth/(login|register|me|reset_request|reset_confirm|resend_verification)$#', $uri, $m)) {
+    if (preg_match('#^/api/auth/(login|register|me|reset_request|reset_confirm|resend_verification|review_login)$#', $uri, $m)) {
 
         require __DIR__ . '/api/auth/' . $m[1] . '.php'; exit;
 
