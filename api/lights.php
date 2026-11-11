@@ -17,13 +17,40 @@ require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/lights.php';
 
 cors_headers();
-$user = require_auth();
-$uid  = (int)$user['id'];
 $db   = get_db();
 lights_ensure($db);
+$path = rtrim(preg_replace('#^.*?/api/lights#', '', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)), '/');
+
+// ── Public lights (no sign-in): a light is public when at least one of its readings is, and only those readings show ──────────
+if (preg_match('#^/public(?:/(\d+))?$#', $path, $pp)) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_error('Method not allowed', 405);
+    $hid = [];
+    try {
+        $mids = array_map(fn($x) => (int)$x['id'], $db->query('SELECT DISTINCT u.id FROM users u JOIN reports r ON r.user_id = u.id WHERE u.name_masked = 1 AND r.is_public = 1 ORDER BY u.id')->fetchAll());
+        foreach ($mids as $i => $mid) $hid[$mid] = count($mids) === 1 ? 'hidden' : 'hidden ' . ($i + 1);
+    } catch (\Throwable $e) {}
+    $sql = 'SELECT l.*, u.name AS owner_name FROM lights l LEFT JOIN users u ON u.id = l.user_id
+             WHERE EXISTS (SELECT 1 FROM light_reports lr JOIN reports r ON r.id = lr.report_id WHERE lr.light_id = l.id AND r.is_public = 1)';
+    if (!empty($pp[1])) {
+        $s = $db->prepare($sql . ' AND l.id = ?'); $s->execute([(int)$pp[1]]);
+        $l = $s->fetch();
+        if (!$l) json_error('Not found', 404);
+        $o = lights_summary($db, $l, true, true);
+        $o['owner'] = $hid[(int)$l['user_id']] ?? ($l['owner_name'] ?: 'user');
+        json_out($o);
+    }
+    $out = [];
+    foreach ($db->query($sql . ' ORDER BY l.name ASC')->fetchAll() as $l) {
+        $o = lights_summary($db, $l, false, true);
+        $o['owner'] = $hid[(int)$l['user_id']] ?? ($l['owner_name'] ?: 'user');
+        $out[] = $o;
+    }
+    json_out($out);
+}
+
+$user = require_auth();
+$uid  = (int)$user['id'];
 $m    = $_SERVER['REQUEST_METHOD'];
-$path = preg_replace('#^.*?/api/lights#', '', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
-$path = rtrim($path, '/');
 
 if ($path === '') {
     if ($m === 'GET') {
@@ -34,7 +61,7 @@ if ($path === '') {
     if ($m === 'POST') {
         $c = lights_clean(body());
         if ($c['name'] === '') json_error("'name' required");
-        $db->prepare('INSERT INTO lights(user_id,name,brand,model,notes) VALUES(?,?,?,?,?)')->execute([$uid, $c['name'], $c['brand'], $c['model'], $c['notes']]);
+        $db->prepare('INSERT INTO lights(user_id,name,brand,model,led_brand,led_model,optic,notes) VALUES(?,?,?,?,?,?,?,?)')->execute([$uid, $c['name'], $c['brand'], $c['model'], $c['led_brand'], $c['led_model'], $c['optic'], $c['notes']]);
         $id = (int)$db->lastInsertId();
         $ids = array_filter(array_map(fn($k) => hcri_rid($db, $k), (array)(body()['reportIds'] ?? [])));
         if ($ids) lights_attach($db, $uid, $id, $ids);
@@ -60,7 +87,7 @@ if (!$isReports) {
     if ($m === 'PATCH') {
         $c = lights_clean(body(), $light);
         if ($c['name'] === '') json_error("'name' cannot be empty");
-        $db->prepare('UPDATE lights SET name=?,brand=?,model=?,notes=? WHERE id=?')->execute([$c['name'], $c['brand'], $c['model'], $c['notes'], $lid]);
+        $db->prepare('UPDATE lights SET name=?,brand=?,model=?,led_brand=?,led_model=?,optic=?,notes=? WHERE id=?')->execute([$c['name'], $c['brand'], $c['model'], $c['led_brand'], $c['led_model'], $c['optic'], $c['notes'], $lid]);
         json_out(lights_summary($db, lights_owned($db, $uid, $lid), true));
     }
     if ($m === 'DELETE') {   // only the grouping goes; the readings themselves are never touched

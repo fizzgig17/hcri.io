@@ -94,6 +94,21 @@ const box = (T, extra) => ({ background: T.surface, border: `1px solid ${T.borde
 const btnS = (T, kind) => ({ background: kind === 'primary' ? T.accent : 'none', color: kind === 'primary' ? (T.name === 'dark' ? '#06121f' : '#fff') : kind === 'bad' ? T.bad : T.text, border: kind === 'primary' ? 'none' : `1px solid ${kind === 'bad' ? T.bad : T.border}`, borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' });
 const inputS = (T) => ({ width: '100%', boxSizing: 'border-box', background: T.bg || T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: '7px 9px', color: T.text, fontSize: 13, fontFamily: 'monospace' });
 
+const FIELDS = [['brand', 'Light brand'], ['model', 'Light model'], ['led_brand', 'LED brand'], ['led_model', 'LED model'], ['optic', 'Optic']];
+const fromLight = (l) => ({ name: l.name || '', brand: l.brand || '', model: l.model || '', led_brand: l.ledBrand || '', led_model: l.ledModel || '', optic: l.optic || '', notes: l.notes || '' });
+function LightFields({ v, set, T, autoFocus }) {
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <input autoFocus={autoFocus} placeholder="Name" value={v.name} maxLength={160} onChange={(e) => set({ ...v, name: e.target.value })} style={inputS(T)} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+        {FIELDS.map(([k, lab]) => <input key={k} placeholder={lab} aria-label={lab} title={lab} value={v[k] || ''} maxLength={120} onChange={(e) => set({ ...v, [k]: e.target.value })} style={inputS(T)} />)}
+      </div>
+      {'notes' in v && <textarea placeholder="Notes" value={v.notes} rows={2} onChange={(e) => set({ ...v, notes: e.target.value })} style={inputS(T)} />}
+    </div>
+  );
+}
+const specLine = (l) => [l.brand, l.model].filter(Boolean).join(' ') + ([l.ledBrand, l.ledModel].some(Boolean) ? ' · LED ' + [l.ledBrand, l.ledModel].filter(Boolean).join(' ') : '') + (l.optic ? ' · ' + l.optic : '');
+
 // ── Overview card (list) ─────────────────────────────────────────────────────
 function LightCard({ light, T, onOpen, checked, onCheck }) {
   const l = light.latest;
@@ -103,8 +118,8 @@ function LightCard({ light, T, onOpen, checked, onCheck }) {
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <input type="checkbox" checked={!!checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label="Select to compare" style={{ accentColor: T.accent, width: 18, height: 18, marginTop: 2, cursor: 'pointer' }} />
           <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: T.white || T.text }}>{light.name}</div>
-          <div style={{ fontSize: 11, color: T.dim }}>{[light.brand, light.model].filter(Boolean).join(' · ') || 'No brand / model'}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.white || T.text }}>{light.name}{light.owner == null && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 400, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: light.isPublic ? T.good || T.accent : T.dim }}>{light.isPublic ? 'public' : 'private'}</span>}</div>
+          <div style={{ fontSize: 11, color: T.dim }}>{specLine(light) || 'No brand / model'}{light.owner ? ` · by ${light.owner}` : ''}</div>
           </div>
         </div>
         <div style={{ fontSize: 11, color: T.dim, textAlign: 'right' }}>{light.count} reading{light.count === 1 ? '' : 's'}{l ? <><br />latest {when(l.createdAt)}</> : null}</div>
@@ -129,7 +144,8 @@ function LightCard({ light, T, onOpen, checked, onCheck }) {
 }
 
 // ── Detail ───────────────────────────────────────────────────────────────────
-function LightDetail({ id, T, onBack, onChanged }) {
+function LightDetail({ id, T, onBack, onChanged, pub }) {
+  const base = pub ? `/lights/public/${id}` : `/lights/${id}`;
   const [light, setLight] = useState(null);
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(null);
@@ -138,7 +154,7 @@ function LightDetail({ id, T, onBack, onChanged }) {
   const [labelEdit, setLabelEdit] = useState({});
   const cardRefs = useRef({});
 
-  const load = useCallback(() => api.get(`/lights/${id}`).then(setLight).catch((e) => setErr(e.message)), [id]);
+  const load = useCallback(() => api.get(base).then(setLight).catch((e) => setErr(e.message)), [base]);
   useEffect(() => { load(); }, [load]);
   if (err) return <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>;
   if (!light) return <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>;
@@ -161,8 +177,7 @@ function LightDetail({ id, T, onBack, onChanged }) {
       <div style={{ ...box(T), marginBottom: 14 }}>
         {edit ? (
           <div style={{ display: 'grid', gap: 8 }}>
-            {['name', 'brand', 'model'].map((k) => <input key={k} placeholder={k[0].toUpperCase() + k.slice(1)} value={edit[k]} maxLength={160} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} style={inputS(T)} />)}
-            <textarea placeholder="Notes" value={edit.notes} rows={3} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} style={inputS(T)} />
+            <LightFields v={edit} set={setEdit} T={T} />
             <div style={{ display: 'flex', gap: 8 }}><button onClick={saveEdit} style={btnS(T, 'primary')}>Save</button><button onClick={() => setEdit(null)} style={btnS(T)}>Cancel</button></div>
           </div>
         ) : (
@@ -170,12 +185,12 @@ function LightDetail({ id, T, onBack, onChanged }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: T.white || T.text }}>{light.name}</div>
-                <div style={{ fontSize: 12, color: T.dim }}>{[light.brand, light.model].filter(Boolean).join(' · ')}</div>
+                <div style={{ fontSize: 12, color: T.dim }}>{specLine(light)}{pub && light.owner ? ` · by ${light.owner}` : ''}</div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <button onClick={() => setEdit({ name: light.name, brand: light.brand, model: light.model, notes: light.notes })} style={btnS(T)}>Edit</button>
+              {!pub && <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <button onClick={() => setEdit(fromLight(light))} style={btnS(T)}>Edit</button>
                 <button onClick={del} style={btnS(T, 'bad')}>Delete light</button>
-              </div>
+              </div>}
             </div>
             {light.notes && <div style={{ fontSize: 12, color: T.text, marginTop: 8, whiteSpace: 'pre-wrap' }}>{light.notes}</div>}
           </>
@@ -185,7 +200,7 @@ function LightDetail({ id, T, onBack, onChanged }) {
       {R.length === 0 ? <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>No readings in this light yet.</div> : (
         <>
           <div style={{ fontSize: 12, color: T.dim, marginBottom: 6 }}>
-            Headline is the latest reading ({when(light.latest.createdAt)}). Tap a trend to enlarge it.
+            Headline is the latest reading ({when(light.latest.createdAt)}). Tap a trend to enlarge it.{pub ? ' Only public readings are shown.' : (light.isPublic ? ' This light is public; others see only its public readings.' : ' This light is private: none of its readings is public.')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8, marginBottom: 14 }}>
             {METRICS.filter(([k]) => light.stats[k]).map(([k, lab, d, unit], i) => {
@@ -222,7 +237,8 @@ function LightDetail({ id, T, onBack, onChanged }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
                   <div style={{ fontSize: 13, color: T.text, fontWeight: 700 }}>
                     <span style={{ color: T.dim, fontWeight: 400 }}>#{i + 1} </span>
-                    <a href={`?explore=mine&rid=${r.id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
+                    <a href={`?explore${pub ? "" : "=mine"}&rid=${r.id}`} style={{ color: T.accent, textDecoration: 'none' }}>{r.label}</a>
+                    {!pub && !r.isPublic && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>private</span>}
                     {r.linkLabel && <span style={{ marginLeft: 8, fontSize: 11, border: `1px solid ${T.border}`, borderRadius: 10, padding: '1px 7px', color: T.dim, fontWeight: 400 }}>{r.linkLabel}</span>}
                   </div>
                   <div style={{ fontSize: 11, color: T.dim }}>{when(r.createdAt)}</div>
@@ -230,14 +246,14 @@ function LightDetail({ id, T, onBack, onChanged }) {
                 <div style={{ fontSize: 12, color: T.text, margin: '4px 0' }}>
                   {METRICS.filter(([k]) => r[k] != null).map(([k, lab, d, unit]) => `${lab} ${fmtN(r[k], d)}${unit ? ' ' + unit : ''}`).join(' · ')}
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                {pub ? null : <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   <input placeholder="Label (e.g. Turbo, after 10 min)" maxLength={80}
                     value={labelEdit[r.id] ?? r.linkLabel} onChange={(e) => setLabelEdit({ ...labelEdit, [r.id]: e.target.value })}
                     onKeyDown={(e) => { if (e.key === 'Enter') saveLabel(r); }}
                     style={{ ...inputS(T), flex: '1 1 180px', width: 'auto', padding: '4px 8px', fontSize: 12 }} />
                   {labelEdit[r.id] != null && labelEdit[r.id] !== r.linkLabel && <button onClick={() => saveLabel(r)} style={btnS(T, 'primary')}>Save label</button>}
                   <button onClick={() => remove(r)} style={btnS(T)}>Remove from light</button>
-                </div>
+                </div>}
               </div>
             ))}
           </div>
@@ -278,11 +294,11 @@ function MultiTrend({ lights, metric, dec, T }) {
   );
 }
 
-function CompareLights({ ids, T, onBack }) {
+function CompareLights({ ids, T, onBack, pub }) {
   const [lights, setLights] = useState(null);
   const [err, setErr] = useState('');
   const [metric, setMetric] = useState('cct');
-  useEffect(() => { Promise.all(ids.map((i) => api.get(`/lights/${i}`))).then(setLights).catch((e) => setErr(e.message)); }, [ids.join(',')]); // eslint-disable-line
+  useEffect(() => { Promise.all(ids.map((i) => api.get(pub ? `/lights/public/${i}` : `/lights/${i}`))).then(setLights).catch((e) => setErr(e.message)); }, [ids.join(',')]); // eslint-disable-line
   if (err) return <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>;
   if (!lights) return <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>;
   const metrics = METRICS.filter(([k]) => lights.some((l) => l.stats[k]));
@@ -347,19 +363,22 @@ export default function LightsTab({ T }) {
   const [creating, setCreating] = useState(false);
   const [pick, setPick] = useState([]);       // light ids ticked for Compare
   const [comparing, setComparing] = useState(false);
-  const [draft, setDraft] = useState({ name: '', brand: '', model: '', notes: '' });
+  const [pub, setPub] = useState(() => { try { return new URLSearchParams(window.location.search).get('scope') === 'public'; } catch { return false; } });
+  const blank = { name: '', brand: '', model: '', led_brand: '', led_model: '', optic: '', notes: '' };
+  const [draft, setDraft] = useState(blank);
 
-  const load = useCallback(() => api.get('/lights').then((d) => { setLights(d); setErr(''); }).catch((e) => setErr(e.message)), []);
+  const load = useCallback(() => { setLights(null); return api.get(pub ? '/lights/public' : '/lights').then((d) => { setLights(d); setErr(''); }).catch((e) => setErr(e.message)); }, [pub]);
   useEffect(() => { load(); }, [load]);
+  const setScope = (v) => { setPub(v); setPick([]); setOpen(null); setCreating(false); try { const u = new URL(window.location.href); u.searchParams.delete('light'); if (v) u.searchParams.set('scope', 'public'); else u.searchParams.delete('scope'); window.history.replaceState(window.history.state, '', u); } catch {} };
   const go = (id) => { setOpen(id); try { const u = new URL(window.location.href); if (id) u.searchParams.set('light', id); else u.searchParams.delete('light'); window.history.replaceState(window.history.state, '', u); } catch {} };
 
   const create = async () => {
     if (!draft.name.trim()) return;
-    try { const l = await api.post('/lights', draft); setCreating(false); setDraft({ name: '', brand: '', model: '', notes: '' }); await load(); go(l.id); } catch (e) { setErr(e.message); }
+    try { const l = await api.post('/lights', draft); setCreating(false); setDraft(blank); await load(); go(l.id); } catch (e) { setErr(e.message); }
   };
 
-  if (comparing) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><CompareLights ids={pick} T={T} onBack={() => setComparing(false)} /></div>;
-  if (open) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><LightDetail id={open} T={T} onBack={() => go(null)} onChanged={load} /></div>;
+  if (comparing) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><CompareLights ids={pick} pub={pub} T={T} onBack={() => setComparing(false)} /></div>;
+  if (open) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><LightDetail id={open} pub={pub} T={T} onBack={() => go(null)} onChanged={load} /></div>;
   return (
     <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -367,18 +386,22 @@ export default function LightsTab({ T }) {
           <div style={{ fontSize: 16, fontWeight: 700, color: T.white || T.text }}>Lights</div>
           <div style={{ fontSize: 12, color: T.dim }}>Group several readings of the same light. Add reports from My Reports with “Add to light”.</div>
         </div>
-        <button onClick={() => setCreating(true)} style={btnS(T, 'primary')}>+ New light</button>
+        {!pub && <button onClick={() => setCreating(true)} style={btnS(T, 'primary')}>+ New light</button>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {[[false, 'My lights'], [true, 'Public lights']].map(([v, lab]) => (
+          <button key={lab} onClick={() => setScope(v)} style={{ ...btnS(T), borderColor: pub === v ? T.accent : T.border, fontWeight: pub === v ? 700 : 400 }}>{lab}</button>
+        ))}
       </div>
       {creating && (
         <div style={{ ...box(T), marginBottom: 12, display: 'grid', gap: 8 }}>
-          {['name', 'brand', 'model'].map((k) => <input key={k} autoFocus={k === 'name'} placeholder={k[0].toUpperCase() + k.slice(1)} value={draft[k]} maxLength={160} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} style={inputS(T)} />)}
-          <textarea placeholder="Notes (optional)" rows={2} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} style={inputS(T)} />
+          <LightFields v={draft} set={setDraft} T={T} autoFocus />
           <div style={{ display: 'flex', gap: 8 }}><button onClick={create} style={btnS(T, 'primary')}>Create</button><button onClick={() => setCreating(false)} style={btnS(T)}>Cancel</button></div>
         </div>
       )}
       {err && <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>}
       {!lights && !err && <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>}
-      {lights && lights.length === 0 && !creating && <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>No lights yet. Create one, or select reports in My Reports and choose “Add to light”.</div>}
+      {lights && lights.length === 0 && !creating && <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>{pub ? 'No public lights yet: a light appears here once one of its readings is public.' : 'No lights yet. Create one, or select reports in My Reports and choose “Add to light”.'}</div>}
       <div style={{ display: 'grid', gap: 10 }}>
         {(lights || []).map((l) => <LightCard key={l.id} light={l} T={T} onOpen={() => go(l.id)} checked={pick.includes(l.id)} onCheck={() => setPick((c) => c.includes(l.id) ? c.filter((x) => x !== l.id) : [...c, l.id].slice(-8))} />)}
       </div>
@@ -396,48 +419,63 @@ export default function LightsTab({ T }) {
 // ── "Add to light" modal, used from My Reports ───────────────────────────────
 export function AddToLightModal({ T, reportIds, onClose, onDone }) {
   const [lights, setLights] = useState(null);
-  const [newName, setNewName] = useState('');
+  const [draft, setDraft] = useState({ name: '', brand: '', model: '', led_brand: '', led_model: '', optic: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [sug, setSug] = useState(null);
+  const [done, setDone] = useState(null);     // { id, name } of the light just made or added to, so it can be opened straight away
+  const [sugShown, setSugShown] = useState(false);
   useEffect(() => { api.get('/lights').then(setLights).catch((e) => setMsg(e.message)); }, []);
-  // Suggested title: light brand + model, then LED brand + model + CCT, with anything after those (e.g. "- Turbo") dropped.
-  useEffect(() => { api.post('/lights/suggest', { reportIds }).then((d) => { setSug(d); setNewName((cur) => cur || d.name || ''); }).catch(() => {}); }, []); // eslint-disable-line
+  // Suggested details: light brand + model, then LED brand, LED model and CCT, with anything after those (e.g. "- Turbo") dropped.
+  useEffect(() => {
+    api.post('/lights/suggest', { reportIds }).then((d) => {
+      if (!d.name) return;
+      setSugShown(true);
+      setDraft((cur) => cur.name ? cur : { name: d.name, brand: d.brand || '', model: d.model || '', led_brand: d.ledBrand || '', led_model: d.ledModel || '', optic: d.optic || '' });
+    }).catch(() => {});
+  }, []); // eslint-disable-line
   const addTo = async (l) => {
     setBusy(true);
-    try { const d = await api.post(`/lights/${l.id}/reports`, { reportIds }); setMsg(`Added ${d.added} reading${d.added === 1 ? '' : 's'} to “${l.name}”${d.added < reportIds.length ? ` (${reportIds.length - d.added} already there)` : ''}.`); onDone && onDone(); }
+    try { const d = await api.post(`/lights/${l.id}/reports`, { reportIds }); setMsg(`Added ${d.added} reading${d.added === 1 ? '' : 's'} to “${l.name}”${d.added < reportIds.length ? ` (${reportIds.length - d.added} already there)` : ''}.`); setDone({ id: l.id, name: l.name }); onDone && onDone(); }
     catch (e) { setMsg(e.message); }
     setBusy(false);
   };
   const createAndAdd = async () => {
-    if (!newName.trim()) return;
+    if (!draft.name.trim()) return;
     setBusy(true);
-    try { const same = sug && newName.trim() === sug.name;
-      const l = await api.post('/lights', { name: newName.trim(), brand: same ? sug.brand : '', model: same ? sug.model : '', reportIds }); setMsg(`Created “${l.name}” with ${l.count} reading${l.count === 1 ? '' : 's'}.`); setNewName(''); onDone && onDone(); }
+    try { const l = await api.post('/lights', { ...draft, name: draft.name.trim(), reportIds }); setMsg(`Created “${l.name}” with ${l.count} reading${l.count === 1 ? '' : 's'}.`); setDone({ id: l.id, name: l.name }); onDone && onDone(); }
     catch (e) { setMsg(e.message); }
     setBusy(false);
   };
+  const openHref = done ? `${window.location.pathname}?explore=lights&light=${done.id}` : '#';
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 2500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ ...box(T), width: '100%', maxWidth: 420, maxHeight: '85dvh', overflowY: 'auto', fontFamily: 'monospace' }}>
+      <div style={{ ...box(T), width: '100%', maxWidth: 460, maxHeight: '85dvh', overflowY: 'auto', fontFamily: 'monospace' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ fontWeight: 700, color: T.white || T.text }}>Add {reportIds.length} reading{reportIds.length === 1 ? '' : 's'} to a light</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.dim, fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
         {msg && <div style={{ fontSize: 12, color: T.good || T.accent, marginBottom: 8 }}>{msg}</div>}
-        <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
-          {lights === null ? <div style={{ color: T.dim, fontSize: 12 }}>Loading…</div> : lights.length === 0 ? <div style={{ color: T.dim, fontSize: 12 }}>No lights yet; create one below.</div> :
-            lights.map((l) => (
-              <button key={l.id} disabled={busy} onClick={() => addTo(l)} style={{ ...btnS(T), textAlign: 'left', fontWeight: 400, padding: '8px 10px' }}>
-                <b>{l.name}</b> <span style={{ color: T.dim }}>{[l.brand, l.model].filter(Boolean).join(' · ')} · {l.count} reading{l.count === 1 ? '' : 's'}</span>
-              </button>
-            ))}
-        </div>
-        {sug && sug.name && <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Suggested name from the selected reports (edit it if you like):</div>}
-        <div style={{ display: 'flex', gap: 6 }}>
-          <input placeholder="New light name" value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') createAndAdd(); }} style={inputS(T)} />
-          <button disabled={busy || !newName.trim()} onClick={createAndAdd} style={btnS(T, 'primary')}>Create</button>
-        </div>
+        {done ? (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a href={openHref} style={{ ...btnS(T, 'primary'), textDecoration: 'none', display: 'inline-block' }}>Open “{done.name}”</a>
+            <button onClick={onClose} style={btnS(T)}>Close</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
+              {lights === null ? <div style={{ color: T.dim, fontSize: 12 }}>Loading…</div> : lights.length === 0 ? <div style={{ color: T.dim, fontSize: 12 }}>No lights yet; create one below.</div> :
+                lights.map((l) => (
+                  <button key={l.id} disabled={busy} onClick={() => addTo(l)} style={{ ...btnS(T), textAlign: 'left', fontWeight: 400, padding: '8px 10px' }}>
+                    <b>{l.name}</b> <span style={{ color: T.dim }}>{specLine(l)} · {l.count} reading{l.count === 1 ? '' : 's'}</span>
+                  </button>
+                ))}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 4 }}>Or create a new light</div>
+            {sugShown && <div style={{ fontSize: 11, color: T.dim, marginBottom: 4 }}>Suggested from the selected reports; edit anything you like.</div>}
+            <LightFields v={draft} set={setDraft} T={T} />
+            <button disabled={busy || !draft.name.trim()} onClick={createAndAdd} style={{ ...btnS(T, 'primary'), marginTop: 8, opacity: draft.name.trim() ? 1 : 0.5 }}>Create light</button>
+          </>
+        )}
       </div>
     </div>
   );

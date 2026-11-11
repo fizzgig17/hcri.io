@@ -16,6 +16,9 @@ function lights_ensure(PDO $db): void {
         name VARCHAR(160) NOT NULL,
         brand VARCHAR(120) NOT NULL DEFAULT '',
         model VARCHAR(120) NOT NULL DEFAULT '',
+        led_brand VARCHAR(120) NOT NULL DEFAULT '',
+        led_model VARCHAR(120) NOT NULL DEFAULT '',
+        optic VARCHAR(120) NOT NULL DEFAULT '',
         notes TEXT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_lights_user (user_id)
@@ -28,6 +31,9 @@ function lights_ensure(PDO $db): void {
         PRIMARY KEY (light_id, report_id),
         INDEX idx_lr_report (report_id)
     )");
+    foreach (['led_brand', 'led_model', 'optic'] as $col) {   // lights table made before these existed
+        if (!$db->query("SHOW COLUMNS FROM lights LIKE '$col'")->fetch()) $db->exec("ALTER TABLE lights ADD COLUMN $col VARCHAR(120) NOT NULL DEFAULT '' AFTER model");
+    }
     $done = true;
 }
 
@@ -42,7 +48,8 @@ function lights_clean(array $b, array $old = []): array {
         $v = array_key_exists($k, $b) ? trim((string)$b[$k]) : (string)($old[$k] ?? '');
         return mb_substr($v, 0, $max);
     };
-    return ['name' => $pick('name', 160), 'brand' => $pick('brand', 120), 'model' => $pick('model', 120), 'notes' => $pick('notes', 4000)];
+    return ['name' => $pick('name', 160), 'brand' => $pick('brand', 120), 'model' => $pick('model', 120), 'led_brand' => $pick('led_brand', 120),
+            'led_model' => $pick('led_model', 120), 'optic' => $pick('optic', 120), 'notes' => $pick('notes', 4000)];
 }
 
 /** One reading's numbers, as the light cards show them. */
@@ -53,6 +60,7 @@ function lights_reading(array $r, bool $withSpd): array {
         'id'        => hcri_pid(get_db(), (int)$r['id']),
         'label'     => $r['label'],
         'linkLabel' => $r['link_label'] ?? '',
+        'isPublic'  => !empty($r['is_public']),
         'createdAt' => $r['created_at'],
         'cct' => $num($r['cct']), 'duv' => $num($r['duv']),
         'ra'  => $num($meta['ra'] ?? null), 'r9' => $num($meta['r9'] ?? null),
@@ -85,17 +93,20 @@ function lights_stats(array $readings): array {
     return $st;
 }
 
-function lights_readings(PDO $db, int $lightId, bool $withSpd): array {
-    $cols = 'r.id,r.label,r.cct,r.duv,r.rf,r.rg,r.meta,r.created_at,lr.label AS link_label' . ($withSpd ? ',r.spd_data' : '');
-    $s = $db->prepare("SELECT $cols FROM light_reports lr JOIN reports r ON r.id=lr.report_id WHERE lr.light_id=? ORDER BY r.created_at ASC, r.id ASC");
+function lights_readings(PDO $db, int $lightId, bool $withSpd, bool $publicOnly = false): array {
+    $cols = 'r.is_public,r.id,r.label,r.cct,r.duv,r.rf,r.rg,r.meta,r.created_at,lr.label AS link_label' . ($withSpd ? ',r.spd_data' : '');
+    $s = $db->prepare("SELECT $cols FROM light_reports lr JOIN reports r ON r.id=lr.report_id WHERE lr.light_id=?" . ($publicOnly ? ' AND r.is_public=1' : '') . ' ORDER BY r.created_at ASC, r.id ASC');
     $s->execute([$lightId]);
     return array_map(fn($r) => lights_reading($r, $withSpd), $s->fetchAll());
 }
 
-function lights_summary(PDO $db, array $l, bool $detail): array {
-    $readings = lights_readings($db, (int)$l['id'], $detail);
+function lights_summary(PDO $db, array $l, bool $detail, bool $publicOnly = false): array {
+    $readings = lights_readings($db, (int)$l['id'], $detail, $publicOnly);
     $out = [
-        'id' => (int)$l['id'], 'name' => $l['name'], 'brand' => $l['brand'], 'model' => $l['model'], 'notes' => $l['notes'] ?? '',
+        'id' => (int)$l['id'], 'name' => $l['name'], 'brand' => $l['brand'], 'model' => $l['model'], 'ledBrand' => $l['led_brand'] ?? '', 'ledModel' => $l['led_model'] ?? '', 'optic' => $l['optic'] ?? '',
+        'notes' => $l['notes'] ?? '',
+        // A light is public only while at least one of its readings is public; the public view shows only those readings.
+        'isPublic' => (bool)array_filter($readings, fn($r) => $r['isPublic']),
         'createdAt' => $l['created_at'], 'count' => count($readings),
         'latest' => $readings ? end($readings) : null,
         'stats' => lights_stats($readings),
@@ -114,7 +125,7 @@ function lights_summary(PDO $db, array $l, bool $detail): array {
  */
 function lights_suggest(PDO $db, int $uid, array $ids): array {
     $ids = array_values(array_unique(array_map('intval', $ids)));
-    if (!$ids) return ['name' => '', 'brand' => '', 'model' => ''];
+    if (!$ids) return ['name' => '', 'brand' => '', 'model' => '', 'ledBrand' => '', 'ledModel' => '', 'optic' => ''];
     require_once __DIR__ . '/categories.php';
     $in = implode(',', array_fill(0, count($ids), '?'));
     $q = $db->prepare("SELECT id,label FROM reports WHERE user_id=? AND id IN ($in)");
@@ -131,7 +142,7 @@ function lights_suggest(PDO $db, int $uid, array $ids): array {
         $t = trim(implode(' ', array_filter([$lb, $lm])));
         $l2 = trim(implode(' ', array_filter([$led, $cct])));
         $title = trim($t . ($t !== '' && $l2 !== '' ? ' · ' : '') . $l2);
-        if ($title !== '') { $titles[] = $title; $parts[$title] = ['brand' => $lb, 'model' => $lm]; }
+        if ($title !== '') { $titles[] = $title; $parts[$title] = ['brand' => $lb, 'model' => $lm, 'ledBrand' => $v('led_brand'), 'ledModel' => $v('led_model'), 'optic' => $v('optic')]; }
         $labels[] = (string)$r['label'];
     }
     // The report titles are what the user actually wrote, so they lead: the part every title shares, cut back to a whole word, with
@@ -148,14 +159,14 @@ function lights_suggest(PDO $db, int $uid, array $ids): array {
     if ($titles) {
         $cnt = array_count_values($titles); arsort($cnt);
         $best = (string)array_key_first($cnt);
-        $b = $parts[$best]['brand']; $m = $parts[$best]['model'];
+        $b = $parts[$best]['brand']; $m = $parts[$best]['model']; $xtra = ['ledBrand' => $parts[$best]['ledBrand'], 'ledModel' => $parts[$best]['ledModel'], 'optic' => $parts[$best]['optic']];
         $agrees = count($cnt) === 1 && ($b === '' || stripos($pre, $b) !== false);
-        if ($pre === '') return ['name' => $best, 'brand' => $b, 'model' => $m];
+        if ($pre === '') return ['name' => $best, 'brand' => $b, 'model' => $m] + $xtra;
         if ($agrees) {
             // Same light by title and by category: add the LED details the title does not already carry.
             $extra = trim(preg_replace('/^.*? · /u', '', $best, 1));
-            return ['name' => $pre . (strpos($best, ' · ') !== false && stripos($pre, $extra) === false ? ' · ' . $extra : ''), 'brand' => $b, 'model' => $m];
+            return ['name' => $pre . (strpos($best, ' · ') !== false && stripos($pre, $extra) === false ? ' · ' . $extra : ''), 'brand' => $b, 'model' => $m] + $xtra;
         }
     }
-    return ['name' => $pre, 'brand' => '', 'model' => ''];
+    return ['name' => $pre, 'brand' => '', 'model' => '', 'ledBrand' => '', 'ledModel' => '', 'optic' => ''];
 }
