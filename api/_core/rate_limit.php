@@ -100,7 +100,7 @@ function hcri_rate_limit(string $group, string $uri = ''): void
 }
 
 // A signed-in account making more than this many limited requests in a minute gets reported by email (at most once an hour per account).
-const HCRI_ACCOUNT_ALERT_PER_MIN = 30;
+const HCRI_ACCOUNT_ALERT_PER_MIN = 100;
 
 // Short-term request log, so an alert can say what the requests were. Signed-in accounts and the limited endpoints only.
 // Privacy: path only (no query string), share tokens replaced, no IP address, rows deleted after two days.
@@ -145,18 +145,55 @@ function hcri_account_activity(PDO $db, int $userId, int $minute, int $hour, str
         $user = $u->fetch();
         if (!$user) return;
         require_once __DIR__ . '/mailer.php';
-        $recent = '';
+        $now = time();
+        $kinds = fn(string $p) => preg_replace(['#^/api/explore/[A-Za-z0-9]+$#', '#^/api/shared/.*$#', '#^/api/reports/[A-Za-z0-9]+#'], ['/api/explore/[report]', '/api/shared/[token]', '/api/reports/[report]'], $p);
+        $summary = ''; $recent = ''; $totals = '';
         try {
+            // What the last minute looked like: requests grouped by kind of endpoint, and how many different reports were opened.
+            $m = $db->prepare('SELECT path FROM account_request_log WHERE user_id = ? AND ts >= ? ORDER BY ts DESC');
+            $m->execute([$userId, $now - 60]);
+            $minRows = $m->fetchAll(PDO::FETCH_COLUMN);
+            $by = []; $reports = [];
+            foreach ($minRows as $path) {
+                $by[$kinds($path)] = ($by[$kinds($path)] ?? 0) + 1;
+                if (preg_match('#^/api/explore/([A-Za-z0-9]+)$#', $path, $mm)) $reports[$mm[1]] = true;
+            }
+            arsort($by);
+            $summary = "What the last minute looked like (" . count($minRows) . " logged requests):\n";
+            foreach ($by as $kind => $n) $summary .= sprintf("  %4d  %s\n", $n, $kind);
+            $summary .= "  Different reports opened: " . count($reports) . "\n";
+            foreach ([['last hour', 3600], ['last 24 hours', 86400]] as [$lab, $sec]) {
+                $c = $db->prepare('SELECT COUNT(*) FROM account_request_log WHERE user_id = ? AND ts >= ?');
+                $c->execute([$userId, $now - $sec]);
+                $totals .= "  $lab: " . (int)$c->fetchColumn() . " requests\n";
+            }
             $l = $db->prepare('SELECT ts, path FROM account_request_log WHERE user_id = ? ORDER BY ts DESC LIMIT ' . HCRI_REQUEST_LOG_IN_ALERT);
             $l->execute([$userId]);
             foreach ($l->fetchAll() as $row) $recent .= gmdate('H:i:s', (int)$row['ts']) . '  ' . $row['path'] . "\n";
         } catch (\Throwable $e) {}
+        // The account itself.
+        $acct = '';
+        try {
+            $ai = $db->prepare('SELECT created_at, last_login_at, is_admin, disabled, (SELECT COUNT(*) FROM reports r WHERE r.user_id = users.id) AS reports FROM users WHERE id = ?');
+            $ai->execute([$userId]);
+            if ($x = $ai->fetch()) {
+                $acct = "Account: joined " . ($x['created_at'] ?? '?') . ", last login " . ($x['last_login_at'] ?? 'never') . ", " . (int)$x['reports'] . " saved reports"
+                      . (!empty($x['is_admin']) ? ", admin" : '') . (!empty($x['disabled']) ? ", DISABLED" : '') . "\n";
+            }
+        } catch (\Throwable $e) {}
+        $ua = substr(preg_replace('/[\r\n]+/', ' ', (string)($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 200);
+        $ref = substr(preg_replace('/[\r\n]+/', ' ', (string)($_SERVER['HTTP_REFERER'] ?? '')), 0, 200);
         $to = getenv('HCRI_ALERT_EMAIL') ?: (defined('HCRI_ALERT_EMAIL') ? HCRI_ALERT_EMAIL : 'fizzgig@hcri.io');
-        send_email($to, 'hCRI.io admin', 'hCRI.io: heavy activity from ' . $user['name'],
+        send_email($to, 'hCRI.io admin', 'hCRI.io: heavy activity from ' . $user['name'] . ' (' . $hits . ' requests in a minute)',
             "Account \"" . $user['name'] . "\" (" . $user['email'] . ", user id $userId) made $hits requests in one minute"
-            . " (alert threshold " . HCRI_ACCOUNT_ALERT_PER_MIN . ").\n\nHost: " . ($_SERVER['HTTP_HOST'] ?? '') . "\nIP: " . hcri_client_ip()
-            . "\nTime: " . gmdate('Y-m-d H:i:s') . " UTC\n\n"
+            . " (alert threshold " . HCRI_ACCOUNT_ALERT_PER_MIN . ").\n\n"
+            . $acct
+            . "Host: " . ($_SERVER['HTTP_HOST'] ?? '') . "\nIP: " . hcri_client_ip()
+            . "\nBrowser: " . ($ua !== '' ? $ua : 'unknown') . ($ref !== '' ? "\nReferrer: $ref" : '')
+            . "\nTime: " . gmdate('Y-m-d H:i:s') . " UTC (" . date_default_timezone_get() . " server time " . date('H:i:s') . ")\n\n"
+            . ($summary !== '' ? $summary . "\nActivity totals for this account:\n" . $totals . "\n" : '')
             . ($recent !== '' ? "Latest requests (UTC, newest first; share tokens hidden):\n$recent\n" : '')
+            . "To act on it: Admin > Users > this account (disable it there), or Admin > API log for the full list.\n"
             . "You get at most one of these per account per hour.");
     } catch (\Throwable $e) { error_log('hCRI activity alert failed: ' . $e->getMessage()); }
 }
