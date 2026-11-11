@@ -1055,6 +1055,14 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
   // A reading opened from a light (?from=light-ID) goes back to that light, not to the report list. Read once on load: the report's
   // own URL is rewritten below and would otherwise lose it.
   const [fromLightId] = useState(() => { try { const m = /^light-(\d+)$/.exec(new URLSearchParams(window.location.search).get('from') || ''); return m ? m[1] : ''; } catch { return ''; } });
+  // A compare opened from a light (?light=ID, plus &t= tokens on a shared link) offers a link back to view that light.
+  const [cmpLightLink] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search); const id = (q.get('light') || '').replace(/\D/g, '');
+      if (!id) return '';
+      return `${window.location.pathname}?lights=${id}` + (q.get('t') ? `&t=${q.get('t')}` : '');
+    } catch { return ''; }
+  });
   const lightUrl = `${typeof window !== 'undefined' ? window.location.pathname : ''}?explore=lights&light=${fromLightId}`;
   usePanelBackClose(!!ee, () => { if (fromLightId) { window.location.href = lightUrl; return; } F(null); }, () => {
     const base = exploreTabUrl(tab) + (fromLightId ? '&from=light-' + fromLightId : '');
@@ -2148,6 +2156,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
           {cmpView !== 'photo' && (
             <button onClick={showCompareShareCard} style={btn()} title="Show a shareable card">Share Card</button>
           )}
+          {cmpLightLink && !fromLightId && <a href={cmpLightLink} style={{ ...btn(), textDecoration: 'none', display: 'inline-block' }}>View light</a>}
           <button onClick={() => { if (fromLightId) { window.location.href = lightUrl; return; } setComparing(false); }} style={btn()}>{fromLightId ? '← Back to light' : '← Back'}</button>
         </div>
       </div>

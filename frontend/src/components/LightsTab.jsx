@@ -171,7 +171,7 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
   };
   const sortByDate = async () => { try { setLight(await api.post(`/lights/${id}/reports/order`, { reportIds: [...R].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)).map((x) => x.id) })); onChanged(); } catch (e) { setErr(e.message); } };
   // The normal compare page for this light's readings (private ones carry their share token in a shared link).
-  const compareHref = `?compare=${R.slice(-12).map((r) => (pub && !r.isPublic && r.token ? `${r.id}.${r.token}` : r.id)).join(',')}${pub ? '' : `&from=light-${id}`}`;
+  const compareHref = `?compare=${R.slice(-12).map((r) => (pub && !r.isPublic && r.token ? `${r.id}.${r.token}` : r.id)).join(',')}${pub ? `&light=${id}${tk ? `&t=${encodeURIComponent(tk)}` : ''}` : `&from=light-${id}&light=${id}`}`;
   const bigDef = big && METRICS.find((m) => m[0] === big);
 
   return (
@@ -211,7 +211,7 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
           <div style={{ fontSize: 12, color: T.dim, marginBottom: 6 }}>
             Headline is the last reading in the order below. Tap a trend to enlarge it.{pub ? ' Only public readings are shown.' : (light.isPublic ? ' This light is public; others see only its public readings.' : ' This light is private: none of its readings is public.')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: 8, marginBottom: 14 }}>
             {METRICS.filter(([k]) => light.stats[k]).map(([k, lab, d, unit], i) => {
               const s = light.stats[k];
               return (
@@ -251,8 +251,8 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
                   <div style={{ fontSize: 11, color: T.dim, display: 'flex', gap: 6, alignItems: 'center' }}>
                     {when(r.createdAt)}
                     {!pub && R.length > 1 && <>
-                      <button disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up" title="Move earlier in the trend order" style={{ ...btnS(T), padding: '2px 8px', opacity: i === 0 ? 0.35 : 1 }}>↑</button>
-                      <button disabled={i === R.length - 1} onClick={() => move(i, 1)} aria-label="Move down" title="Move later in the trend order" style={{ ...btnS(T), padding: '2px 8px', opacity: i === R.length - 1 ? 0.35 : 1 }}>↓</button>
+                      <button disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up" title="Move earlier in the trend order" style={{ ...btnS(T), padding: '6px 12px', opacity: i === 0 ? 0.35 : 1 }}>↑</button>
+                      <button disabled={i === R.length - 1} onClick={() => move(i, 1)} aria-label="Move down" title="Move later in the trend order" style={{ ...btnS(T), padding: '6px 12px', opacity: i === R.length - 1 ? 0.35 : 1 }}>↓</button>
                     </>}
                   </div>
                 </div>
@@ -335,17 +335,17 @@ function CompareLights({ ids, T, onBack, pub }) {
       <div style={{ fontSize: 16, fontWeight: 700, color: T.white || T.text, marginBottom: 4 }}>Compare lights ({lights.length})</div>
       <div style={{ fontSize: 12, color: T.dim, marginBottom: 10 }}>Each light is represented by its latest reading; trends run in reading order.</div>
       <div style={{ overflowX: 'auto', marginBottom: 14 }}>
-        <table style={{ borderCollapse: 'collapse', fontSize: 12, minWidth: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 12, width: '100%' }}>
           <thead><tr>
             <th style={{ textAlign: 'left', padding: '6px 8px', color: T.dim }}></th>
-            {lights.map((l, i) => (<th key={l.id} style={{ textAlign: 'right', padding: '6px 8px', color: T.text, borderBottom: `2px solid ${PALETTE[i % PALETTE.length]}`, whiteSpace: 'nowrap' }}>{l.name}<div style={{ fontWeight: 400, color: T.dim, fontSize: 10 }}>{l.count} reading{l.count === 1 ? '' : 's'}</div></th>))}
+            {lights.map((l, i) => (<th key={l.id} style={{ textAlign: 'right', padding: '6px 6px', color: T.text, borderBottom: `2px solid ${PALETTE[i % PALETTE.length]}`, verticalAlign: 'bottom', wordBreak: 'break-word', minWidth: 70 }}>{l.name}<div style={{ fontWeight: 400, color: T.dim, fontSize: 10 }}>{l.count} reading{l.count === 1 ? '' : 's'}</div></th>))}
           </tr></thead>
           <tbody>
             {metrics.map(([k, lab, d, unit]) => (
               <tr key={k} style={{ borderTop: `1px solid ${T.border}` }}>
-                <td style={{ padding: '6px 8px', color: T.dim }}>{lab}{unit ? ` (${unit})` : ''}</td>
+                <td style={{ padding: '6px 6px 6px 0', color: T.dim, verticalAlign: 'top' }}>{lab}</td>
                 {lights.map((l) => { const s = l.stats[k]; return (
-                  <td key={l.id} style={{ padding: '6px 8px', textAlign: 'right', color: T.text, whiteSpace: 'nowrap' }}>
+                  <td key={l.id} style={{ padding: '6px 6px', textAlign: 'right', color: T.text, verticalAlign: 'top' }}>
                     {s ? <>{fmtN(s.latest, d)}<div style={{ fontSize: 10, color: T.dim }}>{s.n > 1 ? `${fmtN(s.min, d)}–${fmtN(s.max, d)} · ${fmtD(s.change, d)}` : ''}</div></> : '–'}
                   </td>); })}
               </tr>
