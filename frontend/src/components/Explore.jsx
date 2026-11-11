@@ -1026,6 +1026,10 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   // Misc chrome
   const [adminOpen, setAdminOpen] = useState(false);
+  // Arriving from an emailed category-suggestion link: open Admin (its Categories panel reads the same hand-off).
+  useEffect(() => {
+    try { if (n && n.isAdmin && sessionStorage.getItem('hcri_cat_review')) setAdminOpen(true); } catch (e) {}
+  }, [n]);
   const [helpOpen, setHelpOpen] = useState(false);
   const [fbOpen, setFbOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);

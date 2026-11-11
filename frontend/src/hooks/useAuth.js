@@ -43,6 +43,18 @@ export function useAuth() {
     return u;
   }, []);
 
+  // Exchanges the one-time token from a category-review email link for a normal session (the site owner's). Throws if the
+  // link is expired or already used; the caller then falls back to the usual auto-login.
+  const reviewLogin = useCallback(async (token) => {
+    const r = await api.post('/auth/review_login', { token });
+    if (!r || !r.user) throw new Error(r?.error || 'Link not accepted');
+    const u = { ...r.user, isAdmin: !!r.user.is_admin };
+    setToken(r.token);
+    setUser(u);
+    setChecking(false);
+    return u;
+  }, []);
+
   // Registers a new account. `consent: true` is sent unconditionally since
   // the signup form requires checking a terms/consent box before this is
   // ever called. Stores the returned token and sets `user` on success.
@@ -74,5 +86,5 @@ export function useAuth() {
   // setUser is exposed so App.jsx can patch the logged-in user object in
   // place (e.g. after AccountSettings/Sidebar hands back an updated user)
   // without a round trip through login/register.
-  return { user, setUser, checking, tryAutoLogin, login, register, logout };
+  return { user, setUser, checking, tryAutoLogin, reviewLogin, login, register, logout };
 }

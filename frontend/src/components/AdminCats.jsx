@@ -67,6 +67,8 @@ export default function AdminCats({ theme: o }) {
   const [reqs, setReqs] = useState([]);          // pending suggestions from users
   const [reqEdit, setReqEdit] = useState({});    // `${kind}|${value}` -> corrected spelling before approving
   const [reqBusy, setReqBusy] = useState('');
+  const [reqMsg, setReqMsg] = useState('');
+  const [focusReq, setFocusReq] = useState(null);   // { kind, value } of the suggestion an emailed link pointed at
 
   const auth = () => ({ Authorization: `Bearer ${getToken()}` });
   const lab = (k) => {
@@ -97,14 +99,29 @@ export default function AdminCats({ theme: o }) {
     const key = `${r.kind}|${r.value}`;
     const nv = (reqEdit[key] ?? r.value).trim();
     if (action === 'approve' && !nv) return;
-    setReqBusy(key);
+    setReqBusy(key); setReqMsg('');
     try {
-      await api.post('/admin/category_requests/resolve', { kind: r.kind, value: r.value, action, newValue: nv });
+      const d = await api.post('/admin/category_requests/resolve', { kind: r.kind, value: r.value, action, newValue: nv });
+      setReqMsg(action === 'approve' ? `Added to ${lab(r.kind)} as “${d.category ? d.category.value : nv}”.` : `Declined “${r.value}”.`);
       await loadReqs();
       if (action === 'approve') load();
     } catch (e) { setErr(e.message || 'Could not update the suggestion'); }
     setReqBusy('');
   };
+  // "View list": show that kind's list, filtered to the suggestion's first word, to check it against what is there.
+  const viewList = (r) => { setActive(r.kind); setQ((r.value.split(/\s+/)[0] || '').slice(0, 20)); };
+
+  // Opened from an emailed suggestion link: open this panel on that suggestion's list.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('hcri_cat_review');
+      if (!raw) return;
+      sessionStorage.removeItem('hcri_cat_review');
+      const h = JSON.parse(raw);
+      setOpen(true);
+      if (KINDS.some((x) => x[0] === h.kind)) { setActive(h.kind); setFocusReq(h); }
+    } catch (e) { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (open) { load(); loadReqs(); }
@@ -469,6 +486,7 @@ export default function AdminCats({ theme: o }) {
   ) : (
     <div>
       {err && <div style={{ color: o.bad, fontSize: 12, marginBottom: 10 }}>{err}</div>}
+      {reqMsg && <div style={{ color: o.good, fontSize: 12, marginBottom: 10, fontFamily: 'monospace' }}>{reqMsg}</div>}
       {reqs.length > 0 && (
         <div style={{ border: `1px solid ${o.accent}66`, borderRadius: 8, padding: 12, marginBottom: 14, background: `${o.accent}0d` }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: o.accent, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
@@ -478,9 +496,15 @@ export default function AdminCats({ theme: o }) {
             const key = `${r.kind}|${r.value}`;
             const dis = reqBusy === key;
             return (
-              <div key={key} style={{ borderTop: `1px solid ${o.border}`, padding: '8px 0', fontFamily: 'monospace' }}>
+              <div key={key} style={{ borderTop: `1px solid ${o.border}`, padding: '8px 6px', fontFamily: 'monospace', borderRadius: 6, background: focusReq && focusReq.kind === r.kind && focusReq.value.toLowerCase() === r.value.toLowerCase() ? `${o.accent}22` : 'transparent' }}>
                 <div style={{ fontSize: 11, color: o.dim, marginBottom: 4 }}>
                   {lab(r.kind)} · {r.count} request{r.count === 1 ? '' : 's'}{r.users.length ? ` · ${r.users.slice(0, 3).join(', ')}${r.users.length > 3 ? '…' : ''}` : ''}
+                </div>
+                <div style={{ fontSize: 11, color: o.dim, marginBottom: 4, lineHeight: 1.5 }}>
+                  {r.similar && r.similar.length > 0
+                    ? <>Close matches in the list: {r.similar.map((v) => <span key={v} style={{ display: 'inline-block', border: `1px solid ${o.border}`, borderRadius: 10, padding: '0 7px', margin: '1px 4px 1px 0', color: o.text }}>{v}</span>)}</>
+                    : 'Nothing similar in the list yet.'}
+                  {r.normalized && r.normalized !== (reqEdit[key] ?? r.value) && <div>Will be saved as: <span style={{ color: o.text }}>{r.normalized}</span></div>}
                 </div>
                 {r.notes.map((n, i) => <div key={i} style={{ fontSize: 11, color: o.dim, fontStyle: 'italic', marginBottom: 4, wordBreak: 'break-word' }}>“{n}”</div>)}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
@@ -491,7 +515,8 @@ export default function AdminCats({ theme: o }) {
                     style={{ flex: '1 1 160px', minWidth: 0, background: o.bg, border: `1px solid ${o.border}`, borderRadius: 6, padding: '6px 8px', color: o.text, fontSize: 13, fontFamily: 'monospace' }}
                   />
                   <button disabled={dis} onClick={() => resolveReq(r, 'approve')} style={{ background: `${o.accent}20`, border: `1px solid ${o.accent}`, color: o.accent, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>Approve</button>
-                  <button disabled={dis} onClick={() => resolveReq(r, 'reject')} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.dim, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>Reject</button>
+                  <button disabled={dis} onClick={() => resolveReq(r, 'reject')} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.dim, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>Decline</button>
+                  <button disabled={dis} onClick={() => viewList(r)} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.text, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>View list</button>
                 </div>
               </div>
             );

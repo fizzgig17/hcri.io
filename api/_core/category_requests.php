@@ -11,12 +11,54 @@ declare(strict_types=1);
 //   POST /api/admin/category_requests/resolve  { kind, value, action: 'approve'|'reject', newValue? }
 
 require_once __DIR__ . '/categories.php';
+require_once __DIR__ . '/categories_csv.php';
+require_once __DIR__ . '/review_login.php';
 
 const CATEGORY_REQUEST_MAX_PENDING = 30;   // per person
 
 /** The kinds people can suggest values for: the curated lists (lumens and current are free-text numbers). */
 function category_suggestable_kinds(): array {
     return ['light_brand', 'light_model', 'led_cct', 'led_brand', 'led_model', 'optic'];
+}
+
+/** Existing values in a list that look like $value (same words, a typo apart, one contains the other), best first. */
+function category_similar_values(PDO $db, string $kind, string $value, int $limit = 6): array {
+    $norm = fn(string $s) => preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($s));
+    $v = $norm($value);
+    if ($v === '') return [];
+    $s = $db->prepare('SELECT value FROM categories WHERE kind = ?');
+    $s->execute([$kind]);
+    $scored = [];
+    foreach ($s->fetchAll(PDO::FETCH_COLUMN) as $cand) {
+        $c = $norm((string)$cand);
+        if ($c === '') continue;
+        $score = 0.0;
+        if ($c === $v) $score = 100;
+        elseif (strlen($v) >= 3 && strlen($c) >= 3 && (str_contains($c, $v) || str_contains($v, $c))) $score = 85;
+        else {
+            similar_text($v, $c, $pct);
+            $lev = levenshtein(substr($v, 0, 60), substr($c, 0, 60));
+            if ($pct >= 70 || $lev <= max(1, (int)floor(min(strlen($v), strlen($c)) * 0.25))) $score = max($pct, 60);
+        }
+        if ($score > 0) $scored[(string)$cand] = $score;
+    }
+    arsort($scored);
+    return array_slice(array_keys($scored), 0, $limit);
+}
+
+/** The value as it would be stored: spaces tidied and, if an admin has chosen a case style for the list, that case applied. */
+function category_normalize_value(PDO $db, string $kind, string $value): string {
+    $value = trim(preg_replace('/\s+/', ' ', $value));
+    $pref = category_case_prefs_get($db)[$kind] ?? null;
+    return ($pref && in_array($pref, CATEGORY_VALID_CASES, true)) ? category_apply_case($value, $pref) : $value;
+}
+
+/** The site owner's admin account (the one whose email is the site's mail address), or null. */
+function category_review_admin(PDO $db): ?array {
+    require_once __DIR__ . '/mail_config.php';
+    $s = $db->prepare('SELECT id, email, name FROM users WHERE is_admin = 1 AND LOWER(email) = LOWER(?) LIMIT 1');
+    $s->execute([MAIL_FROM]);
+    return $s->fetch() ?: null;
 }
 
 /** Creates the table if needed and adds the review columns to a pre-existing one. */
@@ -66,14 +108,28 @@ function category_request_submit(PDO $db, int $uid, string $kind, string $value,
     $db->prepare('INSERT INTO category_requests (user_id, kind, value, note) VALUES (?, ?, ?, ?)')
        ->execute([$uid, $kind, $value, $note !== '' ? $note : null]);
 
-    // Best-effort heads-up to the site owner.
+    // Best-effort heads-up to the site owner, with the closest existing values and a one-time link that signs them in
+    // and opens the list on this suggestion.
     try {
         require_once __DIR__ . '/mailer.php';
         $who = $db->prepare('SELECT name, email FROM users WHERE id = ?');
         $who->execute([$uid]);
         $u = $who->fetch() ?: ['name' => '?', 'email' => ''];
-        send_email(MAIL_FROM, MAIL_FROM_NAME, 'hCRI.io category suggestion: ' . $value,
-            "New category suggestion\n\nKind:  $kind\nValue: $value\nNote:  " . ($note !== '' ? $note : '-') . "\nFrom:  {$u['name']} <{$u['email']}>\n\nReview it in Admin > Categories > Suggestions.");
+        $similar = category_similar_values($db, $kind, $value);
+        $stored  = category_normalize_value($db, $kind, $value);
+        $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $base  = $proto . '://' . ($_SERVER['HTTP_HOST'] ?? 'www.hcri.io') . '/';
+        $link  = $base . '?catreview=%s&kind=' . rawurlencode($kind) . '&value=' . rawurlencode($value);
+        $admin = category_review_admin($db);
+        $url   = $admin ? sprintf($link, review_token_create($db, (int)$admin['id'], 'category_review')) : $base . '?explore=mine';
+        $body = "New category suggestion\n\n"
+              . "List:   $kind\nValue:  $value\nWould be saved as: $stored\nNote:   " . ($note !== '' ? $note : '-') . "\n"
+              . "From:   {$u['name']} <{$u['email']}>\n\n"
+              . ($similar ? "Close matches already in the list:\n  - " . implode("\n  - ", $similar) . "\n\n" : "Nothing similar is in the list yet.\n\n")
+              . ($admin
+                  ? "Review it (opens the list with Approve / Decline; signs you in, single use, expires in 3 days):\n$url\n"
+                  : "Review it: sign in and open Admin > Categories.\n$url\n");
+        send_email(MAIL_FROM, MAIL_FROM_NAME, 'hCRI.io category suggestion: ' . $value, $body);
     } catch (\Throwable $e) { /* the suggestion is saved either way */ }
     return ['status' => 'sent', 'value' => $value];
 }
@@ -103,6 +159,11 @@ function category_requests_pending(PDO $db): array {
     }
     $out = array_values($g);
     usort($out, fn($a, $b) => $b['count'] <=> $a['count'] ?: strcmp($b['latest'], $a['latest']));
+    foreach ($out as &$o) {
+        $o['similar']    = category_similar_values($db, $o['kind'], $o['value']);
+        $o['normalized'] = category_normalize_value($db, $o['kind'], $o['value']);
+    }
+    unset($o);
     return $out;
 }
 
@@ -115,7 +176,7 @@ function category_requests_resolve(PDO $db, int $adminId, string $kind, string $
     if (!in_array($kind, category_suggestable_kinds(), true)) throw new InvalidArgumentException('Invalid category');
     $cat = null;
     if ($action === 'approve') {
-        $final = trim((string)($newValue ?? $value));
+        $final = category_normalize_value($db, $kind, (string)($newValue ?? $value));   // the list's case style, tidy spaces
         if ($final === '' || mb_strlen($final) > 255) throw new InvalidArgumentException('Invalid value');
         $cat = get_or_create_category($db, $kind, $final, $adminId);
     } elseif ($action !== 'reject') {
