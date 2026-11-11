@@ -201,6 +201,10 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if (preg_match('#^/api/lights(/.*)?$#', $uri)) {
+        require __DIR__ . '/api/lights.php'; exit;
+    }
+
     if (preg_match('#^/api/reports/([A-Za-z0-9]+)/led_suggest/?$#', $uri)) {
         require __DIR__ . '/api/reports_led_suggest.php'; exit;
     }

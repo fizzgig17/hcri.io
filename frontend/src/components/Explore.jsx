@@ -103,6 +103,7 @@ import OverlaySPD from './OverlaySPD';
 import ExploreStats from './ExploreStats';
 import FlickerTab from './FlickerTab';
 import RuntimeTab from './RuntimeTab';
+import LightsTab, { AddToLightModal } from './LightsTab';
 import QuickFieldsModal from './QuickFieldsModal';
 import AdminPanel from './AdminPanel';
 import { FeedbackModal } from './AuthScreen';
@@ -922,6 +923,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     if (val === 'myinsights') return loggedIn ? 'myinsights' : 'browse';
     if (val === 'flicker') return loggedIn ? 'flicker' : 'browse';
     if (val === 'runtime') return loggedIn ? 'runtime' : 'browse';
+    if (val === 'lights') return loggedIn ? 'lights' : 'browse';
     return 'browse';
   };
 
@@ -1019,6 +1021,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
   // Categorize modal
   const [catModalOpen, setCatModalOpen] = useState(false);
+  const [lightModalOpen, setLightModalOpen] = useState(false);
   const [catModalSel, setCatModalSel] = useState({});
   const [catOverwrite, setCatOverwrite] = useState(false);
   const [catBusy, setCatBusy] = useState(false);
@@ -2249,6 +2252,11 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
             </button>
           )}
           {tab === 'myreports' && (
+            <button onClick={() => setLightModalOpen(true)} title="Group the selected readings under a light" style={{ flex: 1, minWidth: 0, background: 'none', border: `1px solid ${r.border}`, color: r.text, borderRadius: 6, padding: '11px 8px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
+              Add to light
+            </button>
+          )}
+          {tab === 'myreports' && (
             <button onClick={bulkDelete} title={`Delete ${cmpSel.length} selected`} aria-label="Delete selected reports" style={{ flexShrink: 0, width: 42, background: 'none', border: `1px solid ${r.bad}`, color: r.bad, borderRadius: 6, padding: '11px 8px', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               🗑
             </button>
@@ -2278,6 +2286,11 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
         {tab === 'myreports' && (
           <button onClick={() => { setCatModalOpen(true); loadAllCategories(); }} title="Add category values to the selected reports" style={{ background: 'none', border: `1px solid ${r.border}`, color: r.text, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
             Categorize
+          </button>
+        )}
+        {tab === 'myreports' && (
+          <button onClick={() => setLightModalOpen(true)} title="Group the selected readings under a light" style={{ background: 'none', border: `1px solid ${r.border}`, color: r.text, borderRadius: 6, padding: '7px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer' }}>
+            Add to light
           </button>
         )}
         {tab === 'myreports' && (
@@ -2528,6 +2541,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     ['insights', 'Insights'],
     ...(filtersTouched ? [['finsights', 'Filtered Insights']] : []),
     ...(n ? [['myinsights', 'My Insights']] : []),
+    ...(n ? [['lights', 'Lights']] : []),
     ...(n ? [['flicker', 'Flicker']] : []),
     ...(n ? [['runtime', 'Runtime']] : []),
   ];
@@ -2685,6 +2699,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
     tab === 'insights' ? <ExploreStats theme={r} />
     : tab === 'finsights' ? <FilteredInsights q={window.__exploreQ || ''} T={r} heading="Filtered Insights" note="Statistics across every report matching your current Explore filters." />
     : tab === 'flicker' ? <FlickerTab T={r} isAdmin={!!(n && n.isAdmin)} onOpenReport={(rid) => { window.location.href = window.location.pathname + '?explore=mine&rid=' + rid; }} />
+    : tab === 'lights' ? <LightsTab T={r} />
     : tab === 'runtime' ? <RuntimeTab T={r} isAdmin={!!(n && n.isAdmin)} />
     : tab === 'myinsights' ? <FilteredInsights q={`userId=${(n && n.id) || 0}`} T={r} heading="My Insights" note="Statistics across your own reports, including private ones." />
     : listingBody;
@@ -2779,6 +2794,7 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
 
       {compareBar}
       {categorizeModal}
+      {lightModalOpen && <AddToLightModal T={r} reportIds={cmpSel.map((x) => x.id)} onClose={() => setLightModalOpen(false)} />}
       {compareView}
 
       {/* The three top-level layouts, picked in order: desktop split view
