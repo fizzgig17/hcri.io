@@ -275,6 +275,12 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/og/lights.png') {
+
+        require __DIR__ . '/api/og_lights.php'; exit;
+
+    }
+
     if ($uri === '/api/og/compare.png') {
 
         require __DIR__ . '/api/og_compare.php'; exit;
@@ -1109,6 +1115,34 @@ if ($cmpRaw !== '' && $shareTok === '' && $reportId === 0) {
 
     }
 
+}
+
+// Shared lights (?lights=ID or ?lights=ID,ID,...): one light, or a comparison, previewed with the same card.
+$ltRaw = isset($_GET['lights']) ? (string)$_GET['lights'] : '';
+if ($ltRaw !== '' && $shareTok === '' && $reportId === 0 && $cmpRaw === '') {
+    $ltIds = array_slice(array_values(array_unique(array_filter(array_map('intval', explode(',', $ltRaw))))), 0, 8);
+    if ($ltIds) {
+        try {
+            require_once __DIR__ . '/api/_core/db.php';
+            $ltDb = get_db();
+            $ltq = $ltDb->prepare('SELECT l.name, (SELECT COUNT(*) FROM light_reports lr JOIN reports r ON r.id = lr.report_id WHERE lr.light_id = l.id AND r.is_public = 1) AS n FROM lights l WHERE l.id = ?');
+            $ltRows = [];
+            foreach ($ltIds as $ltId) { $ltq->execute([$ltId]); $lr = $ltq->fetch(); if ($lr && (int)$lr['n'] > 0) $ltRows[] = $lr; }
+            if ($ltRows) {
+                $ltN = array_sum(array_map(fn($x) => (int)$x['n'], $ltRows));
+                if (count($ltRows) === 1) {
+                    $ogTitle = $ltRows[0]['name'] . ' — ' . $ltN . ' reading' . ($ltN === 1 ? '' : 's') . ' — hCRI.io';
+                    $ogDesc  = $ltN . ' reading' . ($ltN === 1 ? '' : 's') . ' of ' . $ltRows[0]['name'] . ', with CCT, Duv, CRI, R9 and TM-30 trends, on hCRI.io.';
+                } else {
+                    $ogTitle = 'Comparison of ' . count($ltRows) . ' lights — hCRI.io';
+                    $ogDesc  = implode(', ', array_slice(array_map(fn($x) => $x['name'], $ltRows), 0, 4)) . (count($ltRows) > 4 ? ' and more' : '') . ' — ' . $ltN . ' readings compared, on hCRI.io.';
+                }
+                $ogUrl  = $ogBase . '?lights=' . rawurlencode(implode(',', $ltIds));
+                $ogType = 'article';
+                if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/lights.png?l=' . rawurlencode(implode(',', $ltIds));
+            }
+        } catch (\Throwable $e) { /* fall back to site defaults */ }
+    }
 }
 
 $rtRaw = isset($_GET['runtime']) ? (string)$_GET['runtime'] : '';

@@ -6,7 +6,7 @@
 // API: GET/POST /api/lights, GET/PATCH/DELETE /api/lights/:id, POST /api/lights/:id/reports, PATCH/DELETE /api/lights/:id/reports/:rid
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { api } from '../lib/api';
+import { api, basePath } from '../lib/api';
 
 export const METRICS = [
   ['cct', 'CCT', 0, 'K'], ['duv', 'Duv', 4, ''], ['ra', 'Ra', 1, ''], ['r9', 'R9', 1, ''],
@@ -149,6 +149,7 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
   const [light, setLight] = useState(null);
   const [err, setErr] = useState('');
   const [edit, setEdit] = useState(null);
+  const [sharing, setSharing] = useState(false);
   const [big, setBig] = useState(null);      // metric key being enlarged
   const [axis, setAxis] = useState('time');
   const [labelEdit, setLabelEdit] = useState({});
@@ -173,7 +174,11 @@ function LightDetail({ id, T, onBack, onChanged, pub }) {
 
   return (
     <div>
-      <button onClick={onBack} style={{ ...btnS(T), marginBottom: 12 }}>← All lights</button>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+        {onBack && <button onClick={onBack} style={btnS(T)}>← All lights</button>}
+        {(pub || light.isPublic) ? <button onClick={() => setSharing(true)} style={btnS(T, 'primary')}>Share</button> : <span style={{ fontSize: 11, color: T.dim }}>Make at least one reading public to share this light.</span>}
+      </div>
+      {sharing && <ShareLightsModal T={T} ids={[light.id]} onClose={() => setSharing(false)} />}
       <div style={{ ...box(T), marginBottom: 14 }}>
         {edit ? (
           <div style={{ display: 'grid', gap: 8 }}>
@@ -298,9 +303,11 @@ function CompareLights({ ids, T, onBack, pub }) {
   const [lights, setLights] = useState(null);
   const [err, setErr] = useState('');
   const [metric, setMetric] = useState('cct');
+  const [sharing, setSharing] = useState(false);
   useEffect(() => { Promise.all(ids.map((i) => api.get(pub ? `/lights/public/${i}` : `/lights/${i}`))).then(setLights).catch((e) => setErr(e.message)); }, [ids.join(',')]); // eslint-disable-line
   if (err) return <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>;
   if (!lights) return <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>;
+  const shareIds = lights.filter((l) => pub || l.isPublic).map((l) => l.id);
   const metrics = METRICS.filter(([k]) => lights.some((l) => l.stats[k]));
   const md = METRICS.find((m) => m[0] === metric) || METRICS[0];
   const spd = lights.map((l, i) => ({ l, i, r: [...l.readings].reverse().find((x) => x.spd && x.spd.length) })).filter((x) => x.r);
@@ -311,7 +318,11 @@ function CompareLights({ ids, T, onBack, pub }) {
   const sy = (v) => p.t + (1 - v) * (H - p.t - p.b);
   return (
     <div>
-      <button onClick={onBack} style={{ ...btnS(T), marginBottom: 12 }}>← All lights</button>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+        {onBack && <button onClick={onBack} style={btnS(T)}>← All lights</button>}
+        {shareIds.length > 0 ? <button onClick={() => setSharing(true)} style={btnS(T, 'primary')}>Share</button> : <span style={{ fontSize: 11, color: T.dim }}>None of these lights is public, so there is nothing to share.</span>}
+      </div>
+      {sharing && <ShareLightsModal T={T} ids={shareIds} onClose={() => setSharing(false)} />}
       <div style={{ fontSize: 16, fontWeight: 700, color: T.white || T.text, marginBottom: 4 }}>Compare lights ({lights.length})</div>
       <div style={{ fontSize: 12, color: T.dim, marginBottom: 10 }}>Each light is represented by its latest reading; trends run in reading order.</div>
       <div style={{ overflowX: 'auto', marginBottom: 14 }}>
@@ -353,6 +364,40 @@ function CompareLights({ ids, T, onBack, pub }) {
       </div>
     </div>
   );
+}
+
+
+// ── Share card: one card for a light or for a comparison (the same image the link preview uses) ───────────────────────────────
+export function ShareLightsModal({ T, ids, onClose }) {
+  const list = ids.join(',');
+  const url = `${window.location.origin}${window.location.pathname}?lights=${list}`;
+  const img = `${basePath()}index.php/api/og/lights.png?l=${list}&t=${Date.now()}`;
+  const [copied, setCopied] = useState(false);
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { window.prompt('Copy this link', url); } };
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 2600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ ...box(T), width: '100%', maxWidth: 640, maxHeight: '90dvh', overflowY: 'auto', fontFamily: 'monospace' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, color: T.white || T.text }}>Share {ids.length === 1 ? 'light' : `comparison of ${ids.length} lights`}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.dim, fontSize: 18, cursor: 'pointer' }}>✕</button>
+        </div>
+        <img src={img} alt="Share card" style={{ width: '100%', borderRadius: 8, border: `1px solid ${T.border}`, display: 'block', marginBottom: 10, background: '#0d1117', aspectRatio: '1200 / 630' }} />
+        <div style={{ fontSize: 11, color: T.dim, marginBottom: 8 }}>Anyone with the link sees public readings only. This card is also the preview that appears when the link is posted.</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={copy} style={btnS(T, 'primary')}>{copied ? 'Copied ✓' : '🔗 Copy link'}</button>
+          <a href={img} download="hcri-lights.png" style={{ ...btnS(T), textDecoration: 'none', display: 'inline-block' }}>↓ Download card</a>
+          <a href={url} target="_blank" rel="noreferrer" style={{ ...btnS(T), textDecoration: 'none', display: 'inline-block' }}>Open link</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// What a shared link (?lights=ID or ?lights=ID,ID,...) shows, signed in or not: one light, or a comparison.
+export function SharedLights({ T, ids }) {
+  return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+    {ids.length === 1 ? <LightDetail id={ids[0]} pub T={T} onChanged={() => {}} /> : <CompareLights ids={ids} pub T={T} />}
+  </div>;
 }
 
 // ── The tab ──────────────────────────────────────────────────────────────────
