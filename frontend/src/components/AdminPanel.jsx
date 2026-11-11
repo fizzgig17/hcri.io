@@ -326,18 +326,12 @@ export default function AdminPanel({ onClose, me }) {
                         {usr.isAdmin && (
                           <span style={{ fontSize: 9, background: `${t.accent}20`, color: t.accent, border: `1px solid ${t.accent}40`, borderRadius: 3, padding: '1px 5px', fontWeight: 700, letterSpacing: 0.5 }}>ADMIN</span>
                         )}
-                        <span style={{ fontSize: 11, color: t.dim }}>{usr.reportCount} rpt{usr.reportCount === 1 ? '' : 's'}</span>
-                        <span title="Folders in My Reports" style={{ fontSize: 11, color: t.dim }}>{usr.folderCount || 0} folder{usr.folderCount === 1 ? '' : 's'}</span>
-                        {usr.apiReportCount > 0 && <span style={{ fontSize: 11, color: t.accent }}>{usr.apiReportCount} via API</span>}
-                        {usr.avgCompleteness != null && (
-                          <span title="Average completeness score of this user's reports" style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: usr.avgCompleteness >= 80 ? t.good : usr.avgCompleteness >= 50 ? t.warn : t.bad }}>
-                            avg {Math.round(usr.avgCompleteness)}%
-                          </span>
-                        )}
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, color: t.dim }}>{usr.email}</span>
-                    <span style={{ fontSize: 10, color: `${t.dim}80` }}>{fmtTZ(usr.createdAt.replace(' ', 'T'), undefined, true)}</span>
+                    <span style={{ fontSize: 11, color: t.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{usr.email}</span>
+                    <span title="Saved reports and My Reports folders" style={{ fontSize: 11, color: `${t.dim}cc` }}>
+                      {usr.reportCount} report{usr.reportCount === 1 ? '' : 's'} · {usr.folderCount || 0} folder{usr.folderCount === 1 ? '' : 's'}{usr.disabled ? ' · disabled' : ''}
+                    </span>
                   </div>
                 ))
               )}
@@ -365,7 +359,7 @@ export default function AdminPanel({ onClose, me }) {
                       </div>
                       <div style={{ fontSize: 13, color: t.dim }}>{u.email}</div>
                       <div style={{ fontSize: 12, color: `${t.dim}80`, marginTop: 2 }}>
-                        Joined {fmtTZ(u.createdAt.replace(' ', 'T'), undefined, true)} · {u.reportCount} saved report{u.reportCount === 1 ? '' : 's'} · {u.folderCount || 0} folder{u.folderCount === 1 ? '' : 's'}
+                        Joined {fmtTZ(u.createdAt.replace(' ', 'T'), undefined, true)} · {u.reportCount} saved report{u.reportCount === 1 ? '' : 's'} · {u.folderCount || 0} folder{u.folderCount === 1 ? '' : 's'}{u.apiReportCount > 0 ? ` · ${u.apiReportCount} via API` : ''}{u.avgCompleteness != null ? ` · avg completeness ${Math.round(u.avgCompleteness)}%` : ''}
                         {u.apiReportCount > 0 ? ` (${u.apiReportCount} via API)` : ''}
                         {u.avgCompleteness != null ? ` · avg completeness ${Math.round(u.avgCompleteness)}%` : ''}
                       </div>
