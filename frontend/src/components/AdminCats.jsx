@@ -68,6 +68,9 @@ export default function AdminCats({ theme: o }) {
   const [reqEdit, setReqEdit] = useState({});    // `${kind}|${value}` -> corrected spelling before approving
   const [reqBusy, setReqBusy] = useState('');
   const [reqMsg, setReqMsg] = useState('');
+  const [view, setView] = useState(null);          // 'suggestions' | 'lists' (null = suggestions when any are pending, else lists)
+  const [checking, setChecking] = useState(null);    // { kind, value }: the suggestion being checked against a list
+  const [toolsOpen, setToolsOpen] = useState(false);  // mobile: Export / Import / Duplicates / Normalize
   const [focusReq, setFocusReq] = useState(null);   // { kind, value } of the suggestion an emailed link pointed at
 
   const auth = () => ({ Authorization: `Bearer ${getToken()}` });
@@ -109,7 +112,7 @@ export default function AdminCats({ theme: o }) {
     setReqBusy('');
   };
   // "View list": show that kind's list, filtered to the suggestion's first word, to check it against what is there.
-  const viewList = (r) => { setActive(r.kind); setQ((r.value.split(/\s+/)[0] || '').slice(0, 20)); };
+  const viewList = (r) => { setActive(r.kind); setQ((r.value.split(/\s+/)[0] || '').slice(0, 20)); setChecking({ kind: r.kind, value: r.value }); setView('lists'); };
 
   // Opened from an emailed suggestion link: open this panel on that suggestion's list.
   useEffect(() => {
@@ -119,7 +122,7 @@ export default function AdminCats({ theme: o }) {
       sessionStorage.removeItem('hcri_cat_review');
       const h = JSON.parse(raw);
       setOpen(true);
-      if (KINDS.some((x) => x[0] === h.kind)) { setActive(h.kind); setFocusReq(h); }
+      if (KINDS.some((x) => x[0] === h.kind)) { setActive(h.kind); setFocusReq(h); setView('suggestions'); }
     } catch (e) { /* ignore */ }
   }, []);
 
@@ -481,17 +484,30 @@ export default function AdminCats({ theme: o }) {
     );
   };
 
+  const curView = view || (reqs.length ? 'suggestions' : 'lists');
+  const checkReq = checking ? reqs.find((r) => r.kind === checking.kind && r.value === checking.value) || null : null;
+
   const bodyInner = loading ? (
     <div style={{ padding: 24, color: o.dim, fontSize: 13, textAlign: 'center' }}>Loading…</div>
   ) : (
     <div>
       {err && <div style={{ color: o.bad, fontSize: 12, marginBottom: 10 }}>{err}</div>}
       {reqMsg && <div style={{ color: o.good, fontSize: 12, marginBottom: 10, fontFamily: 'monospace' }}>{reqMsg}</div>}
-      {reqs.length > 0 && (
-        <div style={{ border: `1px solid ${o.accent}66`, borderRadius: 8, padding: 12, marginBottom: 14, background: `${o.accent}0d` }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: o.accent, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-            Suggestions ({reqs.length})
-          </div>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 12, border: `1px solid ${o.border}`, borderRadius: 8, overflow: 'hidden' }}>
+        {[['suggestions', `Suggestions (${reqs.length})`], ['lists', 'Lists']].map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => { setView(k); if (k === 'suggestions') setChecking(null); }}
+            style={{ flex: 1, padding: '10px 8px', border: 'none', cursor: 'pointer', fontFamily: 'monospace', fontSize: 13, fontWeight: 700,
+              background: curView === k ? `${o.accent}25` : 'transparent', color: curView === k ? o.accent : o.dim }}
+          >{label}</button>
+        ))}
+      </div>
+      {curView === 'suggestions' && reqs.length === 0 && (
+        <div style={{ color: o.dim, fontSize: 13, fontStyle: 'italic', padding: '8px 2px' }}>No suggestions waiting for review.</div>
+      )}
+      {curView === 'suggestions' && reqs.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
           {reqs.map((r) => {
             const key = `${r.kind}|${r.value}`;
             const dis = reqBusy === key;
@@ -523,7 +539,27 @@ export default function AdminCats({ theme: o }) {
           })}
         </div>
       )}
+      {curView === 'lists' && checkReq && (
+        <div style={{ position: 'sticky', top: -18, zIndex: 3, background: o.surface, border: `1px solid ${o.accent}`, borderRadius: 8, padding: '8px 10px', marginBottom: 10, fontFamily: 'monospace' }}>
+          <div style={{ fontSize: 12, color: o.dim, marginBottom: 6 }}>
+            Checking <b style={{ color: o.text }}>“{checkReq.value}”</b> against {lab(checkReq.kind)}
+            {checkReq.normalized && checkReq.normalized !== checkReq.value ? <> · saved as <b style={{ color: o.text }}>{checkReq.normalized}</b></> : null}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <button disabled={reqBusy === `${checkReq.kind}|${checkReq.value}`} onClick={async () => { await resolveReq(checkReq, 'approve'); setChecking(null); setView(null); }} style={{ background: `${o.accent}20`, border: `1px solid ${o.accent}`, color: o.accent, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+            <button disabled={reqBusy === `${checkReq.kind}|${checkReq.value}`} onClick={async () => { await resolveReq(checkReq, 'reject'); setChecking(null); setView(null); }} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.dim, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>Decline</button>
+            <button onClick={() => { setChecking(null); setView('suggestions'); }} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.text, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer' }}>← Suggestions</button>
+          </div>
+        </div>
+      )}
+      {curView === 'lists' && (<>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+        {isMobile && (
+          <button onClick={() => setToolsOpen((x) => !x)} style={{ background: 'none', border: `1px solid ${o.border}`, color: o.dim, borderRadius: 6, padding: '5px 9px', fontSize: 11, cursor: 'pointer', fontFamily: 'monospace', marginBottom: 4 }}>
+            Tools {toolsOpen ? '▴' : '▾'}
+          </button>
+        )}
+        {(!isMobile || toolsOpen) && (
         <div
           style={{
             display: 'flex',
@@ -533,6 +569,7 @@ export default function AdminCats({ theme: o }) {
             marginBottom: 10,
             paddingBottom: 10,
             borderBottom: `1px solid ${o.border}`,
+            width: '100%',
           }}
         >
           <button
@@ -643,6 +680,7 @@ export default function AdminCats({ theme: o }) {
             </span>
           </div>
         </div>
+        )}
         {KINDS.map(([k, la]) => <TabBtn key={k} k={k} la={la} />)}
       </div>
       <input
@@ -715,6 +753,7 @@ export default function AdminCats({ theme: o }) {
           + Add
         </button>
       </div>
+      </>)}
     </div>
   );
 
@@ -748,7 +787,7 @@ export default function AdminCats({ theme: o }) {
             alignItems: 'flex-start',
             justifyContent: 'center',
             padding: isMobile ? 0 : 16,
-            overflowY: 'auto',
+            overflowY: isMobile ? 'hidden' : 'auto',
             WebkitOverflowScrolling: 'touch',
           }}
           onClick={(e) => {
@@ -762,8 +801,8 @@ export default function AdminCats({ theme: o }) {
               borderRadius: isMobile ? 0 : 12,
               width: '100%',
               maxWidth: isMobile ? '100%' : 720,
-              maxHeight: isMobile ? 'none' : '90vh',
-              minHeight: isMobile ? '100%' : 'auto',
+              maxHeight: isMobile ? '100dvh' : '90vh',
+              height: isMobile ? '100dvh' : 'auto',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -789,7 +828,7 @@ export default function AdminCats({ theme: o }) {
                 ✕
               </button>
             </div>
-            <div style={{ padding: 18, overflowY: 'auto' }}>{bodyInner}</div>
+            <div style={{ padding: 18, overflowY: 'auto', minHeight: 0, flex: '1 1 auto', WebkitOverflowScrolling: 'touch' }}>{bodyInner}</div>
           </div>
         </div>
       )}
