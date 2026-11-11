@@ -143,8 +143,8 @@ export default function AppHistory({ theme: o, userId = null }) {
     setBusy(false);
   };
 
-  const convertSelected = async () => {
-    const pick = items.filter((x) => selected.has(x.id));
+  const convertSelected = () => convertItems(items.filter((x) => selected.has(x.id)));
+  const convertItems = async (pick) => {
     const todo = pick.filter((x) => x.kind === 'reading' && !x.reportId && x.hasSpectrum);
     if (!todo.length) { setMsg('Nothing to convert: flickers, readings without a spectrum, and readings that already have a report are skipped.'); return; }
     if (!window.confirm(`Create ${todo.length} website report${todo.length === 1 ? '' : 's'} from the selected reading${todo.length === 1 ? '' : 's'}? They are added to My Reports using your default visibility.`)) return;
@@ -160,7 +160,7 @@ export default function AppHistory({ theme: o, userId = null }) {
         setItems((cur) => cur.map((x) => (byId[x.id] ? { ...x, reportId: byId[x.id].reportId, reportIsPublic: byId[x.id].isPublic } : x)));
       }
       setMsg(`Converted ${done} reading${done === 1 ? '' : 's'} to website reports${failed ? `; ${failed} could not be converted` : ''}. Find them in My Reports.`);
-      clearSel();
+      if (selecting) clearSel();
     } catch (e) { setErr(e.message || 'Could not convert'); }
     setBusy(false);
   };
@@ -230,7 +230,10 @@ export default function AppHistory({ theme: o, userId = null }) {
               <button disabled={busy} onClick={clearSel} style={btn(o.dim)}>Clear</button>
             </>
           ) : (
-            <span style={{ fontSize: 11, color: o.dim }}>Press and hold an item to select several.</span>
+            <>
+              <span style={{ fontSize: 11, color: o.dim, flex: '1 1 auto' }}>Open an item to convert it to a website report, or press and hold to select several.</span>
+              <button onClick={() => { const ids = shown.filter((x) => x.kind === 'reading' && x.hasSpectrum && !x.reportId).map((x) => x.id); setSelected(new Set(ids)); }} style={btn(o.dim)}>Select not-yet-uploaded</button>
+            </>
           )}
         </div>
       )}
@@ -306,6 +309,9 @@ export default function AppHistory({ theme: o, userId = null }) {
                         </>
                       ) : (
                         <>
+                          {it.kind === 'reading' && it.hasSpectrum && !it.reportId && (
+                            <button disabled={busy} onClick={() => convertItems([it])} style={btn(o.accent)}>Convert to website report</button>
+                          )}
                           <button onClick={() => setRenaming({ id: it.id, draft: it.label || '' })} style={btn(o.dim)}>Rename</button>
                           <button onClick={() => remove(it)} style={btn(o.bad)}>Delete from my history</button>
                         </>

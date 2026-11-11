@@ -38,6 +38,7 @@ import AdminNotices from './AdminNotices.jsx';
 import AdminApiLog from './AdminApiLog.jsx';
 import AppHistory from './AppHistory.jsx';
 import AdminCats from './AdminCats.jsx';
+import ScrollRow from './ScrollRow.jsx';
 import AdminReportModal from './AdminReportModal.jsx';
 import CreateUserModal from './CreateUserModal.jsx';
 import usePanelBackClose from '../hooks/usePanelBackClose';
@@ -80,6 +81,7 @@ export default function AdminPanel({ onClose, me }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [recalc, setRecalc] = useState(null); // null | 'running' | {done,failed,total,errors}
   const [quickView, setQuickView] = useState(null);
+  const [userQ, setUserQ] = useState('');   // filter the user list
   usePanelBackClose(addUserOpen, () => setAddUserOpen(false));
   usePanelBackClose(!!quickView, () => setQuickView(null));
 
@@ -87,17 +89,18 @@ export default function AdminPanel({ onClose, me }) {
     overlay: {
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 3000,
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      padding: isMobile ? 0 : 16, overflowY: 'scroll', WebkitOverflowScrolling: 'touch',
+      padding: isMobile ? 0 : 16, overflowY: isMobile ? 'hidden' : 'scroll', WebkitOverflowScrolling: 'touch',
     },
     panel: {
       background: t.surface, border: `1px solid ${t.border}`, borderRadius: isMobile ? 0 : 12,
-      width: '100%', maxWidth: isMobile ? '100%' : 960, height: 'auto', maxHeight: isMobile ? 'none' : '92vh',
-      display: 'flex', flexDirection: 'column', overflow: isMobile ? 'visible' : 'hidden',
+      width: '100%', maxWidth: isMobile ? '100%' : 960, height: isMobile ? '100dvh' : 'auto', maxHeight: isMobile ? '100dvh' : '92vh',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
     },
-    head: { padding: isMobile ? '12px 14px' : '16px 20px', borderBottom: `1px solid ${t.border}`, background: t.surface2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
-    body: { display: 'flex', flex: isMobile ? 'none' : 1, overflow: isMobile ? 'visible' : 'hidden', flexDirection: isMobile ? 'column' : 'row', minHeight: 0 },
-    sidebar: { width: isMobile ? '100%' : 320, flexShrink: 0, borderRight: isMobile ? 'none' : `1px solid ${t.border}`, borderBottom: isMobile ? `1px solid ${t.border}` : 'none', display: 'flex', flexDirection: 'column', overflow: isMobile ? 'visible' : 'hidden', maxHeight: isMobile ? 'auto' : 'none' },
-    main: { flex: 1, overflowY: 'auto', padding: 20, minHeight: 0 },
+    head: { padding: isMobile ? '10px 14px 8px' : '16px 20px', borderBottom: `1px solid ${t.border}`, background: t.surface2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexShrink: 0 },
+    // Mobile: the header stays put and the body scrolls inside the panel (one screen at a time: the user list, then a user).
+    body: { display: 'flex', flex: 1, overflow: isMobile ? 'auto' : 'hidden', flexDirection: isMobile ? 'column' : 'row', minHeight: 0, WebkitOverflowScrolling: 'touch' },
+    sidebar: { width: isMobile ? '100%' : 320, flexShrink: 0, borderRight: isMobile ? 'none' : `1px solid ${t.border}`, display: 'flex', flexDirection: 'column', overflow: isMobile ? 'visible' : 'hidden' },
+    main: { flex: isMobile ? 'none' : 1, overflowY: isMobile ? 'visible' : 'auto', padding: isMobile ? 14 : 20, minHeight: 0 },
     btn: (color = 'accent') => ({ background: `${t[color]}18`, border: `1px solid ${t[color]}50`, color: t[color], borderRadius: 5, padding: '5px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 600 }),
     input: { background: t.bg, border: `1px solid ${t.border}`, borderRadius: 5, padding: '7px 10px', color: t.text, fontSize: 13, outline: 'none', fontFamily: 'monospace', width: '100%' },
     label: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700, display: 'block', marginBottom: 4 },
@@ -257,35 +260,53 @@ export default function AdminPanel({ onClose, me }) {
     <div style={S.overlay}>
       <div style={S.panel}>
         <div style={S.head}>
-          <div style={{ fontWeight: 900, fontSize: 16, color: t.white, fontFamily: 'monospace' }}>
-            Admin Panel
-            {stats && (
-              <span style={{ fontSize: 12, color: t.dim, fontWeight: 400, marginLeft: 14 }}>
-                {stats.users} users · {stats.reports} reports
-              </span>
-            )}
-          </div>
-          <AdminCats theme={t} />
-          <AdminNotices theme={t} />
-          <AdminFeatured theme={t} />
-          <AdminApiLog theme={t} />
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.dim, fontSize: 20, cursor: 'pointer' }}>✕</button>
+          {(() => {
+            const title = (
+              <div style={{ fontWeight: 900, fontSize: 16, color: t.white, fontFamily: 'monospace' }}>
+                Admin Panel
+                {stats && (
+                  <span style={{ fontSize: 12, color: t.dim, fontWeight: 400, marginLeft: isMobile ? 10 : 14 }}>
+                    {stats.users} users · {stats.reports} reports
+                  </span>
+                )}
+              </div>
+            );
+            const tools = (
+              <>
+                <AdminCats theme={t} />
+                <AdminNotices theme={t} />
+                <AdminFeatured theme={t} />
+                <AdminApiLog theme={t} />
+              </>
+            );
+            const close = <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: t.dim, fontSize: 20, cursor: 'pointer' }}>✕</button>;
+            return isMobile ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>{title}{close}</div>
+                <ScrollRow bg={t.surface2} accent={t.accent} style={{ marginTop: 8 }}>{tools}</ScrollRow>
+              </>
+            ) : (<>{title}{tools}{close}</>);
+          })()}
         </div>
 
         <div style={S.body}>
+          {(!isMobile || !u) && (
           <div style={S.sidebar}>
-            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700 }}>Users</span>
+            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: t.dim, fontWeight: 700 }}>Users ({users.length})</span>
               <button onClick={() => setAddUserOpen(true)} style={S.btn('accent')}>+ Add User</button>
               <button onClick={recalcAll} disabled={recalc === 'running'} style={{ ...S.btn('warn'), opacity: recalc === 'running' ? 0.5 : 1 }} title="Recompute all metrics (Rf, Rg, Ra, R9, bins) from stored SPD data">
                 {recalc === 'running' ? '⟳ Recalculating…' : '⟳ Recalc All'}
               </button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ padding: '8px 14px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+              <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search users by name or email" style={{ ...S.input, boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ flex: isMobile ? 'none' : 1, overflowY: isMobile ? 'visible' : 'auto' }}>
               {loading ? (
                 <div style={{ padding: 20, color: t.dim, fontSize: 13, textAlign: 'center' }}>Loading…</div>
               ) : (
-                users.map((usr) => (
+                users.filter((usr) => { const s = userQ.trim().toLowerCase(); return !s || `${usr.name} ${usr.email}`.toLowerCase().includes(s); }).map((usr) => (
                   <div
                     key={usr.id}
                     onClick={() => selectUser(usr)}
@@ -305,29 +326,29 @@ export default function AdminPanel({ onClose, me }) {
                         {usr.isAdmin && (
                           <span style={{ fontSize: 9, background: `${t.accent}20`, color: t.accent, border: `1px solid ${t.accent}40`, borderRadius: 3, padding: '1px 5px', fontWeight: 700, letterSpacing: 0.5 }}>ADMIN</span>
                         )}
-                        <span style={{ fontSize: 11, color: t.dim }}>{usr.reportCount} rpt{usr.reportCount === 1 ? '' : 's'}</span>
-                        {usr.apiReportCount > 0 && <span style={{ fontSize: 11, color: t.accent }}>{usr.apiReportCount} via API</span>}
-                        {usr.avgCompleteness != null && (
-                          <span title="Average completeness score of this user's reports" style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: usr.avgCompleteness >= 80 ? t.good : usr.avgCompleteness >= 50 ? t.warn : t.bad }}>
-                            avg {Math.round(usr.avgCompleteness)}%
-                          </span>
-                        )}
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, color: t.dim }}>{usr.email}</span>
-                    <span style={{ fontSize: 10, color: `${t.dim}80` }}>{fmtTZ(usr.createdAt.replace(' ', 'T'), undefined, true)}</span>
+                    <span style={{ fontSize: 11, color: t.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{usr.email}</span>
+                    <span title="Saved reports and My Reports folders" style={{ fontSize: 11, color: `${t.dim}cc` }}>
+                      {usr.reportCount} report{usr.reportCount === 1 ? '' : 's'} · {usr.folderCount || 0} folder{usr.folderCount === 1 ? '' : 's'}{usr.disabled ? ' · disabled' : ''}
+                    </span>
                   </div>
                 ))
               )}
             </div>
           </div>
+          )}
 
+          {(!isMobile || u) && (
           <div style={S.main}>
+            {isMobile && u && (
+              <button onClick={() => setSelectedUser(null)} style={{ ...S.btn(), marginBottom: 12 }}>← All users</button>
+            )}
             {u ? (
               <>
                 <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: 16, marginBottom: 20 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div>
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 12 : 0, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ minWidth: 0, wordBreak: 'break-word' }}>
                       <div style={{ fontSize: 18, fontWeight: 700, color: t.white, fontFamily: 'monospace', marginBottom: 4 }}>
                         {u.name}
                         {u.disabled && (
@@ -338,7 +359,7 @@ export default function AdminPanel({ onClose, me }) {
                       </div>
                       <div style={{ fontSize: 13, color: t.dim }}>{u.email}</div>
                       <div style={{ fontSize: 12, color: `${t.dim}80`, marginTop: 2 }}>
-                        Joined {fmtTZ(u.createdAt.replace(' ', 'T'), undefined, true)} · {u.reportCount} saved report{u.reportCount === 1 ? '' : 's'}
+                        Joined {fmtTZ(u.createdAt.replace(' ', 'T'), undefined, true)} · {u.reportCount} saved report{u.reportCount === 1 ? '' : 's'} · {u.folderCount || 0} folder{u.folderCount === 1 ? '' : 's'}{u.apiReportCount > 0 ? ` · ${u.apiReportCount} via API` : ''}{u.avgCompleteness != null ? ` · avg completeness ${Math.round(u.avgCompleteness)}%` : ''}
                         {u.apiReportCount > 0 ? ` (${u.apiReportCount} via API)` : ''}
                         {u.avgCompleteness != null ? ` · avg completeness ${Math.round(u.avgCompleteness)}%` : ''}
                       </div>
@@ -346,7 +367,7 @@ export default function AdminPanel({ onClose, me }) {
                         Last login: {u.lastLoginAt ? fmtTZ(u.lastLoginAt.replace(' ', 'T')) : 'never'}  ·  Last active: {u.lastActiveAt ? fmtTZ(u.lastActiveAt.replace(' ', 'T')) : 'never'}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
                       <button onClick={() => toggleAdmin(u)} style={S.btn(u.isAdmin ? 'warn' : 'accent')}>
                         {u.isAdmin ? 'Revoke Admin' : 'Make Admin'}
                       </button>
@@ -396,6 +417,7 @@ export default function AdminPanel({ onClose, me }) {
                 ) : userReports.length === 0 ? (
                   <div style={{ color: t.dim, fontSize: 13, fontStyle: 'italic' }}>No saved reports</div>
                 ) : (
+                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
@@ -434,6 +456,7 @@ export default function AdminPanel({ onClose, me }) {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '22px 0 10px' }}>
@@ -457,6 +480,7 @@ export default function AdminPanel({ onClose, me }) {
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 

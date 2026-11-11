@@ -201,6 +201,10 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if (preg_match('#^/api/lights(/.*)?$#', $uri)) {
+        require __DIR__ . '/api/lights.php'; exit;
+    }
+
     if (preg_match('#^/api/reports/([A-Za-z0-9]+)/led_suggest/?$#', $uri)) {
         require __DIR__ . '/api/reports_led_suggest.php'; exit;
     }
@@ -268,6 +272,12 @@ if (str_starts_with($uri, '/api/')) {
     if ($uri === '/api/og/runtime.png') {
 
         require __DIR__ . '/api/og_runtime.php'; exit;
+
+    }
+
+    if ($uri === '/api/og/lights.png') {
+
+        require __DIR__ . '/api/og_lights.php'; exit;
 
     }
 
@@ -1105,6 +1115,38 @@ if ($cmpRaw !== '' && $shareTok === '' && $reportId === 0) {
 
     }
 
+}
+
+// Shared lights (?lights=ID or ?lights=ID,ID,...): one light, or a comparison, previewed with the same card.
+$ltRaw = isset($_GET['lights']) ? (string)$_GET['lights'] : '';
+if ($ltRaw !== '' && $shareTok === '' && $reportId === 0 && $cmpRaw === '') {
+    $ltIds = array_slice(array_values(array_unique(array_filter(array_map('intval', explode(',', $ltRaw))))), 0, 8);
+    if ($ltIds) {
+        try {
+            require_once __DIR__ . '/api/_core/db.php';
+            $ltDb = get_db();
+            require_once __DIR__ . '/api/_core/lights.php';
+            lights_ensure($ltDb);
+            $ltTok = lights_parse_tokens($ltDb, (string)($_GET['t'] ?? ''));
+            $ltq = $ltDb->prepare('SELECT l.name FROM lights l WHERE l.id = ?');
+            $ltRows = [];
+            foreach ($ltIds as $ltId) { $ltq->execute([$ltId]); $lr = $ltq->fetch(); if (!$lr) continue; $lr['n'] = count(lights_readings($ltDb, $ltId, false, true, $ltTok)); if ($lr['n'] > 0) $ltRows[] = $lr; }
+            if ($ltRows) {
+                $ltN = array_sum(array_map(fn($x) => (int)$x['n'], $ltRows));
+                if (count($ltRows) === 1) {
+                    $ogTitle = $ltRows[0]['name'] . ' — ' . $ltN . ' reading' . ($ltN === 1 ? '' : 's') . ' — hCRI.io';
+                    $ogDesc  = $ltN . ' reading' . ($ltN === 1 ? '' : 's') . ' of ' . $ltRows[0]['name'] . ', with CCT, Duv, CRI, R9 and TM-30 trends, on hCRI.io.';
+                } else {
+                    $ogTitle = 'Comparison of ' . count($ltRows) . ' lights — hCRI.io';
+                    $ogDesc  = implode(', ', array_slice(array_map(fn($x) => $x['name'], $ltRows), 0, 4)) . (count($ltRows) > 4 ? ' and more' : '') . ' — ' . $ltN . ' readings compared, on hCRI.io.';
+                }
+                $ltT = isset($_GET['t']) ? '&t=' . rawurlencode((string)$_GET['t']) : '';
+                $ogUrl  = $ogBase . '?lights=' . rawurlencode(implode(',', $ltIds)) . $ltT;
+                $ogType = 'article';
+                if (extension_loaded('gd')) $ogImage = $ogBase . 'index.php/api/og/lights.png?l=' . rawurlencode(implode(',', $ltIds)) . $ltT;
+            }
+        } catch (\Throwable $e) { /* fall back to site defaults */ }
+    }
 }
 
 $rtRaw = isset($_GET['runtime']) ? (string)$_GET['runtime'] : '';

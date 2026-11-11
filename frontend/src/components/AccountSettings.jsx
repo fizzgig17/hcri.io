@@ -182,6 +182,12 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
   const [tab, setTab] = useState('password');
   // Tab bar scroll indicators: a fade + arrow on whichever side has more tabs hidden.
   const tabsRef = useRef(null);
+  const [wide, setWide] = useState(typeof window !== 'undefined' && window.innerWidth >= 700);
+  useEffect(() => {
+    const f = () => setWide(window.innerWidth >= 700);
+    window.addEventListener('resize', f);
+    return () => window.removeEventListener('resize', f);
+  }, []);
   const [tabEdge, setTabEdge] = useState({ left: false, right: false });
   const updateTabEdge = useCallback(() => {
     const el = tabsRef.current;
@@ -367,9 +373,9 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
 
   const S = {
     overlay: { position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
-    modal: { background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, width:'100%', maxWidth: tab === 'history' ? 640 : 400, maxHeight:'calc(100dvh - 32px)', display:'flex', flexDirection:'column', fontFamily:'monospace', overflow:'hidden' },
+    modal: { background:T.surface2, border:`1px solid ${T.border}`, borderRadius:10, width:'100%', maxWidth: tab === 'history' ? 640 : (wide ? 560 : 400), maxHeight:'calc(100dvh - 32px)', display:'flex', flexDirection:'column', fontFamily:'monospace', overflow:'hidden' },
     header: { padding:'14px 18px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'space-between' },
-    tabs: { display:'flex', borderBottom:`1px solid ${T.border}`, overflowX:'auto', flexShrink:0, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' },
+    tabs: { display:'flex', flexWrap: wide ? 'wrap' : 'nowrap', borderBottom:`1px solid ${T.border}`, overflowX: wide ? 'visible' : 'auto', flexShrink:0, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' },
     tab: active => ({
       flex:'1 0 auto', padding:'11px 12px', whiteSpace:'nowrap', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:0.8,
       border:'none', cursor:'pointer', fontFamily:'monospace',
@@ -415,9 +421,9 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
             <button key={key} style={S.tab(tab === key)} onClick={(e) => { setTab(key); clearNotice(); e.currentTarget.scrollIntoView?.({ inline:'center', block:'nearest', behavior:'smooth' }); }}>{label}</button>
           ))}
         </div>
-        {['left','right'].map(side => tabEdge[side] && (
-          <div key={side} aria-hidden="true" style={{
-            position:'absolute', top:0, bottom:1, [side]:0, width:30, pointerEvents:'none',
+        {!wide && ['left','right'].map(side => tabEdge[side] && (
+          <div key={side} aria-hidden="true" onClick={() => tabsRef.current?.scrollBy({ left: side === 'left' ? -160 : 160, behavior:'smooth' })} style={{
+            position:'absolute', top:0, bottom:1, [side]:0, width:30, cursor:'pointer',
             display:'flex', alignItems:'center', justifyContent: side === 'left' ? 'flex-start' : 'flex-end',
             background:`linear-gradient(to ${side === 'left' ? 'right' : 'left'}, ${T.surface2} 35%, transparent)`,
             color:T.accent, fontSize:18, fontWeight:700, padding:'0 4px', boxSizing:'border-box',
