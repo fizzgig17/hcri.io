@@ -51,7 +51,7 @@ $db   = get_db();
 require_once __DIR__ . '/_core/lights.php';
 lights_ensure($db);
 $tokens = lights_parse_tokens($db, (string)($_GET['t'] ?? ''));   // share tokens of private readings carried by the link
-$reps = []; $names = []; $totals = [];
+$reps = []; $names = []; $totals = []; $catParts = [];
 foreach ($entries as $lid) {
     try {
         $ls = $db->prepare('SELECT * FROM lights WHERE id = ?'); $ls->execute([$lid]);
@@ -61,6 +61,17 @@ foreach ($entries as $lid) {
         $all = lights_readings($db, $lid, false, true, $tokens);
         if (!$all) continue;
         $names[] = $l['name']; $totals[] = count($all);
+        if (count($entries) === 1) {   // the light's categories, when any are set
+            $lc = lights_categories($db, $lid);
+            $j = fn($k) => implode(' / ', array_map(fn($x) => $x['value'], $lc[$k] ?? []));
+            $cct = $j('led_cct'); if ($cct !== '' && !preg_match('/k\s*$/i', $cct)) $cct .= 'K';
+            $light = trim($j('light_brand') . ' ' . $j('light_model'));
+            $led = trim(implode(' ', array_filter([$j('led_brand'), $j('led_model'), $cct])));
+            $optic = $j('optic');
+            if ($light !== '') $catParts[] = $light;
+            if ($led !== '') $catParts[] = 'LED ' . $led;
+            if ($optic !== '') $catParts[] = 'Optic ' . $optic;
+        }
         if (count($entries) === 1) {   // a single light: its readings overlaid (the comparison chart)
             foreach (array_slice($rd, 0, 10) as $r) $reps[] = ['label' => $r['label'], 'cct' => $r['cct'] !== null ? (int)$r['cct'] : null, 'wls' => array_column($r['spd'], 0), 'vals' => array_column($r['spd'], 1), 'count' => 1];
         } elseif ($rd) {
@@ -137,10 +148,15 @@ $nr = array_sum($totals);
 $cntLbl = $single ? ('(' . $nr . ' reading' . ($nr === 1 ? '' : 's') . ')') : ('(' . count($names) . ' lights · ' . $nr . ' readings)');
 $text(22, $PAD + $textw(42, $F_WORK_B, $ttl) + 16, $PAD + 9, $DIM, $F_WORK_R, $cntLbl);
 
+// ── Categories line (single light, only when some are set) ───────────────────────────────────────────────────────────────────
+$catLine = implode('   ·   ', $catParts);
+if (mb_strlen($catLine) > 78) $catLine = mb_substr($catLine, 0, 77) . '…';
+if ($catLine !== '') $text(20, $PAD, $PAD + 54, $ACCENT, $F_WORK_R, $catLine);
+
 // ── Legend (wraps; up to 2 rows) ─────────────────────────────────────────────
 $lineH = 28;
 $lx    = $PAD;
-$ly    = $PAD + 54;
+$ly    = $PAD + 54 + ($catLine !== '' ? 34 : 0);
 $right = OGC_W - $PAD;
 $legendBottom = $ly;
 foreach ($reps as $i => $rep) {
@@ -152,7 +168,7 @@ foreach ($reps as $i => $rep) {
     if ($rep['cct'] !== null) $lab .= '  ' . $rep['cct'] . 'K';
     $itemW = 16 + 9 + $textw(18, $F_MONO_R, $lab) + 26;
     if ($lx + $itemW > $right && $lx > $PAD) { $lx = $PAD; $ly += $lineH; }
-    if ($ly > $PAD + 54 + $lineH) break; // cap at 2 rows
+    if ($ly > $PAD + 54 + ($catLine !== '' ? 34 : 0) + $lineH) break; // cap at 2 rows
     imagefilledrectangle($im, $lx, $ly + 5, $lx + 16, $ly + 11, $c);
     $text(18, $lx + 25, $ly, $TEXT, $F_MONO_R, $lab);
     $lx += $itemW;
