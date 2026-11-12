@@ -4,6 +4,7 @@
 // signed-in accounts: user, date, time, URL (plus method and HTTP status). Backend: GET /api/admin/api_log
 // (api/admin.php, table written by api/_core/api_log.php). Newest first, 1000 entries at most.
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { basePath, getToken } from '../lib/api';
 import { fmtTZ } from '../lib/tz';
@@ -47,7 +48,7 @@ export default function AdminApiLog({ theme: o }) {
       >
         API Log
       </button>
-      {open && (
+      {open && createPortal(
         <div
           style={{ position: 'fixed', inset: 0, background: isMobile ? o.bg : 'rgba(0,0,0,0.7)', zIndex: 3500, display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 20 }}
           onClick={() => { if (!isMobile) setOpen(false); }}
@@ -95,7 +96,7 @@ export default function AdminApiLog({ theme: o }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

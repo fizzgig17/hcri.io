@@ -13,6 +13,7 @@
 //   PATCH  /api/admin/notices/:id
 //   DELETE /api/admin/notices/:id
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
@@ -195,7 +196,7 @@ export default function AdminNotices({ theme: o }) {
       >
         🔔 Notices
       </button>
-      {open && (
+      {open && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -490,7 +491,7 @@ export default function AdminNotices({ theme: o }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

@@ -21,6 +21,7 @@
 //   GET  /api/admin/category_requests           -- pending suggestions from users, grouped by kind + value
 //   POST /api/admin/category_requests/resolve   -- { kind, value, action: 'approve'|'reject', newValue? }
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef } from 'react';
 import { basePath, getToken, api } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
@@ -776,7 +777,7 @@ export default function AdminCats({ theme: o }) {
       >
         🏷 Categories
       </button>
-      {open && (
+      {open && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -831,7 +832,7 @@ export default function AdminCats({ theme: o }) {
             <div style={{ padding: 18, overflowY: 'auto', minHeight: 0, flex: '1 1 auto', WebkitOverflowScrolling: 'touch' }}>{bodyInner}</div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

@@ -7,6 +7,7 @@
 // Backend: GET/POST /api/admin/featured (api/admin.php) -- GET returns
 // { ids, reports }, POST body is { ids: number[] } (max 3, numeric only).
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
 import { basePath, getToken } from '../lib/api';
 import usePanelBackClose from '../hooks/usePanelBackClose';
@@ -93,7 +94,7 @@ export default function AdminFeatured({ theme: o }) {
       >
         ★ Featured
       </button>
-      {open && (
+      {open && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -199,7 +200,7 @@ export default function AdminFeatured({ theme: o }) {
             </button>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }
