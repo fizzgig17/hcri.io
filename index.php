@@ -201,7 +201,7 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
-    if (preg_match('#^/api/lights(/.*)?$#', $uri)) {
+    if (preg_match('#^/api/(?:v1/)?lights(/.*)?$#', $uri)) {
         require __DIR__ . '/api/lights.php'; exit;
     }
 

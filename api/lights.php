@@ -15,11 +15,12 @@ require_once __DIR__ . '/_core/response.php';
 require_once __DIR__ . '/_core/db.php';
 require_once __DIR__ . '/_core/auth.php';
 require_once __DIR__ . '/_core/lights.php';
+require_once __DIR__ . '/_core/api_token.php';
 
 cors_headers();
 $db   = get_db();
 lights_ensure($db);
-$path = rtrim(preg_replace('#^.*?/api/lights#', '', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)), '/');
+$path = rtrim(preg_replace('#^.*?/api/(?:v1/)?lights#', '', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)), '/');
 
 // ── Public lights (no sign-in): a light is public when at least one of its readings is, and only those readings show ──────────
 if (preg_match('#^/public(?:/(\d+))?$#', $path, $pp)) {
@@ -51,7 +52,10 @@ if (preg_match('#^/public(?:/(\d+))?$#', $path, $pp)) {
     json_out($out);
 }
 
-$user = require_auth();
+// Signed-in website session (JWT) or a personal API token (the Companion app).
+$tokUser = (str_starts_with(get_auth_header(), 'Bearer ') && !jwt_verify(substr(get_auth_header(), 7))) || get_auth_header() === '' ? user_from_api_token($db, api_token_from_request()) : null;
+$user = $tokUser ?: require_auth();
+if ($tokUser && !empty($tokUser['disabled'])) json_error('Account disabled', 403);
 $uid  = (int)$user['id'];
 $m    = $_SERVER['REQUEST_METHOD'];
 
