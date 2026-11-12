@@ -249,7 +249,7 @@ export default function AnnexEModal({ report, onClose }) {
 
       // Hue-bin bar panels: chroma shift / hue shift / fidelity
       function binPanel(values, y, h, lo, hi, refLine, label, axisFmt, barLabelFmt) {
-        const p0 = y + 13, p1 = y + h - 14, binW = 471 / 16;
+        const p0 = y + 25, p1 = y + h - 14, binW = 471 / 16;
         const zeroY = p1 - ((0 - lo) / (hi - lo)) * (p1 - p0);
         sectionLabel(label, 308, y);
         const gridVals = lo < 0 ? [lo, lo / 2, 0, hi / 2, hi] : [0, 25, 50, 75, 100];
@@ -371,7 +371,7 @@ export default function AnnexEModal({ report, onClose }) {
       const N = 765 / 99;
       sectionLabel('Color Sample Fidelity, Rf,CES', 18, 636);
       [0, 25, 50, 75, 100].forEach((v) => {
-        const y = 756 - (v / 100) * 108;
+        const y = 756 - (v / 100) * 94;
         c.strokeStyle = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'; c.lineWidth = 0.4;
         c.beginPath(); c.moveTo(42, y); c.lineTo(807, y); c.stroke();
         c.fillStyle = colDim; c.font = '7.5px sans-serif'; c.textAlign = 'right'; c.textBaseline = 'middle';
@@ -382,7 +382,7 @@ export default function AnnexEModal({ report, onClose }) {
         return rfBins[b0] * (1 - frac) + rfBins[b1] * frac;
       }).forEach((v, i) => {
         const [rr, gg, bb] = hueToRGB((i / 99) * 360);
-        const h = (Math.max(0, v) / 100) * 108;
+        const h = (Math.max(0, v) / 100) * 94;
         c.fillStyle = `rgba(${rr},${gg},${bb},0.85)`;
         c.fillRect(42 + i * N + 0.3, 756 - h, 7.427272727272728, h);
       });
@@ -391,7 +391,7 @@ export default function AnnexEModal({ report, onClose }) {
         c.fillText(n, 42 + (n - 0.5) * N, 759);
       });
       c.fillStyle = colDim; c.font = '8px sans-serif'; c.textAlign = 'center'; c.fillText('CES Color', 424.5, 769);
-      boxBorder(42, 807, 648, 756);
+      boxBorder(42, 807, 660, 756);
 
       // Chromaticity + CRI mini-panel
       c.fillStyle = dark ? '#141c2b' : '#f4f7fb'; c.fillRect(607, 771, 200, 76);
