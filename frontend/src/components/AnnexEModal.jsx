@@ -274,8 +274,9 @@ export default function AnnexEModal({ report, onClose }) {
           const clamped = Math.max(lo, Math.min(hi, raw));
           // Positive bars rise from the zero line (or the baseline for fidelity); negative bars hang below it.
           // (They used to be drawn 1px tall, so the negative chroma/hue shifts showed as a number with no bar.)
-          const top = clamped >= 0 ? p1 - (clamped / (hi - lo)) * (p1 - p0) : zeroY;
-          const bottom = clamped >= 0 ? p1 : zeroY + (Math.abs(clamped) / (hi - lo)) * (p1 - p0);
+          // (zeroY is the baseline for fidelity too, where lo = 0 puts it at the bottom of the panel.)
+          const top = clamped >= 0 ? zeroY - (clamped / (hi - lo)) * (p1 - p0) : zeroY;
+          const bottom = clamped >= 0 ? zeroY : zeroY + (Math.abs(clamped) / (hi - lo)) * (p1 - p0);
           const x = 336 + i * binW + 1;
           c.fillStyle = `rgba(${rr},${gg},${bb},0.88)`;
           c.fillRect(x, top, binW - 2, Math.max(1, bottom - top));
