@@ -197,7 +197,7 @@
 
   <main>
     <h1 class="doc-title">hCRI Companion — User Manual</h1>
-    <div class="doc-meta">Covers app version 1.28 · Last updated November 1, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    <div class="doc-meta">Covers iOS 2.0 and Android 2026.11.9.1 · Last updated November 12, 2026 · <a href="https://github.com/fizzgig17/hcri-companion" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
 
     <section id="overview">
       <h2><span class="num">01</span> Overview</h2>
@@ -229,7 +229,14 @@
           <a href="../bridge/">ESP32 bridge setup guide</a> covers which board to buy, how to connect it and how to install the firmware. Hopoocolor HPCS meters connect directly and need
           no bridge. See <a href="#torchbearer">Using a Torch Bearer</a>.</p>
       </div>
-      <h3>What's new in the latest update (Android 2026.11.1.2, iOS 1.28)</h3>
+      <h3>What's new in the latest update (iOS 2.0)</h3>
+      <ul>
+        <li><strong>Lights:</strong> group several readings of the same flashlight into a <em>light</em>, kept in step with hCRI.io. <code>History &rarr; Lights</code> lists your lights with small trend charts; create one, add readings, categorize it (light brand and model, LED brand, model and CCT, optic) and tap <code>Sync</code>: the light is created on hCRI.io, every reading that was never uploaded is uploaded, and all of them are linked in your order. Lights you made on the website appear here too. See <a href="#lights">The Lights list</a>.</li>
+        <li><strong>To light:</strong> select readings in History and tap <code>To light</code> to put them on an existing light or start a new one named after what the titles have in common.</li>
+        <li>Opening Lights without a valid hCRI.io token asks you to sign in (or paste a token) first.</li>
+        <li>Android gets the same in its next release.</li>
+      </ul>
+      <h3>Android 2026.11.1.2, iOS 1.28</h3>
       <ul>
         <li><strong>Categorize:</strong> set a reading's LEDs and every hCRI.io category (light brand and model, optic, lumens, current) from one window. Use the tag icon on a History row or on a reading's page, the Categorize pill on Main, or select several readings in History and tap <code>Categorize</code> to do them all at once. Nothing is applied until you tap Categorize, and the window remembers what you applied last time. See <a href="#categorize">Categorize</a>.</li>
         <li><strong>Category lists</strong> refresh each time the app starts (when you are online) and are kept for offline use.</li>
@@ -782,7 +789,7 @@
 
     <section id="history-tab">
       <h2><span class="num">11</span> The History tab</h2>
-      <p>A switch at the top chooses between three lists: <code>Readings</code>, <code>Flicker</code> (saved flicker samples, described below) and <code>Runtime</code> (runs recorded with a TKLamp tester; see <a href="#tklamp">Using a TKLamp tester</a>).</p>
+      <p>A switch at the top chooses between four lists: <code>Readings</code>, <code>Flicker</code> (saved flicker samples, described below), <code>Runtime</code> (runs recorded with a TKLamp tester; see <a href="#tklamp">Using a TKLamp tester</a>) and <code>Lights</code> (readings grouped by flashlight; see <a href="#lights">The Lights list</a>).</p>
       <p>Your most recent readings (up to 100), grouped by day, newest first. From here you can:</p>
       <ul>
         <li><strong>View</strong> a past reading's full measurement grid, spectrum, chromaticity, and
@@ -797,11 +804,21 @@
           first tap creates its share link, which anyone holding the link can open.</li>
         <li><strong>Select</strong> multiple readings: hold a reading's title to start, with that reading checked. Tap
           more rows to add them, use <code>Select all</code> at the top, and tap the X to stop. Then upload them to
-          hCRI.io in one batch, <a href="#categorize">categorize</a>, share, compare or delete them.</li>
+          hCRI.io in one batch, <a href="#categorize">categorize</a>, share, compare, put them <code>To light</code> or delete them.</li>
         <li><strong>Share</strong> a single reading, the readings you have selected, or your entire history, as CSV. Shared files end with a short summary of the computed values.</li>
         <li><strong>Add a saved flicker</strong> to a reading that has none: the lightning-bolt button lists your saved flickers that aren't attached to a reading yet. Pick one and it is copied into the reading, so it is saved and uploaded with it. If the reading was already uploaded, the flicker is also added to its report on hCRI.io. The button only appears when the reading has no flicker and a free saved flicker exists. A reading that has a flicker shows a small waveform icon next to its date; its hint says when the flicker went up with the report.</li>
         <li><strong>Delete</strong> a reading you no longer want — this only removes it from your phone (and from your cloud backup, if backup is on); a
           copy already uploaded to hCRI.io as a report stays there until you delete it from your account separately.</li>
+      </ul>
+      <h3 id="lights">The Lights list</h3>
+      <p>A <em>light</em> groups several readings of the same flashlight (for example one reading per mode, or one per week as the battery ages) so you can follow how it changes. A light is kept on your phone and on hCRI.io: the website's <code>Explore &rarr; Lights</code> shows the same lights, with trend charts, a spectra overlay, comparison and a share link.</p>
+      <ul>
+        <li><strong>Sign in first.</strong> Lights live on hCRI.io, so the tab needs your API token. If none is saved, or hCRI.io no longer accepts it, the tab asks you to sign in with your username and password (this creates a token) or to paste one. Without a connection you can still work on lights; Sync waits until you are online.</li>
+        <li><strong>Create</strong> a light with <code>+ New light</code>, or select readings in the Readings list and tap <code>To light</code>. Add more later with <code>+ Add readings</code> (a searchable list of your History readings). Use the arrows to put the readings in order: that order is the trend order on hCRI.io as well. The cross takes a reading off the light; it never deletes the reading.</li>
+        <li><strong>Categorize</strong> a light with the same window as a reading: light brand and model, LED brand, model and CCT, and optic. A light keeps only values that are already in hCRI.io's lists.</li>
+        <li><strong>Sync</strong> (the large button on a light, or <code>Sync all</code>) creates the light on hCRI.io if it is new, uploads every reading of the light that was never uploaded (readings already uploaded are left as they are), links them all in your order, takes off the ones you removed, and brings back the latest numbers and trend charts. If a reading cannot be uploaded the light stays marked <em>Unsent changes</em>; sync again to retry.</li>
+        <li><strong>Refresh</strong> brings down the lights on your account, including ones made on the website. Readings of a light that are not on this phone show as <em>On hCRI.io only</em>.</li>
+        <li><strong>Delete light</strong> removes the light here and on hCRI.io. The readings are kept (in History and as reports); only the grouping goes.</li>
       </ul>
       <h3>The Flicker list</h3>
       <p>Each <code>New sample</code> from the Flicker page is saved here automatically when it ends (up to 100, newest first). A row shows the date, the meter model, the frequency, percent flicker and flicker index. Tap the title to rename it, the eye to view the waveform, the cloud to upload it to hCRI.io on its own, or the bin to delete it. A badge says where it belongs:</p>
