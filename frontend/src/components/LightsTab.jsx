@@ -102,8 +102,40 @@ function LightFields({ v, set, T, autoFocus }) {
 const specLine = (l) => [l.brand, l.model].filter(Boolean).join(' ') + ([l.ledBrand, l.ledModel].some(Boolean) ? ' · LED ' + [l.ledBrand, l.ledModel].filter(Boolean).join(' ') : '') + (l.optic ? ' · ' + l.optic : '');
 
 // ── Overview card (list) ─────────────────────────────────────────────────────
-function LightCard({ light, T, onOpen, checked, onCheck }) {
+const COMPACT = ['cct', 'duv', 'ra', 'r9'];
+function LightCard({ light, T, onOpen, checked, onCheck, compact }) {
   const l = light.latest;
+  if (compact) return (
+    <div onClick={onOpen} style={{ ...box(T, { padding: 10 }), cursor: 'pointer', borderColor: checked ? T.accent : T.border, minWidth: 0 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+        <input type="checkbox" checked={!!checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label="Select to compare" style={{ accentColor: T.accent, width: 18, height: 18, marginTop: 1, cursor: 'pointer', flexShrink: 0 }} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: T.white || T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{light.name}</div>
+          <div style={{ fontSize: 11, color: T.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{specLine(light) || 'No brand / model'}</div>
+          <div style={{ fontSize: 11, color: T.dim }}>
+            {light.count} reading{light.count === 1 ? '' : 's'}{light.owner ? ` · by ${light.owner}` : ''}
+            {light.owner == null && <span style={{ marginLeft: 6, color: light.isPublic ? T.good || T.accent : T.dim }}>· {light.isPublic ? 'public' : 'private'}</span>}
+          </div>
+        </div>
+      </div>
+      {light.count === 0 ? <div style={{ fontSize: 11, color: T.dim, fontStyle: 'italic' }}>No readings yet.</div> : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {METRICS.filter(([k]) => COMPACT.includes(k) && light.stats[k]).map(([k, lab, d, unit]) => {
+            const st = light.stats[k]; const i = METRICS.findIndex((m) => m[0] === k);
+            return (
+              <div key={k} style={{ border: `1px solid ${T.border}`, borderRadius: 6, padding: '4px 6px', minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: 9, color: T.dim, textTransform: 'uppercase', letterSpacing: 0.6 }}>{lab}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{fmtN(st.latest, d)}<span style={{ fontSize: 9, color: T.dim }}>{unit}</span></span>
+                </div>
+                <Sparkline values={light.series[k]} color={PALETTE[i % PALETTE.length]} w={110} h={20} dec={d} T={T} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
   return (
     <div onClick={onOpen} style={{ ...box(T), cursor: 'pointer', borderColor: checked ? T.accent : T.border }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -458,6 +490,7 @@ export function SharedLights({ T, ids }) {
 }
 
 // ── The tab ──────────────────────────────────────────────────────────────────
+const PAGE = 24;
 export default function LightsTab({ T }) {
   const [lights, setLights] = useState(null);
   const [err, setErr] = useState('');
@@ -471,7 +504,7 @@ export default function LightsTab({ T }) {
 
   const load = useCallback(() => { setLights(null); return api.get(pub ? '/lights/public' : '/lights').then((d) => { setLights(d); setErr(''); }).catch((e) => setErr(e.message)); }, [pub]);
   useEffect(() => { load(); }, [load]);
-  const setScope = (v) => { setPub(v); setPick([]); setOpen(null); setCreating(false); try { const u = new URL(window.location.href); u.searchParams.delete('light'); if (v) u.searchParams.set('scope', 'public'); else u.searchParams.delete('scope'); window.history.replaceState(window.history.state, '', u); } catch {} };
+  const setScope = (v) => { setPub(v); setFo(''); setFb(''); setFq(''); setPick([]); setOpen(null); setCreating(false); try { const u = new URL(window.location.href); u.searchParams.delete('light'); if (v) u.searchParams.set('scope', 'public'); else u.searchParams.delete('scope'); window.history.replaceState(window.history.state, '', u); } catch {} };
   const go = (id) => { setOpen(id); try { const u = new URL(window.location.href); if (id) u.searchParams.set('light', id); else u.searchParams.delete('light'); window.history.replaceState(window.history.state, '', u); } catch {} };
 
   const create = async () => {
@@ -479,10 +512,27 @@ export default function LightsTab({ T }) {
     try { const l = await api.post('/lights', draft); setCreating(false); setDraft(blank); await load(); go(l.id); } catch (e) { setErr(e.message); }
   };
 
+  const [fq, setFq] = useState('');
+  const [fo, setFo] = useState('');
+  const [fb, setFb] = useState('');
+  const [fs, setFs] = useState('recent');
+  const [shown, setShown] = useState(PAGE);
+  const [compactView, setCompactView] = useState(() => { try { return localStorage.getItem('hcri_lights_view') !== 'detailed'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('hcri_lights_view', compactView ? 'cards' : 'detailed'); } catch {} }, [compactView]);
+  const tally = (arr) => Object.entries(arr.reduce((m, x) => { if (x) m[x] = (m[x] || 0) + 1; return m; }, {})).sort((a, b) => a[0].localeCompare(b[0]));
+  const owners = tally((lights || []).map((l) => l.owner));
+  const brands = tally((lights || []).map((l) => l.brand));
+  const filtered = (lights || []).filter((l) => {
+    if (fo && l.owner !== fo) return false;
+    if (fb && l.brand !== fb) return false;
+    const q = fq.trim().toLowerCase();
+    return !q || [l.name, l.brand, l.model, l.ledBrand, l.ledModel, l.optic, l.owner].some((x) => x && String(x).toLowerCase().includes(q));
+  }).sort((a, b) => fs === 'name' ? a.name.localeCompare(b.name) : fs === 'count' ? b.count - a.count || a.name.localeCompare(b.name) : (epoch(b.latest?.createdAt || b.createdAt) - epoch(a.latest?.createdAt || a.createdAt)));
+
   if (comparing) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><CompareLights ids={pick} pub={pub} T={T} onBack={() => setComparing(false)} /></div>;
   if (open) return <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}><LightDetail id={open} pub={pub} T={T} onBack={() => go(null)} onChanged={load} /></div>;
   return (
-    <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: T.white || T.text }}>Lights</div>
@@ -504,9 +554,40 @@ export default function LightsTab({ T }) {
       {err && <div style={{ color: T.bad, fontSize: 13 }}>{err}</div>}
       {!lights && !err && <div style={{ color: T.dim, fontSize: 13 }}>Loading…</div>}
       {lights && lights.length === 0 && !creating && <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>{pub ? 'No public lights yet: a light appears here once one of its readings is public.' : 'No lights yet. Create one, or select reports in My Reports and choose “Add to light”.'}</div>}
-      <div style={{ display: 'grid', gap: 10 }}>
-        {(lights || []).map((l) => <LightCard key={l.id} light={l} T={T} onOpen={() => go(l.id)} checked={pick.includes(l.id)} onCheck={() => setPick((c) => c.includes(l.id) ? c.filter((x) => x !== l.id) : [...c, l.id].slice(-8))} />)}
+      {lights && lights.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+          <input value={fq} onChange={(e) => { setFq(e.target.value); setShown(PAGE); }} placeholder="Search name, brand, model, LED, optic…" style={{ ...inputS(T), flex: '1 1 200px', width: 'auto' }} />
+          {pub && owners.length > 1 && (
+            <select value={fo} onChange={(e) => { setFo(e.target.value); setShown(PAGE); }} style={{ ...inputS(T), width: 'auto', flex: '0 1 170px' }} aria-label="Filter by user">
+              <option value="">All users ({lights.length})</option>
+              {owners.map(([n, c]) => <option key={n} value={n}>{n} ({c})</option>)}
+            </select>
+          )}
+          {brands.length > 1 && (
+            <select value={fb} onChange={(e) => { setFb(e.target.value); setShown(PAGE); }} style={{ ...inputS(T), width: 'auto', flex: '0 1 150px' }} aria-label="Filter by brand">
+              <option value="">All brands</option>
+              {brands.map(([n, c]) => <option key={n} value={n}>{n} ({c})</option>)}
+            </select>
+          )}
+          <select value={fs} onChange={(e) => setFs(e.target.value)} style={{ ...inputS(T), width: 'auto', flex: '0 1 150px' }} aria-label="Sort">
+            <option value="recent">Latest reading</option>
+            <option value="name">Name A–Z</option>
+            <option value="count">Most readings</option>
+          </select>
+          <div style={{ display: 'flex' }}>
+            {[[true, '▦', 'Cards'], [false, '☰', 'Detailed']].map(([v, ic, t]) => (
+              <button key={t} title={t} aria-label={t} onClick={() => setCompactView(v)} style={{ ...btnS(T), borderRadius: v ? '6px 0 0 6px' : '0 6px 6px 0', borderColor: compactView === v ? T.accent : T.border, fontWeight: compactView === v ? 700 : 400 }}>{ic}</button>
+            ))}
+          </div>
+          {(fq || fo || fb) && <button onClick={() => { setFq(''); setFo(''); setFb(''); setShown(PAGE); }} style={btnS(T)}>Clear</button>}
+        </div>
+      )}
+      {lights && lights.length > 0 && <div style={{ fontSize: 11, color: T.dim, marginBottom: 8 }}>{filtered.length === lights.length ? `${lights.length} light${lights.length === 1 ? '' : 's'}` : `${filtered.length} of ${lights.length} lights`}</div>}
+      {lights && lights.length > 0 && filtered.length === 0 && <div style={{ color: T.dim, fontSize: 13, fontStyle: 'italic' }}>No lights match.</div>}
+      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: compactView ? 'repeat(auto-fill, minmax(260px, 1fr))' : '1fr' }}>
+        {filtered.slice(0, shown).map((l) => <LightCard key={l.id} light={l} compact={compactView} T={T} onOpen={() => go(l.id)} checked={pick.includes(l.id)} onCheck={() => setPick((c) => c.includes(l.id) ? c.filter((x) => x !== l.id) : [...c, l.id].slice(-8))} />)}
       </div>
+      {filtered.length > shown && <div style={{ textAlign: 'center', marginTop: 12 }}><button onClick={() => setShown((n) => n + PAGE)} style={btnS(T)}>Show more ({filtered.length - shown} left)</button></div>}
       {pick.length > 0 && (
         <div style={{ position: 'sticky', bottom: 12, marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '10px 14px', boxShadow: '0 6px 24px rgba(0,0,0,0.45)' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: T.text, flex: 1 }}>{pick.length} selected</span>
