@@ -57,7 +57,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     <div class="em"><label><input type="checkbox" id="cont"> Contour lines every</label> <input type="number" id="cstep" value="2" min="0.5" step="0.5" aria-label="Degrees between contour lines"> &deg;C</div>
     <div class="em">Outline everything above <input type="number" id="othr" placeholder="off" step="1" aria-label="Outline the area above this temperature"> &deg;C <button class="btn plain" type="button" id="ohalf">Half way</button></div>
     <div class="note">Click the image to pin a temperature, as many spots as you like (up to 12; click a pinned spot again to remove it).</div>
-    <div class="em"><label><input type="checkbox" id="grid"> Show a temperature every few pixels</label> <button class="btn plain" type="button" id="clrpins">Clear pins</button></div>
+    <div class="em"><label><input type="checkbox" id="grid"> Label the highs and lows, up to</label> <input type="number" id="extn" value="3" min="1" max="8" step="1" aria-label="How many highs and lows to label"> of each <button class="btn plain" type="button" id="clrpins">Clear pins</button></div>
     <label class="em"><input type="checkbox" id="frames"> Also save every thermal image when recording (a second CSV, about 4 kB a second)</label>
     <div class="row"><button class="btn plain" type="button" id="rot">Rotate 90&deg;</button><button class="btn plain" type="button" id="png">Save image (PNG)</button><button class="btn plain" type="button" id="camoff">Turn camera off</button></div>
   </div>
@@ -121,7 +121,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   function saveCamPrefs() { try { localStorage.setItem('templog_cam', JSON.stringify({ pal: $('pal').value, smooth: $('smooth').checked, scm: $('scm').value, smin: $('smin').value, smax: $('smax').value, rot: rot, cont: $('cont').checked, cstep: $('cstep').value })); } catch (e) {} }
   try { var cp = JSON.parse(localStorage.getItem('templog_cam') || 'null'); if (cp) { if (PALS[cp.pal]) $('pal').value = cp.pal; $('smooth').checked = cp.smooth !== false; if (cp.scm) $('scm').value = cp.scm; if (cp.smin) $('smin').value = cp.smin; if (cp.smax) $('smax').value = cp.smax; rot = (cp.rot | 0) & 3; $('cont').checked = !!cp.cont; if (cp.cstep) $('cstep').value = cp.cstep; } } catch (e) {}
   function camPrefsChanged() { STOPS = PALS[$('pal').value] || PALS.iron; paintScale(); saveCamPrefs(); drawCam(); }
-  ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr', 'grid'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
+  ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr', 'grid', 'extn'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
   STOPS = PALS[$('pal').value] || PALS.iron; paintScale();
   setInterval(function () { if (S.cam && !S.sim && S.camTime && Date.now() - S.camTime > 4000) { $('camwarn').hidden = false; $('camimg').style.opacity = '0.35'; } }, 1000);
   function onCam(line) {
@@ -174,6 +174,30 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     }
     g.stroke();
   }
+  // The separate hot spots and cold spots in a frame: local peaks and dips of a lightly smoothed copy, strongest first, at
+  // least 5 pixels apart and standing out from their surroundings, so noise does not produce a crowd of labels.
+  function extrema(c, n) {
+    var sm = new Float32Array(CW * CH), i, x, y, dx, dy, lo = Infinity, hi = -Infinity;
+    for (y = 0; y < CH; y++) for (x = 0; x < CW; x++) { var t = 0, k = 0; for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) { var xx = x + dx, yy = y + dy; if (xx >= 0 && xx < CW && yy >= 0 && yy < CH) { t += c.px[yy * CW + xx]; k++; } } sm[y * CW + x] = t / k; }
+    for (i = 0; i < sm.length; i++) { if (sm[i] < lo) lo = sm[i]; if (sm[i] > hi) hi = sm[i]; }
+    var need = Math.max(1, (hi - lo) * 0.06), mean = 0; for (i = 0; i < sm.length; i++) mean += sm[i]; mean /= sm.length;
+    function find(sign) {
+      var cand = [];
+      for (y = 0; y < CH; y++) for (x = 0; x < CW; x++) {
+        var v = sm[y * CW + x] * sign, best = true, ring = 0, rc = 0;
+        for (dy = -1; dy <= 1 && best; dy++) for (dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; var xx = x + dx, yy = y + dy; if (xx >= 0 && xx < CW && yy >= 0 && yy < CH && sm[yy * CW + xx] * sign > v) { best = false; break; } }
+        if (!best) continue;
+        for (dy = -4; dy <= 4; dy++) for (dx = -4; dx <= 4; dx++) { var ax = x + dx, ay = y + dy; if (Math.max(Math.abs(dx), Math.abs(dy)) === 4 && ax >= 0 && ax < CW && ay >= 0 && ay < CH) { ring += sm[ay * CW + ax] * sign; rc++; } }
+        if (rc && v - ring / rc >= need && v - sign * mean >= need * 0.5) cand.push([v, y * CW + x]);
+      }
+      cand.sort(function (a, b) { return b[0] - a[0]; });
+      var out = [];
+      cand.forEach(function (cd) { if (out.length >= n) return; var cx = cd[1] % CW, cy = Math.floor(cd[1] / CW); if (out.every(function (o) { return Math.max(Math.abs(o % CW - cx), Math.abs(Math.floor(o / CW) - cy)) >= 5; })) out.push(cd[1]); });
+      // report the true hottest / coldest pixel next to each smoothed peak
+      return out.map(function (k0) { var bx = k0 % CW, by = Math.floor(k0 / CW), bk = k0; for (var ddy = -1; ddy <= 1; ddy++) for (var ddx = -1; ddx <= 1; ddx++) { var qx = bx + ddx, qy = by + ddy; if (qx >= 0 && qx < CW && qy >= 0 && qy < CH && c.px[qy * CW + qx] * sign > c.px[bk] * sign) bk = qy * CW + qx; } return bk; });
+    }
+    return { highs: find(1), lows: find(-1) };
+  }
   function camRange(c) {
     if ($('scm').value === 'fixed') { var lo = parseFloat($('smin').value), hi = parseFloat($('smax').value); if (isFinite(lo) && isFinite(hi) && hi > lo) return [lo, hi]; }
     return [c.min, c.min + Math.max(c.max - c.min, 2)];
@@ -205,7 +229,11 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     var cd = toDisp(cold % CW, Math.floor(cold / CW)), hd = toDisp(c.hx, c.hy);
     mark(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, '#7cc8ff', 'ring'); tag(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, c.px[cold].toFixed(1) + '°', '#bfe3ff');
     mark(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, '#ffffff', 'cross'); tag(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, c.max.toFixed(1) + '°', '#ffffff');
-    if ($('grid').checked) { for (var gy = 2; gy < CH; gy += 4) for (var gx = 2; gx < CW; gx += 4) { var gd = toDisp(gx, gy); tag(g, (gd[0] + 0.5) * sx - 14, (gd[1] + 0.5) * sy + 12, c.px[gy * CW + gx].toFixed(1), 'rgba(255,255,255,.9)', 11); } }
+    if ($('grid').checked) {
+      var ex = extrema(c, Math.max(1, Math.min(8, parseInt($('extn').value, 10) || 3)));
+      ex.lows.filter(function (k) { return k !== cold; }).forEach(function (k) { var d2 = toDisp(k % CW, Math.floor(k / CW)), x2 = (d2[0] + 0.5) * sx, y2 = (d2[1] + 0.5) * sy; mark(g, x2, y2, '#7cc8ff', 'ring'); tag(g, x2, y2, c.px[k].toFixed(1) + '°', '#bfe3ff'); });
+      ex.highs.filter(function (k) { return k !== c.hy * CW + c.hx; }).forEach(function (k) { var d2 = toDisp(k % CW, Math.floor(k / CW)), x2 = (d2[0] + 0.5) * sx, y2 = (d2[1] + 0.5) * sy; mark(g, x2, y2, '#ffffff', 'cross'); tag(g, x2, y2, c.px[k].toFixed(1) + '°', '#ffffff'); });
+    }
     pins.forEach(function (k, n) { var pd = toDisp(k % CW, Math.floor(k / CW)), px = (pd[0] + 0.5) * sx, py = (pd[1] + 0.5) * sy; mark(g, px, py, '#7dffb0', 'ring'); tag(g, px, py, (n + 1) + ': ' + c.px[k].toFixed(1) + '°', '#b8ffd2'); });
     $('cpin').innerHTML = pins.length ? pins.map(function (k, n) { return (n + 1) + ': ' + c.px[k].toFixed(1) + ' °C (col ' + (k % CW + 1) + ', row ' + (Math.floor(k / CW) + 1) + ')'; }).join('<br>') : '--';
   }
