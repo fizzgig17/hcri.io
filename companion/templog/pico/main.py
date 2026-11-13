@@ -158,14 +158,17 @@ def main():
         except Exception:
             pass
 
-    def find_cam():
+    def find_cam(verbose=False):
         """Try to start the thermal camera; leaves cam[0] None when it is off, missing or the driver file is not on the Pico."""
         cam[0] = None
         if not cam_cfg["on"]:
             return
         try:
             bus = I2C(1, sda=Pin(CAM_SDA), scl=Pin(CAM_SCL), freq=CAM_HZ)
-            if 0x33 not in bus.scan():
+            seen = bus.scan()
+            if 0x33 not in seen:
+                if verbose:
+                    print("# camera not found on GP6 (SDA) / GP7 (SCL); I2C addresses seen there: %s" % (", ".join("0x%02x" % a for a in seen) or "none"))
                 return
             import mlx90640
             gc.collect()
@@ -219,7 +222,7 @@ def main():
         for ch in range(SENSORS):
             found.append("1" if read(ch, REG_AMBIENT) is not None else "0")
         if cam[0] is None:
-            find_cam()
+            find_cam(True)
         print("# hCRI temp logger %s mux=%s sensors=%s emis=%s cam=%s camemis=%.2f" % (
             VERSION, "1" if mux[0] else "0", "".join(found), ",".join("%.2f" % e for e in emis),
             "1" if cam[0] is not None else "0", cam_cfg["emis"]))
