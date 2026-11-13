@@ -56,7 +56,8 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
       <input type="number" id="smin" value="20" step="1" aria-label="Lowest temperature on the colour scale"> to <input type="number" id="smax" value="60" step="1" aria-label="Highest temperature on the colour scale"> &deg;C</div>
     <div class="em"><label><input type="checkbox" id="cont"> Contour lines every</label> <input type="number" id="cstep" value="2" min="0.5" step="0.5" aria-label="Degrees between contour lines"> &deg;C</div>
     <div class="em">Outline everything above <input type="number" id="othr" placeholder="off" step="1" aria-label="Outline the area above this temperature"> &deg;C <button class="btn plain" type="button" id="ohalf">Half way</button></div>
-    <div class="note">Click the image to pin a temperature (click the same spot again to clear it).</div>
+    <div class="note">Click the image to pin a temperature, as many spots as you like (up to 12; click a pinned spot again to remove it).</div>
+    <div class="em"><label><input type="checkbox" id="grid"> Show a temperature every few pixels</label> <button class="btn plain" type="button" id="clrpins">Clear pins</button></div>
     <label class="em"><input type="checkbox" id="frames"> Also save every thermal image when recording (a second CSV, about 4 kB a second)</label>
     <div class="row"><button class="btn plain" type="button" id="rot">Rotate 90&deg;</button><button class="btn plain" type="button" id="png">Save image (PNG)</button><button class="btn plain" type="button" id="camoff">Turn camera off</button></div>
   </div>
@@ -114,12 +115,13 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   var STOPS = PALS.iron;
   function heat(f) { f = Math.max(0, Math.min(1, f)); for (var i = 1; i < STOPS.length; i++) if (f <= STOPS[i][0]) { var a = STOPS[i - 1], b = STOPS[i], u = (f - a[0]) / (b[0] - a[0]); return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u]; } var z = STOPS[STOPS.length - 1]; return [z[1], z[2], z[3]]; }
   function paintScale() { var st = []; STOPS.forEach(function (p) { var c = heat(p[0]); st.push('rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ') ' + Math.round(p[0] * 100) + '%'); }); $('camscale').style.background = 'linear-gradient(90deg,' + st.join(',') + ')'; }
-  var pin = null;   // the pixel (index) you clicked, or null
+  var pins = [];    // the pixels (indexes) you clicked, newest last
+  try { pins = (JSON.parse(localStorage.getItem('templog_pins') || '[]') || []).filter(function (k) { return k >= 0 && k < 768; }).slice(0, 12); } catch (e) {}
   var rot = 0;      // how far the picture is turned, clockwise, in 90 degree steps (0 to 3)
   function saveCamPrefs() { try { localStorage.setItem('templog_cam', JSON.stringify({ pal: $('pal').value, smooth: $('smooth').checked, scm: $('scm').value, smin: $('smin').value, smax: $('smax').value, rot: rot, cont: $('cont').checked, cstep: $('cstep').value })); } catch (e) {} }
   try { var cp = JSON.parse(localStorage.getItem('templog_cam') || 'null'); if (cp) { if (PALS[cp.pal]) $('pal').value = cp.pal; $('smooth').checked = cp.smooth !== false; if (cp.scm) $('scm').value = cp.scm; if (cp.smin) $('smin').value = cp.smin; if (cp.smax) $('smax').value = cp.smax; rot = (cp.rot | 0) & 3; $('cont').checked = !!cp.cont; if (cp.cstep) $('cstep').value = cp.cstep; } } catch (e) {}
   function camPrefsChanged() { STOPS = PALS[$('pal').value] || PALS.iron; paintScale(); saveCamPrefs(); drawCam(); }
-  ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
+  ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr', 'grid'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
   STOPS = PALS[$('pal').value] || PALS.iron; paintScale();
   setInterval(function () { if (S.cam && !S.sim && S.camTime && Date.now() - S.camTime > 4000) { $('camwarn').hidden = false; $('camimg').style.opacity = '0.35'; } }, 1000);
   function onCam(line) {
@@ -176,8 +178,8 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     if ($('scm').value === 'fixed') { var lo = parseFloat($('smin').value), hi = parseFloat($('smax').value); if (isFinite(lo) && isFinite(hi) && hi > lo) return [lo, hi]; }
     return [c.min, c.min + Math.max(c.max - c.min, 2)];
   }
-  function tag(g, x, y, text, color) {
-    g.font = 'bold 15px ui-monospace,Menlo,Consolas,monospace'; g.textBaseline = 'middle';
+  function tag(g, x, y, text, color, size) {
+    g.font = 'bold ' + (size || 15) + 'px ui-monospace,Menlo,Consolas,monospace'; g.textBaseline = 'middle';
     var w = g.measureText(text).width, tx = x + 12; if (tx + w > g.canvas.width - 4) tx = x - 12 - w; var ty = Math.max(10, Math.min(g.canvas.height - 10, y - 12));
     g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(text, tx, ty); g.fillStyle = color; g.fillText(text, tx, ty);
   }
@@ -203,12 +205,15 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     var cd = toDisp(cold % CW, Math.floor(cold / CW)), hd = toDisp(c.hx, c.hy);
     mark(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, '#7cc8ff', 'ring'); tag(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, c.px[cold].toFixed(1) + '°', '#bfe3ff');
     mark(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, '#ffffff', 'cross'); tag(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, c.max.toFixed(1) + '°', '#ffffff');
-    if (pin !== null) { var pd = toDisp(pin % CW, Math.floor(pin / CW)), px = (pd[0] + 0.5) * sx, py = (pd[1] + 0.5) * sy; mark(g, px, py, '#7dffb0', 'ring'); tag(g, px, py, c.px[pin].toFixed(1) + '°', '#b8ffd2'); $('cpin').textContent = c.px[pin].toFixed(1) + ' °C  (column ' + (pin % CW + 1) + ', row ' + (Math.floor(pin / CW) + 1) + ')'; } else $('cpin').textContent = '--';
+    if ($('grid').checked) { for (var gy = 2; gy < CH; gy += 4) for (var gx = 2; gx < CW; gx += 4) { var gd = toDisp(gx, gy); tag(g, (gd[0] + 0.5) * sx - 14, (gd[1] + 0.5) * sy + 12, c.px[gy * CW + gx].toFixed(1), 'rgba(255,255,255,.9)', 11); } }
+    pins.forEach(function (k, n) { var pd = toDisp(k % CW, Math.floor(k / CW)), px = (pd[0] + 0.5) * sx, py = (pd[1] + 0.5) * sy; mark(g, px, py, '#7dffb0', 'ring'); tag(g, px, py, (n + 1) + ': ' + c.px[k].toFixed(1) + '°', '#b8ffd2'); });
+    $('cpin').innerHTML = pins.length ? pins.map(function (k, n) { return (n + 1) + ': ' + c.px[k].toFixed(1) + ' °C (col ' + (k % CW + 1) + ', row ' + (Math.floor(k / CW) + 1) + ')'; }).join('<br>') : '--';
   }
   function pixelAt(el, e) { var r = el.getBoundingClientRect(), dm = dims(), dx = Math.floor((e.clientX - r.left) / r.width * dm[0]), dy = Math.floor((e.clientY - r.top) / r.height * dm[1]); if (dx < 0 || dx >= dm[0] || dy < 0 || dy >= dm[1]) return null; var q = toSrc(dx, dy); return q; }
   $('camimg').onmousemove = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (q) $('cptr').textContent = S.cam.px[q[1] * CW + q[0]].toFixed(1) + ' °C  (column ' + (q[0] + 1) + ', row ' + (q[1] + 1) + ')'; };
-  $('camimg').onclick = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (!q) return; var k = q[1] * CW + q[0]; pin = (pin === k) ? null : k; drawCam(); };
+  $('camimg').onclick = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (!q) return; var k = q[1] * CW + q[0]; var at = pins.indexOf(k); if (at >= 0) pins.splice(at, 1); else { pins.push(k); if (pins.length > 12) pins.shift(); } try { localStorage.setItem('templog_pins', JSON.stringify(pins)); } catch (x) {} drawCam(); };
   $('ohalf').onclick = function () { if (!S.cam) return; $('othr').value = Math.round((S.cam.min + S.cam.max) / 2 * 10) / 10; camPrefsChanged(); };
+  $('clrpins').onclick = function () { pins = []; try { localStorage.setItem('templog_pins', '[]'); } catch (x) {} drawCam(); };
   $('rot').onclick = function () { rot = (rot + 1) & 3; saveCamPrefs(); drawCam(); };
   $('camimg').onmouseleave = function () { $('cptr').textContent = '--'; };
   $('ces').onclick = function () { var e = parseFloat($('ce').value); if (!(e >= 0.1 && e <= 1)) { msg('Emissivity must be from 0.1 to 1.0'); return; } send('CE ' + e); if (S.sim) S.camEmis = e; };
