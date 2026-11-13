@@ -47,6 +47,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   <div><canvas class="img" id="camimg" width="640" height="480" aria-label="Thermal camera image"></canvas>
     <div class="scale" id="camscale"></div><div class="scalel"><span id="cmin">--</span><span id="cmax">--</span></div></div>
   <div class="info"><strong>Thermal camera (MLX90640)</strong>
+    <div class="err" id="camwarn" hidden>No new image from the camera for a few seconds. Check its wires (SDA, SCL, power); the Pico keeps trying to reconnect on its own.</div>
     <div class="stats"><span class="sub">Hottest</span><b id="chot">--</b><span class="sub">Coldest</span><b id="ccold">--</b><span class="sub">Average</span><b id="cavg">--</b><span class="sub">Under the pointer</span><b id="cptr">--</b><span class="sub">Pinned</span><b id="cpin">--</b><span class="sub">Camera chip</span><b id="cdie">--</b></div>
     <div class="em">Emissivity <input type="number" min="0.1" max="1" step="0.01" value="0.95" id="ce" aria-label="Emissivity of the thermal camera"> <button class="btn plain" type="button" id="ces">Set</button></div>
     <div class="em">Palette <select id="pal"><option value="iron">Iron</option><option value="rainbow">Rainbow</option><option value="gray">Grayscale</option></select>
@@ -120,6 +121,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   function camPrefsChanged() { STOPS = PALS[$('pal').value] || PALS.iron; paintScale(); saveCamPrefs(); drawCam(); }
   ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
   STOPS = PALS[$('pal').value] || PALS.iron; paintScale();
+  setInterval(function () { if (S.cam && !S.sim && S.camTime && Date.now() - S.camTime > 4000) { $('camwarn').hidden = false; $('camimg').style.opacity = '0.35'; } }, 1000);
   function onCam(line) {
     var p = line.split(','); if (p.length < 8 + CW * CH) return;
     var t = num(p[1]), px = new Array(CW * CH);
@@ -127,7 +129,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     addCam(t, { die: num(p[2]), min: num(p[3]), max: num(p[4]), avg: num(p[5]), hx: parseInt(p[6], 10), hy: parseInt(p[7], 10), px: px });
   }
   function addCam(t, c) {
-    S.cam = c; $('camwrap').hidden = false;
+    S.cam = c; S.camTime = Date.now(); $('camwrap').hidden = false; $('camwarn').hidden = true; $('camimg').style.opacity = '';
     $('chot').textContent = c.max.toFixed(1) + ' °C  (column ' + (c.hx + 1) + ', row ' + (c.hy + 1) + ')'; $('ccold').textContent = c.min.toFixed(1) + ' °C'; $('cavg').textContent = c.avg.toFixed(1) + ' °C';
     $('cdie').textContent = c.die === null ? '--' : c.die.toFixed(1) + ' °C'; $('cmin').textContent = c.min.toFixed(1) + '°'; $('cmax').textContent = c.max.toFixed(1) + '°';
     drawCam();

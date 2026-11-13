@@ -28,6 +28,7 @@ PERIOD_MS = 1000
 CAM_SDA, CAM_SCL = 6, 7
 CAM_W, CAM_H = 32, 24
 CAM_BAD = -200.0     # pixels below this are dead pixels the camera could not compute
+CAM_HZ = 400000      # camera bus speed; if the camera keeps timing out, try 200000 (or 100000) and keep its wires short
 CPU_MHZ = 125        # the Pico's stock clock; 200 makes the camera maths about 1.5x faster and is normally fine
 
 
@@ -132,6 +133,8 @@ def main():
     mux = [False]   # is a TCA9548A answering? (checked at start and whenever you send ?)
     cam = [None]    # the MLX90640 driver once the camera has answered
     frame = [None]
+    fails = [0]     # camera reads that failed in a row
+    lost = [False]  # the camera was working and then dropped off
 
     def find_mux():
         try:
@@ -161,7 +164,7 @@ def main():
         if not cam_cfg["on"]:
             return
         try:
-            bus = I2C(1, sda=Pin(CAM_SDA), scl=Pin(CAM_SCL), freq=400000)
+            bus = I2C(1, sda=Pin(CAM_SDA), scl=Pin(CAM_SCL), freq=CAM_HZ)
             if 0x33 not in bus.scan():
                 return
             import mlx90640
@@ -171,6 +174,7 @@ def main():
             if frame[0] is None:
                 frame[0] = mlx90640.init_float_array(CAM_W * CAM_H)
             cam[0] = c
+            fails[0] = 0
         except Exception as e:
             print("# camera error: %s" % e)
         gc.collect()
@@ -182,9 +186,16 @@ def main():
         try:
             die = cam[0].get_frame(frame[0], cam_cfg["emis"])
             fix_bad(frame[0])
+            fails[0] = 0
             return die, frame[0]
         except Exception as e:      # a bad read (or a math error on a bad pixel) skips this frame
-            print("# camera read failed: %s" % e)
+            fails[0] += 1
+            if fails[0] in (1, 3):
+                print("# camera read failed: %s" % e)
+            if fails[0] >= 3:       # the camera has dropped off the bus: forget it and keep trying to find it again
+                cam[0] = None
+                lost[0] = True
+                print("# camera lost: check its wires; trying to reconnect")
             return None
 
     def read(ch, reg):
@@ -249,6 +260,9 @@ def main():
         else:
             print("# unknown command (try ?)")
 
+    def now_s():
+        return time.ticks_diff(time.ticks_ms(), t0) / 1000
+
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
     t0 = time.ticks_ms()
@@ -263,6 +277,11 @@ def main():
             nxt = time.ticks_add(time.ticks_ms(), 50)
         # The camera frame comes first (it takes the longest), then the infrared sensors straight after it, so both
         # describe the same moment; the two lines share one timestamp.
+        if cam[0] is None and lost[0] and cam_cfg["on"] and (now_s() % 5) < 1.0:
+            find_cam()                  # every 5 seconds or so while it is missing
+            if cam[0] is not None:
+                lost[0] = False
+                print("# camera reconnected")
         shot = read_cam()
         objs, ambs = [], []
         for ch in range(SENSORS):
