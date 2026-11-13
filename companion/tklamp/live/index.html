@@ -243,6 +243,14 @@
   <div class="pane" id="pane-live">
     <div class="head"><div class="big-num"><span id="big">--</span><small>lm</small></div><div class="recstat" id="recstat"></div></div>
     <div class="temps" id="tempRow" hidden></div>
+    <div id="camBox" hidden style="margin:2px 0 10px">
+      <canvas id="camImg" width="320" height="240" style="width:320px;max-width:100%;border-radius:6px;background:#000;display:block" aria-label="Thermal camera image"></canvas>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:4px;font-size:13px">
+        <span id="camTxt" class="note"></span>
+        <button type="button" class="btn" id="camRot">Rotate</button>
+        <label><input type="checkbox" id="camLive"> Include the thermal image in the live view</label>
+      </div>
+    </div>
     <canvas class="chart" id="cv"></canvas>
     <div class="row">
       <button class="btn big" id="mainBtn" disabled>Start run</button>
@@ -334,6 +342,7 @@
 <dialog id="viewDlg"><h3 id="viewTitle"></h3><div class="detail" id="viewDetail"></div><canvas class="chart" id="vcv"></canvas>
   <div class="btns"><button class="btn plain" id="viewClose">Close</button></div></dialog>
 
+<script src="../../templog/thermal.js"></script>
 <script>
 (function () {
 'use strict';
@@ -856,8 +865,32 @@ if (navigator.serial) navigator.serial.addEventListener('disconnect', function (
 // permission for it once, it is found and opened on its own on later visits and whenever it is plugged in.
 function isPico(p) { try { return p.getInfo().usbVendorId === PICO_VID; } catch (e) { return false; } }
 function numOrNull(x) { if (x === undefined || x === '') return null; var v = parseFloat(x); return isFinite(v) ? v : null; }
+var Cam = { frame: null, at: 0, rot: 0, share: false };
+function camDraw() {
+  var box = $('camBox'); if (!window.HcriThermal || !Cam.frame) return;
+  box.hidden = false;
+  var age = now() - Cam.at, f = Cam.frame;
+  HcriThermal.draw($('camImg'), f, { pal: 'iron', smooth: true, rot: Cam.rot, outline: true, extrema: true });
+  $('camImg').style.opacity = age > 5 ? 0.4 : 1;
+  $('camTxt').textContent = age > 5 ? 'Camera not responding' : f.min.toFixed(1) + ' to ' + f.max.toFixed(1) + ' °C';
+}
+function camInit() {
+  Cam.rot = pref('camRot', 0) | 0; Cam.share = !!pref('camShare', false);
+  $('camLive').checked = Cam.share;
+  $('camLive').onchange = function () { Cam.share = this.checked; setPref('camShare', Cam.share); };
+  $('camRot').onclick = function () { Cam.rot = (Cam.rot + 1) & 3; setPref('camRot', Cam.rot); camDraw(); };
+}
+function camForLive() {   // the latest frame for the live view, only when the user opted in and it is fresh
+  if (!Cam.share || !Cam.frame || now() - Cam.at > 10) return null;
+  return { die: Cam.frame.die, px: Cam.frame.px.map(function (v) { return Math.round(v * 10) / 10; }) };
+}
 function onTempLine(line) {
   line = line.trim();
+  if (line[0] === 'C' && window.HcriThermal) {
+    var cf = HcriThermal.parseLine(line);
+    if (cf) { Cam.frame = cf; Cam.at = now(); camDraw(); }
+    return;
+  }
   if (!line || line[0] !== 'T') return;
   var p = line.split(',');
   var n = Math.floor((p.length - 2) / 2);   // the Pico sends T,seconds, then one object temperature and one chip temperature per sensor
@@ -1003,6 +1036,7 @@ function liveFlush(L, status, message) {
     var tl = [];
     for (var c = 0; c < NT; c++) if (L.tseen[c]) tl.push({ ch: c, name: tName(c), values: L.tvals[c].slice(L.sent, L.sent + chunk.length) });
     if (tl.length) body.temps = tl;
+    var cam = camForLive(); body.thermal = cam;   // null clears it on the server
     if (last && message) body.message = message;
     var sentAck = cmdAck; if (sentAck) body.ack = sentAck;
     return call('POST', '/v1/live', body).then(function (r) {
@@ -1474,12 +1508,13 @@ function tick() {
     }
     if (S.pendingStop) { var ps = S.pendingStop; S.pendingStop = null; stopRun('Stopped automatically: ' + ps.why + '.', true, ps.ended); }
   }
-  tempWriteState(); tempRowUpdate();
+  tempWriteState(); tempRowUpdate(); camDraw();
   redraw();
 }
 
 window.addEventListener('resize', function () { redraw(); drawRun(hcv, selRun()); });
 (function init() {
+  camInit();
   $('win').value = String(pref('win', 120)); $('trim').checked = pref('trim', true); $('trimPeak').checked = pref('trimPeak', false);
   $('limStart').value = pref('limStart', ''); $('limStop').value = pref('limStop', ''); $('dur').value = pref('dur', ''); $('limIdle').value = pref('limIdle', '5');
   $('showLog').checked = pref('showLog', true); $('logWrap').hidden = !$('showLog').checked; $('showTemp').checked = pref('showTemp', true);

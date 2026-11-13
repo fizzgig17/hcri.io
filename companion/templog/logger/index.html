@@ -67,6 +67,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
 <div class="row"><strong>Messages</strong></div><div id="log"></div>
 <p class="note">Temperatures are in &deg;C. Set the emissivity of each surface (anodized aluminum about 0.9, shiny bare metal much lower); it is saved on the Pico. This page needs Chrome or Edge on a computer.</p>
 </main>
+<script src="../thermal.js"></script>
 <script>
 (function () {
   var N = 3, COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)'];
@@ -105,35 +106,24 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     addReading(num(p[1]), [0, 1, 2].map(function (i) { return num(p[2 + i]); }), [0, 1, 2].map(function (i) { return num(p[2 + N + i]); }));
   }
 
-  // ---- thermal camera (C lines: seconds, die, min, max, avg, hot x, hot y, then 768 pixels) ----
-  var CW = 32, CH = 24, camBuf = null, camCtx = null, camImg = null;
-  var PALS = {
-    iron: [[0, 0, 0, 20], [0.2, 60, 10, 110], [0.45, 190, 40, 80], [0.7, 245, 130, 20], [0.9, 255, 225, 70], [1, 255, 255, 235]],
-    rainbow: [[0, 20, 20, 140], [0.25, 20, 120, 230], [0.5, 40, 200, 90], [0.75, 250, 220, 40], [1, 235, 40, 30]],
-    gray: [[0, 0, 0, 0], [1, 255, 255, 255]]
-  };
-  var STOPS = PALS.iron;
-  function heat(f) { f = Math.max(0, Math.min(1, f)); for (var i = 1; i < STOPS.length; i++) if (f <= STOPS[i][0]) { var a = STOPS[i - 1], b = STOPS[i], u = (f - a[0]) / (b[0] - a[0]); return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u]; } var z = STOPS[STOPS.length - 1]; return [z[1], z[2], z[3]]; }
-  function paintScale() { var st = []; STOPS.forEach(function (p) { var c = heat(p[0]); st.push('rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ') ' + Math.round(p[0] * 100) + '%'); }); $('camscale').style.background = 'linear-gradient(90deg,' + st.join(',') + ')'; }
-  var pins = [];    // the pixels (indexes) you clicked, newest last
+  // ---- thermal camera (C lines: seconds, die, min, max, avg, hot x, hot y, then 768 pixels); drawing is done by ../thermal.js ----
+  var CW = HcriThermal.W, CH = HcriThermal.H, rot = 0, pins = [];
   try { pins = (JSON.parse(localStorage.getItem('templog_pins') || '[]') || []).filter(function (k) { return k >= 0 && k < 768; }).slice(0, 12); } catch (e) {}
-  var rot = 0;      // how far the picture is turned, clockwise, in 90 degree steps (0 to 3)
-  function saveCamPrefs() { try { localStorage.setItem('templog_cam', JSON.stringify({ pal: $('pal').value, smooth: $('smooth').checked, scm: $('scm').value, smin: $('smin').value, smax: $('smax').value, rot: rot, cont: $('cont').checked, cstep: $('cstep').value })); } catch (e) {} }
-  try { var cp = JSON.parse(localStorage.getItem('templog_cam') || 'null'); if (cp) { if (PALS[cp.pal]) $('pal').value = cp.pal; $('smooth').checked = cp.smooth !== false; if (cp.scm) $('scm').value = cp.scm; if (cp.smin) $('smin').value = cp.smin; if (cp.smax) $('smax').value = cp.smax; rot = (cp.rot | 0) & 3; $('cont').checked = !!cp.cont; if (cp.cstep) $('cstep').value = cp.cstep; } } catch (e) {}
-  function camPrefsChanged() { STOPS = PALS[$('pal').value] || PALS.iron; paintScale(); saveCamPrefs(); drawCam(); }
+  function saveCamPrefs() { try { localStorage.setItem('templog_cam', JSON.stringify({ pal: $('pal').value, smooth: $('smooth').checked, scm: $('scm').value, smin: $('smin').value, smax: $('smax').value, rot: rot, cont: $('cont').checked, cstep: $('cstep').value, grid: $('grid').checked, extn: $('extn').value })); } catch (e) {} }
+  try { var cp = JSON.parse(localStorage.getItem('templog_cam') || 'null'); if (cp) { if (HcriThermal.PALS[cp.pal]) $('pal').value = cp.pal; $('smooth').checked = cp.smooth !== false; if (cp.scm) $('scm').value = cp.scm; if (cp.smin) $('smin').value = cp.smin; if (cp.smax) $('smax').value = cp.smax; rot = (cp.rot | 0) & 3; $('cont').checked = !!cp.cont; if (cp.cstep) $('cstep').value = cp.cstep; $('grid').checked = !!cp.grid; if (cp.extn) $('extn').value = cp.extn; } } catch (e) {}
+  function paintScale() { $('camscale').style.background = HcriThermal.gradient($('pal').value); }
+  function camPrefsChanged() { paintScale(); saveCamPrefs(); drawCam(); }
   ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr', 'grid', 'extn'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
-  STOPS = PALS[$('pal').value] || PALS.iron; paintScale();
+  paintScale();
   setInterval(function () { if (S.cam && !S.sim && S.camTime && Date.now() - S.camTime > 4000) { $('camwarn').hidden = false; $('camimg').style.opacity = '0.35'; } }, 1000);
   function onCam(line) {
-    var p = line.split(','); if (p.length < 8 + CW * CH) return;
-    var t = num(p[1]), px = new Array(CW * CH);
-    for (var i = 0; i < CW * CH; i++) { px[i] = parseFloat(p[8 + i]); if (!isFinite(px[i])) return; }
-    addCam(t, { die: num(p[2]), min: num(p[3]), max: num(p[4]), avg: num(p[5]), hx: parseInt(p[6], 10), hy: parseInt(p[7], 10), px: px });
+    var f = HcriThermal.parseLine(line); if (!f) return;
+    addCam(f.t, f);
   }
   function addCam(t, c) {
     S.cam = c; S.camTime = Date.now(); $('camwrap').hidden = false; $('camwarn').hidden = true; $('camimg').style.opacity = '';
     $('chot').textContent = c.max.toFixed(1) + ' °C  (column ' + (c.hx + 1) + ', row ' + (c.hy + 1) + ')'; $('ccold').textContent = c.min.toFixed(1) + ' °C'; $('cavg').textContent = c.avg.toFixed(1) + ' °C';
-    $('cdie').textContent = c.die === null ? '--' : c.die.toFixed(1) + ' °C'; $('cmin').textContent = c.min.toFixed(1) + '°'; $('cmax').textContent = c.max.toFixed(1) + '°';
+    $('cdie').textContent = c.die === null ? '--' : c.die.toFixed(1) + ' °C';
     drawCam();
     if (S.rec) {
       var last = S.rec.rows[S.rec.rows.length - 1], n = last ? last.length : 0;
@@ -141,105 +131,16 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
       if ($('frames').checked) { S.rec.frames.push([new Date().toISOString(), t].concat(c.px.map(function (v) { return Math.round(v * 10) / 10; }))); buttons(); }
     }
   }
-  // Source pixel (x, y) in the 32 x 24 frame -> where it lands on the screen after rotating, and the way back.
-  function dims() { return (rot & 1) ? [CH, CW] : [CW, CH]; }
-  function toDisp(x, y) { return rot === 0 ? [x, y] : rot === 1 ? [CH - 1 - y, x] : rot === 2 ? [CW - 1 - x, CH - 1 - y] : [y, CW - 1 - x]; }
-  function toSrc(dx, dy) { return rot === 0 ? [dx, dy] : rot === 1 ? [dy, CH - 1 - dx] : rot === 2 ? [CW - 1 - dx, CH - 1 - dy] : [CW - 1 - dy, dx]; }
-  // Smooth the 32 x 24 temperatures up to 20 pixels per camera pixel (Catmull-Rom cubic, horizontal then vertical) and colour
-  // the result, so the edges stay crisp instead of being blurred by the browser.
-  var UP = 20;
-  function cubic(p0, p1, p2, p3, t) { return p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0))); }
-  function upsample(src, DW, DH, smooth) {
-    var W = DW * UP, H = DH * UP, out = new Float32Array(W * H), x, y;
-    if (!smooth) { for (y = 0; y < H; y++) for (x = 0; x < W; x++) out[y * W + x] = src[Math.floor(y / UP) * DW + Math.floor(x / UP)]; return out; }
-    var lo = Infinity, hi = -Infinity; for (x = 0; x < src.length; x++) { if (src[x] < lo) lo = src[x]; if (src[x] > hi) hi = src[x]; }
-    var tmp = new Float32Array(DH * W), cl = function (v, n) { return v < 0 ? 0 : v >= n ? n - 1 : v; };
-    for (y = 0; y < DH; y++) for (x = 0; x < W; x++) { var fx = (x + 0.5) / UP - 0.5, x0 = Math.floor(fx), t = fx - x0, r = y * DW; tmp[y * W + x] = cubic(src[r + cl(x0 - 1, DW)], src[r + cl(x0, DW)], src[r + cl(x0 + 1, DW)], src[r + cl(x0 + 2, DW)], t); }
-    for (y = 0; y < H; y++) { var fy = (y + 0.5) / UP - 0.5, y0 = Math.floor(fy), u = fy - y0, a = cl(y0 - 1, DH) * W, b = cl(y0, DH) * W, c2 = cl(y0 + 1, DH) * W, d = cl(y0 + 2, DH) * W;
-      for (x = 0; x < W; x++) { var v = cubic(tmp[a + x], tmp[b + x], tmp[c2 + x], tmp[d + x], u); out[y * W + x] = v < lo ? lo : v > hi ? hi : v; } }
-    return out;
-  }
-  // Marching squares on every 4th sample: a line wherever the field crosses `level`.
-  function contour(g, f, W, H, level, color, width) {
-    var K = 4, gw = Math.floor((W - 1) / K), gh = Math.floor((H - 1) / K);
-    g.strokeStyle = color; g.lineWidth = width; g.beginPath();
-    function v(i, j) { return f[(j * K) * W + i * K]; }
-    function lerp(p, q, ip, jp, iq, jq) { var t = (level - p) / (q - p); return [(ip + (iq - ip) * t) * K, (jp + (jq - jp) * t) * K]; }
-    for (var j = 0; j < gh; j++) for (var i = 0; i < gw; i++) {
-      var a = v(i, j), b = v(i + 1, j), c = v(i + 1, j + 1), d = v(i, j + 1), k = (a >= level ? 8 : 0) | (b >= level ? 4 : 0) | (c >= level ? 2 : 0) | (d >= level ? 1 : 0);
-      if (k === 0 || k === 15) continue;
-      var T = function () { return lerp(a, b, i, j, i + 1, j); }, R = function () { return lerp(b, c, i + 1, j, i + 1, j + 1); }, B = function () { return lerp(d, c, i, j + 1, i + 1, j + 1); }, Lf = function () { return lerp(a, d, i, j, i, j + 1); };
-      var segs = { 1: [[Lf, B]], 2: [[B, R]], 3: [[Lf, R]], 4: [[T, R]], 5: [[T, Lf], [B, R]], 6: [[T, B]], 7: [[T, Lf]], 8: [[T, Lf]], 9: [[T, B]], 10: [[T, R], [Lf, B]], 11: [[T, R]], 12: [[Lf, R]], 13: [[B, R]], 14: [[Lf, B]] }[k];
-      for (var s = 0; s < segs.length; s++) { var p = segs[s][0](), q = segs[s][1](); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
-    }
-    g.stroke();
-  }
-  // The separate hot spots and cold spots in a frame: local peaks and dips of a lightly smoothed copy, strongest first, at
-  // least 5 pixels apart and standing out from their surroundings, so noise does not produce a crowd of labels.
-  function extrema(c, n) {
-    var sm = new Float32Array(CW * CH), i, x, y, dx, dy, lo = Infinity, hi = -Infinity;
-    for (y = 0; y < CH; y++) for (x = 0; x < CW; x++) { var t = 0, k = 0; for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) { var xx = x + dx, yy = y + dy; if (xx >= 0 && xx < CW && yy >= 0 && yy < CH) { t += c.px[yy * CW + xx]; k++; } } sm[y * CW + x] = t / k; }
-    for (i = 0; i < sm.length; i++) { if (sm[i] < lo) lo = sm[i]; if (sm[i] > hi) hi = sm[i]; }
-    var need = Math.max(1, (hi - lo) * 0.06), mean = 0; for (i = 0; i < sm.length; i++) mean += sm[i]; mean /= sm.length;
-    function find(sign) {
-      var cand = [];
-      for (y = 0; y < CH; y++) for (x = 0; x < CW; x++) {
-        var v = sm[y * CW + x] * sign, best = true, ring = 0, rc = 0;
-        for (dy = -1; dy <= 1 && best; dy++) for (dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; var xx = x + dx, yy = y + dy; if (xx >= 0 && xx < CW && yy >= 0 && yy < CH && sm[yy * CW + xx] * sign > v) { best = false; break; } }
-        if (!best) continue;
-        for (dy = -4; dy <= 4; dy++) for (dx = -4; dx <= 4; dx++) { var ax = x + dx, ay = y + dy; if (Math.max(Math.abs(dx), Math.abs(dy)) === 4 && ax >= 0 && ax < CW && ay >= 0 && ay < CH) { ring += sm[ay * CW + ax] * sign; rc++; } }
-        if (rc && v - ring / rc >= need && v - sign * mean >= need * 0.5) cand.push([v, y * CW + x]);
-      }
-      cand.sort(function (a, b) { return b[0] - a[0]; });
-      var out = [];
-      cand.forEach(function (cd) { if (out.length >= n) return; var cx = cd[1] % CW, cy = Math.floor(cd[1] / CW); if (out.every(function (o) { return Math.max(Math.abs(o % CW - cx), Math.abs(Math.floor(o / CW) - cy)) >= 5; })) out.push(cd[1]); });
-      // report the true hottest / coldest pixel next to each smoothed peak
-      return out.map(function (k0) { var bx = k0 % CW, by = Math.floor(k0 / CW), bk = k0; for (var ddy = -1; ddy <= 1; ddy++) for (var ddx = -1; ddx <= 1; ddx++) { var qx = bx + ddx, qy = by + ddy; if (qx >= 0 && qx < CW && qy >= 0 && qy < CH && c.px[qy * CW + qx] * sign > c.px[bk] * sign) bk = qy * CW + qx; } return bk; });
-    }
-    return { highs: find(1), lows: find(-1) };
-  }
-  function camRange(c) {
-    if ($('scm').value === 'fixed') { var lo = parseFloat($('smin').value), hi = parseFloat($('smax').value); if (isFinite(lo) && isFinite(hi) && hi > lo) return [lo, hi]; }
-    return [c.min, c.min + Math.max(c.max - c.min, 2)];
-  }
-  function tag(g, x, y, text, color, size) {
-    g.font = 'bold ' + (size || 15) + 'px ui-monospace,Menlo,Consolas,monospace'; g.textBaseline = 'middle';
-    var w = g.measureText(text).width, tx = x + 12; if (tx + w > g.canvas.width - 4) tx = x - 12 - w; var ty = Math.max(10, Math.min(g.canvas.height - 10, y - 12));
-    g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(text, tx, ty); g.fillStyle = color; g.fillText(text, tx, ty);
-  }
-  function mark(g, x, y, color, shape) {
-    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.85)'; g.beginPath();
-    if (shape === 'cross') { g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.moveTo(x, y - 9); g.lineTo(x, y + 9); } else g.arc(x, y, 7, 0, Math.PI * 2);
-    g.stroke(); g.lineWidth = 1.5; g.strokeStyle = color; g.stroke();
-  }
   function drawCam() {
     var c = S.cam; if (!c) return;
-    var dm = dims(), DW = dm[0], DH = dm[1], i, disp = new Float32Array(DW * DH);
-    for (i = 0; i < CW * CH; i++) { var dd = toDisp(i % CW, Math.floor(i / CW)); disp[dd[1] * DW + dd[0]] = c.px[i]; }
-    var rg = camRange(c), lo = rg[0], span = rg[1] - rg[0], sm = $('smooth').checked, W = DW * UP, H = DH * UP, f = upsample(disp, DW, DH, sm);
-    var cv = $('camimg'); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv.style.width = W + 'px'; }
-    var g = cv.getContext('2d'), im = g.createImageData(W, H);
-    for (i = 0; i < W * H; i++) { var col = heat((f[i] - lo) / span); im.data[i * 4] = col[0]; im.data[i * 4 + 1] = col[1]; im.data[i * 4 + 2] = col[2]; im.data[i * 4 + 3] = 255; }
-    g.putImageData(im, 0, 0);
-    $('cmin').textContent = rg[0].toFixed(1) + '°'; $('cmax').textContent = rg[1].toFixed(1) + '°';
-    if ($('cont').checked) { var step = parseFloat($('cstep').value); if (!(step > 0)) step = 2; for (var lv = Math.ceil(c.min / step) * step; lv < c.max; lv += step) contour(g, f, W, H, lv, 'rgba(255,255,255,0.45)', 1); }
-    var thr = parseFloat($('othr').value); if (isFinite(thr) && thr > c.min && thr < c.max) { contour(g, f, W, H, thr, 'rgba(0,0,0,0.9)', 5); contour(g, f, W, H, thr, '#7dffb0', 2.5); }
-    var sx = cv.width / DW, sy = cv.height / DH, cold = 0;
-    for (i = 1; i < CW * CH; i++) if (c.px[i] < c.px[cold]) cold = i;
-    var cd = toDisp(cold % CW, Math.floor(cold / CW)), hd = toDisp(c.hx, c.hy);
-    mark(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, '#7cc8ff', 'ring'); tag(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, c.px[cold].toFixed(1) + '°', '#bfe3ff');
-    mark(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, '#ffffff', 'cross'); tag(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, c.max.toFixed(1) + '°', '#ffffff');
-    if ($('grid').checked) {
-      var ex = extrema(c, Math.max(1, Math.min(8, parseInt($('extn').value, 10) || 3)));
-      ex.lows.filter(function (k) { return k !== cold; }).forEach(function (k) { var d2 = toDisp(k % CW, Math.floor(k / CW)), x2 = (d2[0] + 0.5) * sx, y2 = (d2[1] + 0.5) * sy; mark(g, x2, y2, '#7cc8ff', 'ring'); tag(g, x2, y2, c.px[k].toFixed(1) + '°', '#bfe3ff'); });
-      ex.highs.filter(function (k) { return k !== c.hy * CW + c.hx; }).forEach(function (k) { var d2 = toDisp(k % CW, Math.floor(k / CW)), x2 = (d2[0] + 0.5) * sx, y2 = (d2[1] + 0.5) * sy; mark(g, x2, y2, '#ffffff', 'cross'); tag(g, x2, y2, c.px[k].toFixed(1) + '°', '#ffffff'); });
-    }
-    pins.forEach(function (k, n) { var pd = toDisp(k % CW, Math.floor(k / CW)), px = (pd[0] + 0.5) * sx, py = (pd[1] + 0.5) * sy; mark(g, px, py, '#7dffb0', 'ring'); tag(g, px, py, (n + 1) + ': ' + c.px[k].toFixed(1) + '°', '#b8ffd2'); });
+    var sc = null; if ($('scm').value === 'fixed') sc = [parseFloat($('smin').value), parseFloat($('smax').value)];
+    var cv = $('camimg'), r = HcriThermal.draw(cv, c, { pal: $('pal').value, smooth: $('smooth').checked, scale: sc, rot: rot, contours: $('cont').checked ? (parseFloat($('cstep').value) > 0 ? parseFloat($('cstep').value) : 2) : 0, outline: parseFloat($('othr').value), extrema: $('grid').checked ? (parseInt($('extn').value, 10) || 3) : 0, pins: pins });
+    cv.style.width = cv.width + 'px';
+    $('cmin').textContent = r.lo.toFixed(1) + '°'; $('cmax').textContent = r.hi.toFixed(1) + '°';
     $('cpin').innerHTML = pins.length ? pins.map(function (k, n) { return (n + 1) + ': ' + c.px[k].toFixed(1) + ' °C (col ' + (k % CW + 1) + ', row ' + (Math.floor(k / CW) + 1) + ')'; }).join('<br>') : '--';
   }
-  function pixelAt(el, e) { var r = el.getBoundingClientRect(), dm = dims(), dx = Math.floor((e.clientX - r.left) / r.width * dm[0]), dy = Math.floor((e.clientY - r.top) / r.height * dm[1]); if (dx < 0 || dx >= dm[0] || dy < 0 || dy >= dm[1]) return null; var q = toSrc(dx, dy); return q; }
-  $('camimg').onmousemove = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (q) $('cptr').textContent = S.cam.px[q[1] * CW + q[0]].toFixed(1) + ' °C  (column ' + (q[0] + 1) + ', row ' + (q[1] + 1) + ')'; };
-  $('camimg').onclick = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (!q) return; var k = q[1] * CW + q[0]; var at = pins.indexOf(k); if (at >= 0) pins.splice(at, 1); else { pins.push(k); if (pins.length > 12) pins.shift(); } try { localStorage.setItem('templog_pins', JSON.stringify(pins)); } catch (x) {} drawCam(); };
+  $('camimg').onmousemove = function (e) { if (!S.cam) return; var q = HcriThermal.pixelAt(this, e, rot); if (q) $('cptr').textContent = S.cam.px[q[1] * CW + q[0]].toFixed(1) + ' °C  (column ' + (q[0] + 1) + ', row ' + (q[1] + 1) + ')'; };
+  $('camimg').onclick = function (e) { if (!S.cam) return; var q = HcriThermal.pixelAt(this, e, rot); if (!q) return; var k = q[1] * CW + q[0]; var at = pins.indexOf(k); if (at >= 0) pins.splice(at, 1); else { pins.push(k); if (pins.length > 12) pins.shift(); } try { localStorage.setItem('templog_pins', JSON.stringify(pins)); } catch (x) {} drawCam(); };
   $('ohalf').onclick = function () { if (!S.cam) return; $('othr').value = Math.round((S.cam.min + S.cam.max) / 2 * 10) / 10; camPrefsChanged(); };
   $('clrpins').onclick = function () { pins = []; try { localStorage.setItem('templog_pins', '[]'); } catch (x) {} drawCam(); };
   $('rot').onclick = function () { rot = (rot + 1) & 3; saveCamPrefs(); drawCam(); };

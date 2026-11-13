@@ -75,4 +75,5 @@ foreach ([0, 1, 2, 3] as $ch) {
 }
 $out['run'] = $run;
 $out['info'] = live_info($r);
+$out['thermal'] = live_thermal_view($r);   // the latest thermal camera image (or null)
 json_out($out);
