@@ -51,6 +51,7 @@ foreach ([0, 1, 2, 3] as $ch) {
     $nm = trim((string)($tj[$ch]['name'] ?? ''));
     $tser[] = ['ch' => $ch, 'name' => $nm !== '' ? $nm : 'Temp ' . ($ch + 1), 'vals' => $tv, 'last' => $lastT];
 }
+$thermal = live_thermal_view($r);   // the latest thermal camera image, or null
 $W = 1200; $H = 630;
 $im = imagecreatetruecolor($W, $H);
 imageantialias($im, true);
@@ -63,8 +64,9 @@ imagefilledrectangle($im, 0, 0, $W, $H, $bg);
 
 $info = live_info($r);
 $title = $info['title'] !== '' ? $info['title'] : ($isRun ? ($sum['label'] !== '' ? $sum['label'] : 'TKLamp run') : 'Live reading');
-if (mb_strlen($title) > 44) $title = mb_substr($title, 0, 43) . '…';
-imagettftext($im, 40, 0, 60, 100, $fg, $B, $title);
+$tmax = $thermal ? 28 : 44;   // the thermal picture takes the top right corner
+if (mb_strlen($title) > $tmax) $title = mb_substr($title, 0, $tmax - 1) . '…';
+imagettftext($im, $thermal ? 34 : 40, 0, 60, 100, $fg, $B, $title);
 imagettftext($im, 26, 0, 60, 150, $chipCol, $B, '● ' . $chip);
 $num = $last === null ? '–' : (abs($last) >= 100 ? (string)round($last) : number_format($last, 1));
 imagettftext($im, 150, 0, 60, 340, $fg, $M, $num);
@@ -72,19 +74,59 @@ $bb = imagettfbbox(150, 0, $M, $num);
 imagettftext($im, 44, 0, 60 + ($bb[2] - $bb[0]) + 24, 340, $dim, $R, $sum['unit'] ?: 'lm');
 $tcol = [imagecolorallocate($im, 255, 138, 76), imagecolorallocate($im, 255, 210, 63), imagecolorallocate($im, 197, 139, 255), imagecolorallocate($im, 61, 214, 140)];
 // current temperatures down the right side, level with the big number
-$ty = 200;
+$ty = $thermal ? 362 : 200;
 foreach ($tser as $t) {
     $line = $t['name'] . '  ' . number_format($t['last'], 1) . ' °C';
     if (mb_strlen($line) > 26) $line = mb_substr($line, 0, 25) . '…';
-    $tb = imagettfbbox(32, 0, $B, $line);
-    imagettftext($im, 32, 0, $W - 60 - ($tb[2] - $tb[0]), $ty, $tcol[$t['ch']], $B, $line);
-    $ty += 52;
+    $fs = $thermal ? 26 : 32;
+    $tb = imagettfbbox($fs, 0, $B, $line);
+    imagettftext($im, $fs, 0, $W - 60 - ($tb[2] - $tb[0]), $ty, $tcol[$t['ch']], $B, $line);
+    $ty += $thermal ? 38 : 52;
+}
+
+// thermal camera image (MLX90640, 32 x 24): iron palette scaled from its coldest to its hottest pixel, hottest spot marked
+if ($thermal) {
+    $stops = [[0, 0, 0, 20], [0.2, 60, 10, 110], [0.45, 190, 40, 80], [0.7, 245, 130, 20], [0.9, 255, 225, 70], [1, 255, 255, 235]];
+    $tp = $thermal['px'];
+    $tlo = min($tp); $thi = max($tp); $span = max($thi - $tlo, 2.0);
+    $hot = 0;
+    foreach ($tp as $i => $v) if ($v > $tp[$hot]) $hot = $i;
+    $tw = 340; $th = 255; $tx = $W - 60 - $tw; $tyy = 36;
+    // smooth the 32 x 24 temperatures up to the picture size (bilinear on the temperatures, then colour), like the live views
+    $cols = [];
+    for ($k = 0; $k <= 255; $k++) {
+        $f = $k / 255;
+        for ($j = 1; $j < count($stops); $j++) if ($f <= $stops[$j][0]) break;
+        $j = min($j, count($stops) - 1);
+        $a = $stops[$j - 1]; $b = $stops[$j]; $u = ($f - $a[0]) / ($b[0] - $a[0]);
+        $cols[$k] = imagecolorallocate($im, (int)round($a[1] + ($b[1] - $a[1]) * $u), (int)round($a[2] + ($b[2] - $a[2]) * $u), (int)round($a[3] + ($b[3] - $a[3]) * $u));
+    }
+    for ($y = 0; $y < $th; $y++) {
+        $fy = ($y + 0.5) * 24 / $th - 0.5; $y0 = (int)floor($fy); $wy = $fy - $y0; $ya = max(0, min(23, $y0)); $yb = max(0, min(23, $y0 + 1));
+        for ($x = 0; $x < $tw; $x++) {
+            $fx = ($x + 0.5) * 32 / $tw - 0.5; $x0 = (int)floor($fx); $wx = $fx - $x0; $xa = max(0, min(31, $x0)); $xb = max(0, min(31, $x0 + 1));
+            $v = ($tp[$ya * 32 + $xa] * (1 - $wx) + $tp[$ya * 32 + $xb] * $wx) * (1 - $wy) + ($tp[$yb * 32 + $xa] * (1 - $wx) + $tp[$yb * 32 + $xb] * $wx) * $wy;
+            imagesetpixel($im, $tx + $x, $tyy + $y, $cols[(int)round(max(0.0, min(1.0, ($v - $tlo) / $span)) * 255)]);
+        }
+    }
+    $white = imagecolorallocate($im, 255, 255, 255); $black = imagecolorallocate($im, 0, 0, 0);
+    $hx = (int)round($tx + (($hot % 32) + 0.5) * $tw / 32); $hy = (int)round($tyy + ((intdiv($hot, 32)) + 0.5) * $th / 24);
+    imagesetthickness($im, 5); imageline($im, $hx - 10, $hy, $hx + 10, $hy, $black); imageline($im, $hx, $hy - 10, $hx, $hy + 10, $black);
+    imagesetthickness($im, 2); imageline($im, $hx - 10, $hy, $hx + 10, $hy, $white); imageline($im, $hx, $hy - 10, $hx, $hy + 10, $white);
+    imagesetthickness($im, 1);
+    $lbl = number_format($tp[$hot], 1) . '°';
+    $lx = $hx + 14; $lb = imagettfbbox(18, 0, $B, $lbl); if ($lx + ($lb[2] - $lb[0]) > $tx + $tw - 4) $lx = $hx - 14 - ($lb[2] - $lb[0]);
+    $ly = max($tyy + 22, min($tyy + $th - 8, $hy - 8));
+    foreach ([[-1, 0], [1, 0], [0, -1], [0, 1]] as $d) imagettftext($im, 18, 0, $lx + $d[0] * 2, $ly + $d[1] * 2, $black, $B, $lbl);
+    imagettftext($im, 18, 0, $lx, $ly, $white, $B, $lbl);
+    imagerectangle($im, $tx - 1, $tyy - 1, $tx + $tw, $tyy + $th, $grid);
+    imagettftext($im, 17, 0, $tx, $tyy + $th + 26, $dim, $R, 'Thermal ' . number_format($tlo, 0) . '–' . number_format($thi, 0) . ' °C');
 }
 
 // last readings, scaled from zero
 $n = count($vals);
 if ($n >= 2) {
-    $x0 = 60; $x1 = $W - 60; $y0 = 400; $y1 = $H - 80;
+    $x0 = 60; $x1 = $W - 60; $y0 = $thermal && count($tser) > 2 ? 500 : 400; $y1 = $H - 80;
     $max = max(1.0, (float)max($vals)) * 1.08;
     imageline($im, $x0, $y1, $x1, $y1, $grid);
     imagesetthickness($im, 4);

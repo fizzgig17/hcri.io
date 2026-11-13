@@ -14,6 +14,8 @@ declare(strict_types=1);
 //   POST /api/v1/live {"action":"command","command":"start|stop|clear"} -> asks the connected logger/app to do it; the answer to its next push carries {command:{id,action}}, and it sends "ack":id back
 //   POST /api/v1/live {"runId","kind":"run|monitor","label","unit","intervalSeconds","startIndex","values":[...],"status":"running|finished|error","message",
 //                      "temps":[{"ch":0,"name":"Temp 1","values":[...]}]}   (optional: temperatures, one per reading in "values", null for none)
+//        Optional "thermal":{"die":C,"px":[768 temperatures in C, row by row]} (an MLX90640 image; only the newest is kept and it expires after 2 minutes),
+//        and "thermal":null to clear it.
 //        -> {"count":N}   Sends readings. startIndex is where "values" begin in the run; sending an empty list is a heartbeat.
 //        If startIndex is past what the server has, the answer is {"count":N,"resend":true}: send again from N.
 
@@ -61,14 +63,14 @@ if ($action !== '') {
         $details = mb_substr(trim((string)($b['details'] ?? '')), 0, 2000);
         $db->prepare('UPDATE live_stations SET info_title = ?, info_text = ? WHERE user_id = ?')->execute([$title, $details === '' ? null : $details, $uid]);
     } elseif ($action === 'clear') {
-        $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, temps = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
+        $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, temps = NULL, thermal = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
     } elseif ($action === 'command') {
         // Remote control: a sender that is connected to the tester (the web logger or the app) carries it out with its next push.
         $c = (string)($b['command'] ?? '');
         if (!in_array($c, ['start', 'stop', 'clear'], true)) json_error('command must be start, stop or clear', 400);
         $db->prepare('UPDATE live_stations SET cmd = ?, cmd_id = ?, cmd_at = ? WHERE user_id = ?')->execute([$c, bin2hex(random_bytes(6)), time(), $uid]);
         // While a sender is live it clears the station itself (so its stream restarts clean); otherwise there is nobody to do it, so do it here.
-        if ($c === 'clear' && !($r['status'] === 'running' && !live_is_stale($r))) $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, temps = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
+        if ($c === 'clear' && !($r['status'] === 'running' && !live_is_stale($r))) $db->prepare("UPDATE live_stations SET run_id = '', label = '', points = 0, base = 0, payload = NULL, temps = NULL, thermal = NULL, status = 'idle', message = '', started_at = NULL, last_at = NULL, alerts = NULL WHERE user_id = ?")->execute([$uid]);
     } else {
         json_error('Unknown action', 400);
     }
@@ -97,6 +99,9 @@ if (is_array($b['temps'] ?? null)) foreach (array_slice($b['temps'], 0, 4) as $t
     if ($ch < 0 || $ch > 3 || !is_array($tv) || count($tv) > 5000) continue;
     $temps[$ch] = ['name' => mb_substr(trim((string)($t['name'] ?? '')), 0, 24), 'values' => array_map(fn($v) => $v === null ? null : round((float)$v, 2), array_values($tv))];
 }
+// A thermal camera image (32 x 24): kept as the latest one. thermal:null clears it; leaving the key out leaves it alone.
+$thermalSet = array_key_exists('thermal', $b);
+$thermal = $thermalSet ? live_thermal_clean($b['thermal']) : null;
 $status = (string)($b['status'] ?? 'running');
 if (!in_array($status, ['running', 'finished', 'error'], true)) $status = 'running';
 $message = mb_substr(trim((string)($b['message'] ?? '')), 0, 200);
@@ -157,6 +162,9 @@ try {
     $db->prepare('UPDATE live_stations SET run_id=?, label=?, unit=?, interval_s=?, points=?, payload=?, temps=?, kind=?, base=?, status=?, message=?, started_at=?, last_at=?, alerts=? WHERE user_id=?')
        ->execute([$runId, $row['label'], $unit, $interval, $total, json_encode($merged), $tstore ? json_encode($tstore) : null, $kind, $base, $status, $row['message'],
                   $fresh ? $now : ($r['started_at'] ?: $now), $now, json_encode($alerts), $uid]);
+    // thermal: a new image replaces the old one; a new run (or thermal:null) drops the old run's image
+    if ($thermal !== null) $db->prepare('UPDATE live_stations SET thermal = ? WHERE user_id = ?')->execute([json_encode($thermal), $uid]);
+    elseif ($thermalSet || $fresh) $db->prepare('UPDATE live_stations SET thermal = NULL WHERE user_id = ?')->execute([$uid]);
     $db->commit();
 } catch (\Throwable $e) {
     if ($db->inTransaction()) $db->rollBack();

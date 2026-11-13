@@ -52,6 +52,11 @@ function live_ensure(PDO $db): void
         if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'temps'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN temps MEDIUMTEXT NULL");
     } catch (\Throwable $e) { error_log('live_stations temps: ' . $e->getMessage()); }
 
+    // The latest thermal camera image (MLX90640, 32 x 24) sent with the readings: {"at":unix time,"die":C,"px":[768 temperatures]}. Only the newest frame is kept.
+    try {
+        if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'thermal'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN thermal MEDIUMTEXT NULL");
+    } catch (\Throwable $e) { error_log('live_stations thermal: ' . $e->getMessage()); }
+
     // Remote control: the owner (website or app) leaves a command; whichever sender is connected to the tester picks it up with its next push.
     try {
         if (!$db->query("SHOW COLUMNS FROM live_stations LIKE 'cmd'")->fetch()) $db->exec("ALTER TABLE live_stations ADD COLUMN cmd VARCHAR(8) NOT NULL DEFAULT '', ADD COLUMN cmd_id VARCHAR(16) NOT NULL DEFAULT '', ADD COLUMN cmd_at BIGINT NULL DEFAULT NULL");
@@ -126,6 +131,31 @@ function live_is_stale(array $r): bool
     return $age > live_settings($r['settings'])['staleMin'] * 60;
 }
 
+const LIVE_THERMAL_FRESH = 120;   // seconds: an older thermal image is not shown
+
+/** Checks a thermal image from a sender and returns what to store, or null when it is not a usable 32 x 24 frame. */
+function live_thermal_clean(mixed $t): ?array
+{
+    if (!is_array($t) || !is_array($t['px'] ?? null) || count($t['px']) !== 768) return null;
+    $px = [];
+    foreach ($t['px'] as $v) {
+        if (!is_int($v) && !is_float($v)) return null;
+        $px[] = round(max(-40.0, min(400.0, (float)$v)), 1);
+    }
+    $die = isset($t['die']) && is_numeric($t['die']) ? round((float)$t['die'], 1) : null;
+    return ['at' => time(), 'die' => $die, 'px' => $px];
+}
+
+/** The latest thermal image for a viewer: {px, die, ageSeconds}, or null when there is none or it is old. */
+function live_thermal_view(array $r): ?array
+{
+    $t = json_decode((string)($r['thermal'] ?? ''), true);
+    if (!is_array($t) || !is_array($t['px'] ?? null) || count($t['px']) !== 768) return null;
+    $age = max(0, time() - (int)($t['at'] ?? 0));
+    if ($age > LIVE_THERMAL_FRESH) return null;
+    return ['px' => $t['px'], 'die' => $t['die'] ?? null, 'ageSeconds' => $age];
+}
+
 /** What the owner sees (and the app/website settings page). */
 function live_owner_view(array $r): array
 {
@@ -137,6 +167,7 @@ function live_owner_view(array $r): array
         'info'     => live_info($r),
         'run'      => live_run_summary($r),
         'command'  => live_pending_command($r),
+        'thermal'  => live_thermal_view($r),
     ];
 }
 
