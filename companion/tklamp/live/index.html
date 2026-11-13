@@ -208,6 +208,13 @@
   #viewDlg{max-width:min(980px,96vw);width:96vw}
   #viewDlg canvas{height:380px}
   .note{font-size:12px;color:var(--dim)}
+  .camp{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:2px 0 12px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;border-top:3px solid var(--accent)}
+  .camp canvas{width:640px;max-width:100%;height:auto;border-radius:6px;background:#000;display:block;cursor:crosshair;border:1px solid var(--border)}
+  .camimgw{flex:0 1 640px;max-width:100%}.caminfo{flex:1;min-width:230px;font-size:13px}
+  .camscale{height:12px;border-radius:5px;border:1px solid var(--border);margin-top:6px}.camscalel{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+  .camstats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0}.camstats span,.camnote,.camrow{color:var(--dim);font-size:12.5px}.camstats b{color:var(--text)}
+  .camrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}.camrow input[type=number]{width:64px}.camrow select{font:inherit}
+  .camshare{color:var(--text);font-size:13px}.camwarn{color:#d92b2b}
   .temps{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:2px 0 8px}
   .temps .t{display:inline-flex;align-items:center;gap:6px;font-size:13px}
   .temps .t i{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -243,12 +250,22 @@
   <div class="pane" id="pane-live">
     <div class="head"><div class="big-num"><span id="big">--</span><small>lm</small></div><div class="recstat" id="recstat"></div></div>
     <div class="temps" id="tempRow" hidden></div>
-    <div id="camBox" hidden style="margin:2px 0 10px">
-      <canvas id="camImg" width="320" height="240" style="width:320px;max-width:100%;border-radius:6px;background:#000;display:block" aria-label="Thermal camera image"></canvas>
-      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:4px;font-size:13px">
-        <span id="camTxt" class="note"></span>
-        <button type="button" class="btn" id="camRot">Rotate</button>
-        <label><input type="checkbox" id="camLive"> Include the thermal image in the live view</label>
+    <div id="camBox" class="camp" hidden>
+      <div class="camimgw"><canvas id="camImg" width="640" height="480" aria-label="Thermal camera image"></canvas>
+        <div class="camscale" id="camScale"></div><div class="camscalel"><span id="cmMin">--</span><span id="cmMax">--</span></div></div>
+      <div class="caminfo"><strong>Thermal camera</strong>
+        <div class="camwarn" id="camWarn" hidden>No new image from the camera for a few seconds. Check its wires; the Pico keeps trying to reconnect.</div>
+        <div class="camstats"><span>Hottest</span><b id="cmHot">--</b><span>Coldest</span><b id="cmCold">--</b><span>Average</span><b id="cmAvg">--</b><span>Under the pointer</span><b id="cmPtr">--</b><span>Pinned</span><b id="cmPin">--</b></div>
+        <div class="camrow">Palette <select id="cmPal"><option value="iron">Iron</option><option value="rainbow">Rainbow</option><option value="gray">Grayscale</option></select>
+          <label><input type="checkbox" id="cmSmooth" checked> Smooth</label></div>
+        <div class="camrow">Colour scale <select id="cmScm"><option value="auto">Auto</option><option value="fixed">Fixed</option></select>
+          <input type="number" id="cmSmin" value="20" step="1" aria-label="Lowest temperature on the colour scale"> to <input type="number" id="cmSmax" value="60" step="1" aria-label="Highest temperature on the colour scale"> &deg;C</div>
+        <div class="camrow"><label><input type="checkbox" id="cmCont"> Contour lines every</label> <input type="number" id="cmCstep" value="2" min="0.5" step="0.5" aria-label="Degrees between contour lines"> &deg;C</div>
+        <div class="camrow">Outline everything above <input type="number" id="cmOthr" placeholder="off" step="1" aria-label="Outline the area above this temperature"> &deg;C <button type="button" class="btn plain" id="cmHalf">Half way</button></div>
+        <div class="camrow"><label><input type="checkbox" id="cmExt"> Label the highs and lows, up to</label> <input type="number" id="cmExtn" value="3" min="1" max="8" step="1" aria-label="How many highs and lows to label"> of each</div>
+        <div class="camnote">Click the image to pin a temperature (up to 12; click a pinned spot again to remove it).</div>
+        <div class="camrow"><button type="button" class="btn plain" id="camRot">Rotate 90&deg;</button><button type="button" class="btn plain" id="cmPins">Clear pins</button><button type="button" class="btn plain" id="cmPng">Save image (PNG)</button></div>
+        <label class="camrow camshare"><input type="checkbox" id="camLive"> Include the thermal image in the live view</label>
       </div>
     </div>
     <canvas class="chart" id="cv"></canvas>
@@ -865,20 +882,37 @@ if (navigator.serial) navigator.serial.addEventListener('disconnect', function (
 // permission for it once, it is found and opened on its own on later visits and whenever it is plugged in.
 function isPico(p) { try { return p.getInfo().usbVendorId === PICO_VID; } catch (e) { return false; } }
 function numOrNull(x) { if (x === undefined || x === '') return null; var v = parseFloat(x); return isFinite(v) ? v : null; }
-var Cam = { frame: null, at: 0, rot: 0, share: false };
+var Cam = { frame: null, at: 0, rot: 0, share: false, pins: [] };
+var CAMW = 32;
+function camPrefs() { try { localStorage.setItem('tkl_camp', JSON.stringify({ pal: $('cmPal').value, smooth: $('cmSmooth').checked, scm: $('cmScm').value, smin: $('cmSmin').value, smax: $('cmSmax').value, cont: $('cmCont').checked, cstep: $('cmCstep').value, ext: $('cmExt').checked, extn: $('cmExtn').value, othr: $('cmOthr').value })); } catch (e) {} }
 function camDraw() {
-  var box = $('camBox'); if (!window.HcriThermal || !Cam.frame) return;
-  box.hidden = false;
-  var age = now() - Cam.at, f = Cam.frame;
-  HcriThermal.draw($('camImg'), f, { pal: 'iron', smooth: true, rot: Cam.rot, outline: true, extrema: true });
-  $('camImg').style.opacity = age > 5 ? 0.4 : 1;
-  $('camTxt').textContent = age > 5 ? 'Camera not responding' : f.min.toFixed(1) + ' to ' + f.max.toFixed(1) + ' °C';
+  if (!window.HcriThermal || !Cam.frame) return;
+  var box = $('camBox'), f = Cam.frame, age = now() - Cam.at; box.hidden = false;
+  var sc = null; if ($('cmScm').value === 'fixed') sc = [parseFloat($('cmSmin').value), parseFloat($('cmSmax').value)];
+  var cs = parseFloat($('cmCstep').value);
+  var r = HcriThermal.draw($('camImg'), f, { pal: $('cmPal').value, smooth: $('cmSmooth').checked, scale: sc, rot: Cam.rot, contours: $('cmCont').checked ? (cs > 0 ? cs : 2) : 0, outline: parseFloat($('cmOthr').value), extrema: $('cmExt').checked ? (parseInt($('cmExtn').value, 10) || 3) : 0, pins: Cam.pins });
+  $('camImg').style.opacity = age > 5 ? 0.35 : 1; $('camWarn').hidden = age <= 5;
+  $('cmMin').textContent = r.lo.toFixed(1) + '°'; $('cmMax').textContent = r.hi.toFixed(1) + '°';
+  $('cmHot').textContent = f.max.toFixed(1) + ' °C  (column ' + (f.hx + 1) + ', row ' + (f.hy + 1) + ')'; $('cmCold').textContent = f.min.toFixed(1) + ' °C'; $('cmAvg').textContent = f.avg.toFixed(1) + ' °C';
+  $('cmPin').innerHTML = Cam.pins.length ? Cam.pins.map(function (k, n) { return (n + 1) + ': ' + f.px[k].toFixed(1) + ' °C (col ' + (k % CAMW + 1) + ', row ' + (Math.floor(k / CAMW) + 1) + ')'; }).join('<br>') : '--';
 }
 function camInit() {
+  if (!window.HcriThermal) return;
   Cam.rot = pref('camRot', 0) | 0; Cam.share = !!pref('camShare', false);
+  try { Cam.pins = (JSON.parse(localStorage.getItem('tkl_campins') || '[]') || []).filter(function (k) { return k >= 0 && k < 768; }).slice(0, 12); } catch (e) {}
+  try { var cp = JSON.parse(localStorage.getItem('tkl_camp') || 'null'); if (cp) { if (HcriThermal.PALS[cp.pal]) $('cmPal').value = cp.pal; $('cmSmooth').checked = cp.smooth !== false; if (cp.scm) $('cmScm').value = cp.scm; if (cp.smin) $('cmSmin').value = cp.smin; if (cp.smax) $('cmSmax').value = cp.smax; $('cmCont').checked = !!cp.cont; if (cp.cstep) $('cmCstep').value = cp.cstep; $('cmExt').checked = !!cp.ext; if (cp.extn) $('cmExtn').value = cp.extn; if (cp.othr) $('cmOthr').value = cp.othr; } } catch (e) {}
+  function paintScale() { $('camScale').style.background = HcriThermal.gradient($('cmPal').value); }
+  ['cmPal', 'cmSmooth', 'cmScm', 'cmSmin', 'cmSmax', 'cmCont', 'cmCstep', 'cmOthr', 'cmExt', 'cmExtn'].forEach(function (id) { $(id).onchange = function () { paintScale(); camPrefs(); camDraw(); }; });
+  paintScale();
   $('camLive').checked = Cam.share;
   $('camLive').onchange = function () { Cam.share = this.checked; setPref('camShare', Cam.share); };
   $('camRot').onclick = function () { Cam.rot = (Cam.rot + 1) & 3; setPref('camRot', Cam.rot); camDraw(); };
+  $('cmHalf').onclick = function () { if (!Cam.frame) return; $('cmOthr').value = Math.round((Cam.frame.min + Cam.frame.max) / 2 * 10) / 10; camPrefs(); camDraw(); };
+  $('cmPins').onclick = function () { Cam.pins = []; try { localStorage.setItem('tkl_campins', '[]'); } catch (x) {} camDraw(); };
+  $('cmPng').onclick = function () { var a = document.createElement('a'); a.href = $('camImg').toDataURL('image/png'); a.download = 'Thermal_' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + '.png'; document.body.appendChild(a); a.click(); a.remove(); };
+  $('camImg').onmousemove = function (e) { if (!Cam.frame) return; var q = HcriThermal.pixelAt(this, e, Cam.rot); if (q) $('cmPtr').textContent = Cam.frame.px[q[1] * CAMW + q[0]].toFixed(1) + ' °C  (column ' + (q[0] + 1) + ', row ' + (q[1] + 1) + ')'; };
+  $('camImg').onmouseleave = function () { $('cmPtr').textContent = '--'; };
+  $('camImg').onclick = function (e) { if (!Cam.frame) return; var q = HcriThermal.pixelAt(this, e, Cam.rot); if (!q) return; var k = q[1] * CAMW + q[0], at = Cam.pins.indexOf(k); if (at >= 0) Cam.pins.splice(at, 1); else { Cam.pins.push(k); if (Cam.pins.length > 12) Cam.pins.shift(); } try { localStorage.setItem('tkl_campins', JSON.stringify(Cam.pins)); } catch (x) {} camDraw(); };
 }
 function camForLive() {   // the latest frame for the live view, only when the user opted in and it is fresh
   if (!Cam.share || !Cam.frame || now() - Cam.at > 10) return null;
