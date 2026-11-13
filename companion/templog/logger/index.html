@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Temp Logger (infrared) - web logger</title>
-<meta name="description" content="Log up to three MLX90614 infrared temperature sensors from a Raspberry Pi Pico in Chrome or Edge: live chart, recording and CSV.">
+<meta name="description" content="Log up to three MLX90614 infrared temperature sensors and an MLX90640 thermal camera from a Raspberry Pi Pico in Chrome or Edge: live chart, thermal image, recording and CSV.">
 <link rel="canonical" href="https://www.hcri.io/companion/templog/logger/">
 <style>
 :root{--bg:#0b1220;--surface:#111a2b;--surface2:#16213a;--border:#25334f;--text:#e6edf7;--dim:#8da0bd;--accent:#35d0a0;--bad:#ff6b6b;--c1:#ff8a4c;--c2:#4cc3ff;--c3:#c58bff;color-scheme:dark}
 :root[data-theme=light]{--bg:#f4f6fa;--surface:#fff;--surface2:#eef2f8;--border:#cfd8e6;--text:#14202f;--dim:#55677f;--accent:#0a8f68;--bad:#c43b3b;--c1:#d9631f;--c2:#1b86c9;--c3:#8b4fd1;color-scheme:light}
+[hidden]{display:none!important}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
 header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border)}
 header h1{font-size:16px;margin:0;flex:1}header a{color:var(--accent);text-decoration:none}
@@ -23,6 +24,10 @@ main{max-width:1000px;margin:0 auto;padding:12px 16px 60px}
 canvas{width:100%;height:320px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px}
 select{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit}
 #log{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;height:110px;overflow:auto;font-size:12px;color:var(--dim);white-space:pre-wrap}
+.cam{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:10px 0;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;border-top:3px solid var(--accent)}
+.cam canvas.img{width:320px;height:240px;max-width:100%;border-radius:6px;image-rendering:auto;cursor:crosshair;border:1px solid var(--border)}
+.cam .info{flex:1;min-width:220px}.cam .stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0}.cam .stats b{font-weight:700}
+.scale{height:10px;border-radius:5px;border:1px solid var(--border);margin-top:6px;width:320px;max-width:100%}.scalel{display:flex;justify-content:space-between;width:320px;max-width:100%;font-size:11px;color:var(--dim)}
 .note{color:var(--dim);font-size:12.5px}.err{color:var(--bad)}
 </style></head><body>
 <header><h1>Temp Logger (infrared)</h1><a href="../">Build guide</a><button class="btn plain" id="theme" type="button">Theme</button></header>
@@ -32,11 +37,22 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   <button class="btn plain" id="sim" type="button">Simulate</button>
   <button class="btn" id="rec" type="button" disabled>Start recording</button>
   <button class="btn plain" id="csv" type="button" disabled>Download CSV</button>
+  <button class="btn plain" id="csvf" type="button" disabled hidden>Download thermal images CSV</button>
   <button class="btn plain" id="clear" type="button">Clear chart</button>
   <label class="sub">Show <select id="win"><option value="120">2 min</option><option value="600" selected>10 min</option><option value="1800">30 min</option><option value="0">everything</option></select></label>
   <span class="sub" id="state">Not connected</span>
 </div>
 <div class="cards" id="cards"></div>
+<div class="cam" id="camwrap" hidden>
+  <div><canvas class="img" id="camimg" width="320" height="240" aria-label="Thermal camera image"></canvas>
+    <div class="scale" id="camscale"></div><div class="scalel"><span id="cmin">--</span><span id="cmax">--</span></div></div>
+  <div class="info"><strong>Thermal camera (MLX90640)</strong>
+    <div class="stats"><span class="sub">Hottest</span><b id="chot">--</b><span class="sub">Coldest</span><b id="ccold">--</b><span class="sub">Average</span><b id="cavg">--</b><span class="sub">Under the pointer</span><b id="cptr">--</b><span class="sub">Camera chip</span><b id="cdie">--</b></div>
+    <div class="em">Emissivity <input type="number" min="0.1" max="1" step="0.01" value="0.95" id="ce" aria-label="Emissivity of the thermal camera"> <button class="btn plain" type="button" id="ces">Set</button></div>
+    <label class="em"><input type="checkbox" id="frames"> Also save every thermal image when recording (a second CSV, about 4 kB a second)</label>
+    <div class="row"><button class="btn plain" type="button" id="png">Save image (PNG)</button><button class="btn plain" type="button" id="camoff">Turn camera off</button></div>
+  </div>
+</div>
 <canvas id="cv" width="1000" height="320"></canvas>
 <p class="note" id="support"></p>
 <div class="row"><strong>Messages</strong></div><div id="log"></div>
@@ -46,7 +62,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
 (function () {
   var N = 3, COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)'];
   var $ = function (id) { return document.getElementById(id); };
-  var S = { port: null, reader: null, writer: null, sim: false, t: [], v: [[], [], []], amb: [[], [], []], last: null, rec: null, emis: [1, 1, 1], timer: null, t0: 0 };
+  var S = { cam: null, camEmis: 0.95, camOn: true, port: null, reader: null, writer: null, sim: false, t: [], v: [[], [], []], amb: [[], [], []], last: null, rec: null, emis: [1, 1, 1], timer: null, t0: 0 };
   var labels = ['Sensor 1', 'Sensor 2', 'Sensor 3'];
   try { var sv = JSON.parse(localStorage.getItem('templog_labels') || 'null'); if (sv && sv.length === N) labels = sv; } catch (e) {}
   function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v.replace(/var\((.*)\)/, '$1')).trim(); }
@@ -66,25 +82,67 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   function msg(t) { var l = $('log'); l.textContent += t + '\n'; l.scrollTop = l.scrollHeight; }
   function setState(t) { $('state').textContent = t; }
   function connected() { return !!(S.port || S.sim); }
-  function buttons() { $('rec').disabled = !connected(); $('csv').disabled = !(S.rec && S.rec.rows.length) && !(S.lastRec && S.lastRec.rows.length); $('connect').textContent = S.port ? 'Disconnect' : 'Connect Pico'; $('sim').textContent = S.sim ? 'Stop simulating' : 'Simulate'; $('rec').textContent = S.rec ? 'Stop recording' : 'Start recording'; $('rec').className = 'btn' + (S.rec ? ' rec' : ''); }
+  function buttons() { $('rec').disabled = !connected(); $('csv').disabled = !(S.rec && S.rec.rows.length) && !(S.lastRec && S.lastRec.rows.length); var fr = (S.rec && S.rec.frames.length) ? S.rec : (S.lastRec && S.lastRec.frames.length ? S.lastRec : null); $('csvf').hidden = !fr; $('csvf').disabled = !fr; $('connect').textContent = S.port ? 'Disconnect' : 'Connect Pico'; $('sim').textContent = S.sim ? 'Stop simulating' : 'Simulate'; $('rec').textContent = S.rec ? 'Stop recording' : 'Start recording'; $('rec').className = 'btn' + (S.rec ? ' rec' : ''); }
 
   // ---- readings ----
   function num(s) { if (s === undefined || s === '') return null; var v = parseFloat(s); return isFinite(v) ? v : null; }
   function onLine(line) {
     line = line.trim(); if (!line) return;
-    if (line[0] === '#') { msg(line.slice(1).trim()); var m = /emis=([0-9.,]+)/.exec(line); if (m) m[1].split(',').forEach(function (e, i) { if (i < N && $('e' + i) !== document.activeElement) $('e' + i).value = e; }); return; }
+    if (line[0] === '#') { msg(line.slice(1).trim()); var m = /emis=([0-9.,]+)/.exec(line); if (m) m[1].split(',').forEach(function (e, i) { if (i < N && $('e' + i) !== document.activeElement) $('e' + i).value = e; }); var cm = /camemis=([0-9.]+)/.exec(line); if (cm && $('ce') !== document.activeElement) { $('ce').value = cm[1]; S.camEmis = parseFloat(cm[1]); } var cc = /\bcam=([01])/.exec(line); if (cc && cc[1] === '0') { S.cam = null; $('camwrap').hidden = true; } return; }
+    if (line[0] === 'C') { onCam(line); return; }
     if (line[0] !== 'T') return;
     var p = line.split(',');
     if (p.length < 2 + 2 * N) return;
     addReading(num(p[1]), [0, 1, 2].map(function (i) { return num(p[2 + i]); }), [0, 1, 2].map(function (i) { return num(p[2 + N + i]); }));
   }
+
+  // ---- thermal camera (C lines: seconds, die, min, max, avg, hot x, hot y, then 768 pixels) ----
+  var CW = 32, CH = 24, camBuf = null, camCtx = null, camImg = null;
+  var STOPS = [[0, 0, 0, 20], [0.2, 60, 10, 110], [0.45, 190, 40, 80], [0.7, 245, 130, 20], [0.9, 255, 225, 70], [1, 255, 255, 235]];
+  function heat(f) { f = Math.max(0, Math.min(1, f)); for (var i = 1; i < STOPS.length; i++) if (f <= STOPS[i][0]) { var a = STOPS[i - 1], b = STOPS[i], u = (f - a[0]) / (b[0] - a[0]); return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u]; } return [255, 255, 235]; }
+  (function () { var st = []; STOPS.forEach(function (p) { var c = heat(p[0]); st.push('rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ') ' + Math.round(p[0] * 100) + '%'); }); $('camscale').style.background = 'linear-gradient(90deg,' + st.join(',') + ')'; })();
+  function onCam(line) {
+    var p = line.split(','); if (p.length < 8 + CW * CH) return;
+    var t = num(p[1]), px = new Array(CW * CH);
+    for (var i = 0; i < CW * CH; i++) { px[i] = parseFloat(p[8 + i]); if (!isFinite(px[i])) return; }
+    addCam(t, { die: num(p[2]), min: num(p[3]), max: num(p[4]), avg: num(p[5]), hx: parseInt(p[6], 10), hy: parseInt(p[7], 10), px: px });
+  }
+  function addCam(t, c) {
+    S.cam = c; $('camwrap').hidden = false;
+    $('chot').textContent = c.max.toFixed(1) + ' °C  (column ' + (c.hx + 1) + ', row ' + (c.hy + 1) + ')'; $('ccold').textContent = c.min.toFixed(1) + ' °C'; $('cavg').textContent = c.avg.toFixed(1) + ' °C';
+    $('cdie').textContent = c.die === null ? '--' : c.die.toFixed(1) + ' °C'; $('cmin').textContent = c.min.toFixed(1) + '°'; $('cmax').textContent = c.max.toFixed(1) + '°';
+    drawCam();
+    if (S.rec) {
+      var last = S.rec.rows[S.rec.rows.length - 1], n = last ? last.length : 0;
+      if (last && last[1] === t) { last[n - 6] = c.die; last[n - 5] = c.min; last[n - 4] = c.max; last[n - 3] = c.avg; last[n - 2] = c.hx + 1; last[n - 1] = c.hy + 1; }
+      if ($('frames').checked) { S.rec.frames.push([new Date().toISOString(), t].concat(c.px.map(function (v) { return Math.round(v * 10) / 10; }))); buttons(); }
+    }
+  }
+  function drawCam() {
+    var c = S.cam; if (!c) return;
+    if (!camBuf) { camBuf = document.createElement('canvas'); camBuf.width = CW; camBuf.height = CH; camCtx = camBuf.getContext('2d'); camImg = camCtx.createImageData(CW, CH); }
+    var lo = c.min, span = Math.max(c.max - c.min, 2);
+    for (var i = 0; i < CW * CH; i++) { var col = heat((c.px[i] - lo) / span); camImg.data[i * 4] = col[0]; camImg.data[i * 4 + 1] = col[1]; camImg.data[i * 4 + 2] = col[2]; camImg.data[i * 4 + 3] = 255; }
+    camCtx.putImageData(camImg, 0, 0);
+    var cv = $('camimg'), g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(camBuf, 0, 0, cv.width, cv.height);
+    var sx = cv.width / CW, sy = cv.height / CH, hx = (c.hx + 0.5) * sx, hy = (c.hy + 0.5) * sy;
+    g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(hx - 8, hy); g.lineTo(hx + 8, hy); g.moveTo(hx, hy - 8); g.lineTo(hx, hy + 8); g.stroke();
+  }
+  $('camimg').onmousemove = function (e) {
+    if (!S.cam) return; var r = this.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) / r.width * CW), y = Math.floor((e.clientY - r.top) / r.height * CH);
+    if (x >= 0 && x < CW && y >= 0 && y < CH) $('cptr').textContent = S.cam.px[y * CW + x].toFixed(1) + ' °C  (column ' + (x + 1) + ', row ' + (y + 1) + ')';
+  };
+  $('camimg').onmouseleave = function () { $('cptr').textContent = '--'; };
+  $('ces').onclick = function () { var e = parseFloat($('ce').value); if (!(e >= 0.1 && e <= 1)) { msg('Emissivity must be from 0.1 to 1.0'); return; } send('CE ' + e); if (S.sim) S.camEmis = e; };
+  $('camoff').onclick = function () { if (S.sim) { stopSim(); return; } send('CAM 0'); S.cam = null; $('camwrap').hidden = true; msg('Thermal camera turned off. Send CAM 1 (or unplug and replug the Pico) to turn it back on.'); };
+  $('png').onclick = function () { var a = document.createElement('a'); a.href = $('camimg').toDataURL('image/png'); a.download = 'Thermal_' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + '.png'; document.body.appendChild(a); a.click(); a.remove(); };
   function addReading(t, objs, ambs) {
     if (t === null) return;
     if (S.t.length && t < S.t[S.t.length - 1]) { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; }   // the Pico restarted
     S.t.push(t); for (var i = 0; i < N; i++) { S.v[i].push(objs[i]); S.amb[i].push(ambs[i]); }
     if (S.t.length > 20000) { S.t.splice(0, 2000); for (i = 0; i < N; i++) { S.v[i].splice(0, 2000); S.amb[i].splice(0, 2000); } }
     for (i = 0; i < N; i++) { $('b' + i).innerHTML = (objs[i] === null ? '--' : objs[i].toFixed(1)) + '<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip ' + (ambs[i] === null ? '--' : ambs[i].toFixed(1) + ' °C'); }
-    if (S.rec) { S.rec.rows.push([new Date().toISOString(), t].concat(objs, ambs)); buttons(); }
+    if (S.rec) { S.rec.rows.push([new Date().toISOString(), t].concat(objs, ambs, [null, null, null, null, null, null])); buttons(); }
     draw();
   }
 
@@ -136,23 +194,33 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   }
   // ---- simulation ----
   function startSim() {
-    S.sim = true; S.t0 = performance.now(); setState('Simulating'); buttons(); msg('Simulating three sensors.');
+    S.sim = true; S.t0 = performance.now(); setState('Simulating'); buttons(); msg('Simulating three sensors and the thermal camera.');
     S.timer = setInterval(function () {
       var t = (performance.now() - S.t0) / 1000, objs = [], ambs = [];
       for (var i = 0; i < N; i++) { var base = 24 + i * 3, rise = [38, 22, 12][i] * (1 - Math.exp(-t / (90 + i * 40))); objs.push(base + rise + Math.sin(t / 7 + i) * 0.15 + (Math.random() - 0.5) * 0.1); ambs.push(24 + i * 0.4 + rise * 0.05); }
       var r2 = function (v) { return Math.round(v * 100) / 100; };
-      addReading(Math.round(t * 10) / 10, objs.map(r2), ambs.map(r2));
+      var ts = Math.round(t * 10) / 10; addReading(ts, objs.map(r2), ambs.map(r2));
+      var px = [], tot = 0, mx = -1e9, mn = 1e9, hot = 0, warm = 24 + 30 * (1 - Math.exp(-t / 120));
+      for (var yy = 0; yy < CH; yy++) for (var xx = 0; xx < CW; xx++) { var dx = xx - 21 - Math.sin(t / 15) * 2, dy = yy - 11, v = 23 + (warm - 23) * Math.exp(-(dx * dx + dy * dy) / 40) + (Math.random() - 0.5) * 0.3; v = Math.round(v * 10) / 10; px.push(v); tot += v; if (v > mx) { mx = v; hot = px.length - 1; } if (v < mn) mn = v; }
+      addCam(ts, { die: 27, min: mn, max: mx, avg: Math.round(tot / px.length * 10) / 10, hx: hot % CW, hy: Math.floor(hot / CW), px: px });
     }, 1000);
   }
-  function stopSim() { if (S.timer) clearInterval(S.timer); S.timer = null; if (S.sim) { S.sim = false; if (S.rec) stopRec(); setState(S.port ? 'Connected' : 'Not connected'); buttons(); } }
+  function stopSim() { if (S.timer) clearInterval(S.timer); S.timer = null; if (S.sim) { S.sim = false; S.cam = null; $('camwrap').hidden = true; if (S.rec) stopRec(); setState(S.port ? 'Connected' : 'Not connected'); buttons(); } }
 
   // ---- recording and CSV ----
   function stopRec() { S.lastRec = S.rec; S.rec = null; msg('Recording stopped: ' + S.lastRec.rows.length + ' readings.'); buttons(); }
   function csvText(rec) {
     var h = ['time_iso', 'seconds'].concat(labels.map(function (l) { return l + ' object C'; }), labels.map(function (l) { return l + ' sensor C'; }));
-    return [h.map(function (c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(',')].concat(rec.rows.map(function (r) { return r.map(function (c) { return c === null ? '' : c; }).join(','); })).join('\n') + '\n';
+    var hasCam = rec.rows.some(function (r) { return r[r.length - 5] !== null; }), rows = rec.rows;
+    if (hasCam) h = h.concat(['Camera chip C', 'Camera coldest C', 'Camera hottest C', 'Camera average C', 'Camera hottest column', 'Camera hottest row']);
+    else rows = rows.map(function (r) { return r.slice(0, r.length - 6); });
+    return [h.map(function (c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(',')].concat(rows.map(function (r) { return r.map(function (c) { return c === null ? '' : c; }).join(','); })).join('\n') + '\n';
   }
-  $('rec').onclick = function () { if (S.rec) stopRec(); else { S.rec = { rows: [], start: new Date() }; msg('Recording started.'); buttons(); } };
+  function framesCsv(rec) {
+    var h = ['time_iso', 'seconds']; for (var y = 1; y <= CH; y++) for (var x = 1; x <= CW; x++) h.push('r' + y + 'c' + x);
+    return [h.join(',')].concat(rec.frames.map(function (r) { return r.join(','); })).join('\n') + '\n';
+  }
+  $('rec').onclick = function () { if (S.rec) stopRec(); else { S.rec = { rows: [], frames: [], start: new Date() }; msg('Recording started.'); buttons(); } };
   $('csv').onclick = function () {
     var rec = (S.rec && S.rec.rows.length) ? S.rec : S.lastRec; if (!rec || !rec.rows.length) return;
     var a = document.createElement('a'), d = rec.start, p = function (n) { return ('0' + n).slice(-2); };
@@ -160,9 +228,16 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     a.download = 'Temps_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + '.' + p(d.getMinutes()) + '.' + p(d.getSeconds()) + '.csv';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   };
+  $('csvf').onclick = function () {
+    var rec = (S.rec && S.rec.frames.length) ? S.rec : S.lastRec; if (!rec || !rec.frames.length) return;
+    var a = document.createElement('a'), d = rec.start, p = function (n) { return ('0' + n).slice(-2); };
+    a.href = URL.createObjectURL(new Blob([framesCsv(rec)], { type: 'text/csv' }));
+    a.download = 'ThermalImages_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + '.' + p(d.getMinutes()) + '.' + p(d.getSeconds()) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  };
   $('connect').onclick = function () { if (S.port) disconnect(false); else connect(); };
   $('sim').onclick = function () { if (S.sim) stopSim(); else if (S.port) msg('Disconnect the Pico first.'); else startSim(); };
-  $('clear').onclick = function () { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; for (var i = 0; i < N; i++) { $('b' + i).innerHTML = '--<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip --'; } S.t0 = performance.now(); draw(); };
+  $('clear').onclick = function () { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; for (var i = 0; i < N; i++) { $('b' + i).innerHTML = '--<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip --'; } S.t0 = performance.now(); S.cam = null; $('camwrap').hidden = true; draw(); };
   $('win').onchange = draw; window.addEventListener('resize', draw);
   $('theme').onclick = function () { var h = document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); try { localStorage.setItem('hcri_theme', h.getAttribute('data-theme')); } catch (e) {} draw(); };
   try { var th = localStorage.getItem('hcri_theme'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
