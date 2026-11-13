@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import { RuntimeChart, TEMP_COLORS } from './RuntimeTab';
+import HcriThermal from '../lib/thermal';
 
 const POLL_MS = 5000;
 
@@ -53,7 +54,7 @@ function useLiveRun(token, pollMs = POLL_MS) {
         whole.current = d.run.points === vals.current.length;
       } else { vals.current = []; tvs.current = {}; }
       const temps = Object.keys(tvs.current).map(Number).sort().map((ch) => ({ ch, name: tvs.current[ch].name, values: tvs.current[ch].values }));
-      setState({ loading: false, err: '', live: d.live, run: d.run, values: vals.current, temps, info: d.info || null, got: Date.now() });
+      setState({ loading: false, err: '', live: d.live, run: d.run, values: vals.current, temps, info: d.info || null, thermal: d.thermal || null, got: Date.now() });
     } catch {
       setState((s) => ({ ...s, loading: false, err: 'Could not reach hCRI.io. Trying again…' }));
     }
@@ -71,8 +72,30 @@ function useLiveRun(token, pollMs = POLL_MS) {
   return { ...state, now };
 }
 
+/** The latest thermal-camera frame, when the owner chose to share it. */
+function ThermalImage({ T, thermal, rot, onRot }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current || !thermal || !thermal.px || thermal.px.length !== 768) return;
+    const px = thermal.px, lo = Math.min(...px), hi = Math.max(...px);
+    HcriThermal.draw(ref.current, { px, min: lo, max: hi }, { pal: 'iron', smooth: true, rot, outline: true, extrema: true });
+  }, [thermal, rot]);
+  if (!thermal || !thermal.px) return null;
+  const lo = Math.min(...thermal.px), hi = Math.max(...thermal.px);
+  return (
+    <div style={{ margin: '0 0 12px' }}>
+      <canvas ref={ref} width={640} height={480} aria-label="Thermal camera image" style={{ width: 320, maxWidth: '100%', borderRadius: 6, background: '#000', display: 'block' }} />
+      <div style={{ color: T.dim, fontSize: 12, marginTop: 4, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <span>Thermal {lo.toFixed(1)} to {hi.toFixed(1)} °C</span>
+        <button type="button" onClick={onRot} style={{ background: 'none', border: `1px solid ${T.border || T.dim}`, color: T.dim, borderRadius: 4, padding: '1px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 }}>Rotate</button>
+      </div>
+    </div>
+  );
+}
+
 export function LiveView({ T, token, embedded = false }) {
-  const { loading, err, live, run, values, temps, got, now, info } = useLiveRun(token);
+  const { loading, err, live, run, values, temps, got, now, info, thermal } = useLiveRun(token);
+  const [rot, setRot] = useState(0);
   const wrap = embedded ? { fontFamily: 'monospace', color: T.text } : { maxWidth: 980, margin: '0 auto', padding: '16px 16px 60px', fontFamily: 'monospace', color: T.text };
   if (loading) return <div style={wrap}><p style={{ color: T.dim }}>Loading…</p></div>;
   if (!run && err) return <div style={wrap}><p style={{ color: T.bad }}>{err}</p></div>;
@@ -120,6 +143,7 @@ export function LiveView({ T, token, embedded = false }) {
           })}
         </div>
       )}
+      <ThermalImage T={T} thermal={thermal} rot={rot} onRot={() => setRot((r) => (r + 1) & 3)} />
       <RuntimeChart curves={[curve]} T={T} mode="abs" temps={temps && temps.length ? temps : null} />
       {!embedded && <p style={{ color: T.dim, fontSize: 12, marginTop: 18 }}>Shared live from hCRI.io by its owner. This page refreshes every few seconds.</p>}
     </div>

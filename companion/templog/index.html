@@ -223,6 +223,7 @@
 
     <section id="camera">
       <h2><span class="num">04</span> Thermal camera (MLX90640)</h2>
+      <p><b>Live view:</b> with the camera connected to the TKLamp live page, tick <i>Include the thermal image in the live view</i> and the newest image is shown on your shared live link, in the Live station on hCRI.io, and in the link preview picture. Only the latest image is kept, and it disappears two minutes after the camera stops sending.</p>
       <p>The camera has its own I2C bus on the Pico, separate from the infrared sensors, because it needs a fast bus (400 kHz) and the MLX90614 sensors need a slow one (100 kHz at most). Its address is 0x33, so it never clashes with the sensors.</p>
       <table>
         <tr><th>From</th><th>To</th></tr>
