@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Temp Logger (infrared) - web logger</title>
-<meta name="description" content="Log up to three MLX90614 infrared temperature sensors from a Raspberry Pi Pico in Chrome or Edge: live chart, recording and CSV.">
+<meta name="description" content="Log up to three MLX90614 infrared temperature sensors and an MLX90640 thermal camera from a Raspberry Pi Pico in Chrome or Edge: live chart, thermal image, recording and CSV.">
 <link rel="canonical" href="https://www.hcri.io/companion/templog/logger/">
 <style>
 :root{--bg:#0b1220;--surface:#111a2b;--surface2:#16213a;--border:#25334f;--text:#e6edf7;--dim:#8da0bd;--accent:#35d0a0;--bad:#ff6b6b;--c1:#ff8a4c;--c2:#4cc3ff;--c3:#c58bff;color-scheme:dark}
 :root[data-theme=light]{--bg:#f4f6fa;--surface:#fff;--surface2:#eef2f8;--border:#cfd8e6;--text:#14202f;--dim:#55677f;--accent:#0a8f68;--bad:#c43b3b;--c1:#d9631f;--c2:#1b86c9;--c3:#8b4fd1;color-scheme:light}
+[hidden]{display:none!important}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
 header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border)}
 header h1{font-size:16px;margin:0;flex:1}header a{color:var(--accent);text-decoration:none}
@@ -23,6 +24,10 @@ main{max-width:1000px;margin:0 auto;padding:12px 16px 60px}
 canvas{width:100%;height:320px;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px}
 select{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font:inherit}
 #log{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;height:110px;overflow:auto;font-size:12px;color:var(--dim);white-space:pre-wrap}
+.cam{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:10px 0;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;border-top:3px solid var(--accent)}
+.cam canvas.img{height:auto;max-width:100%;border-radius:6px;image-rendering:auto;cursor:crosshair;border:1px solid var(--border)}
+.cam .info{flex:1;min-width:220px}.cam .stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0}.cam .stats b{font-weight:700}
+.scale{height:12px;border-radius:5px;border:1px solid var(--border);margin-top:6px;width:640px;max-width:100%}.scalel{display:flex;justify-content:space-between;width:640px;max-width:100%;font-size:12px;color:var(--dim)}
 .note{color:var(--dim);font-size:12.5px}.err{color:var(--bad)}
 </style></head><body>
 <header><h1>Temp Logger (infrared)</h1><a href="../">Build guide</a><button class="btn plain" id="theme" type="button">Theme</button></header>
@@ -32,11 +37,31 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   <button class="btn plain" id="sim" type="button">Simulate</button>
   <button class="btn" id="rec" type="button" disabled>Start recording</button>
   <button class="btn plain" id="csv" type="button" disabled>Download CSV</button>
+  <button class="btn plain" id="csvf" type="button" disabled hidden>Download thermal images CSV</button>
   <button class="btn plain" id="clear" type="button">Clear chart</button>
   <label class="sub">Show <select id="win"><option value="120">2 min</option><option value="600" selected>10 min</option><option value="1800">30 min</option><option value="0">everything</option></select></label>
   <span class="sub" id="state">Not connected</span>
 </div>
 <div class="cards" id="cards"></div>
+<div class="cam" id="camwrap" hidden>
+  <div><canvas class="img" id="camimg" width="640" height="480" aria-label="Thermal camera image"></canvas>
+    <div class="scale" id="camscale"></div><div class="scalel"><span id="cmin">--</span><span id="cmax">--</span></div></div>
+  <div class="info"><strong>Thermal camera (MLX90640)</strong>
+    <div class="err" id="camwarn" hidden>No new image from the camera for a few seconds. Check its wires (SDA, SCL, power); the Pico keeps trying to reconnect on its own.</div>
+    <div class="stats"><span class="sub">Hottest</span><b id="chot">--</b><span class="sub">Coldest</span><b id="ccold">--</b><span class="sub">Average</span><b id="cavg">--</b><span class="sub">Under the pointer</span><b id="cptr">--</b><span class="sub">Pinned</span><b id="cpin">--</b><span class="sub">Camera chip</span><b id="cdie">--</b></div>
+    <div class="em">Emissivity <input type="number" min="0.1" max="1" step="0.01" value="0.95" id="ce" aria-label="Emissivity of the thermal camera"> <button class="btn plain" type="button" id="ces">Set</button></div>
+    <div class="em">Palette <select id="pal"><option value="iron">Iron</option><option value="rainbow">Rainbow</option><option value="gray">Grayscale</option></select>
+      <label><input type="checkbox" id="smooth" checked> Smooth</label></div>
+    <div class="em">Colour scale <select id="scm"><option value="auto">Auto</option><option value="fixed">Fixed</option></select>
+      <input type="number" id="smin" value="20" step="1" aria-label="Lowest temperature on the colour scale"> to <input type="number" id="smax" value="60" step="1" aria-label="Highest temperature on the colour scale"> &deg;C</div>
+    <div class="em"><label><input type="checkbox" id="cont"> Contour lines every</label> <input type="number" id="cstep" value="2" min="0.5" step="0.5" aria-label="Degrees between contour lines"> &deg;C</div>
+    <div class="em">Outline everything above <input type="number" id="othr" placeholder="off" step="1" aria-label="Outline the area above this temperature"> &deg;C <button class="btn plain" type="button" id="ohalf">Half way</button></div>
+    <div class="note">Click the image to pin a temperature, as many spots as you like (up to 12; click a pinned spot again to remove it).</div>
+    <div class="em"><label><input type="checkbox" id="grid"> Label the highs and lows, up to</label> <input type="number" id="extn" value="3" min="1" max="8" step="1" aria-label="How many highs and lows to label"> of each <button class="btn plain" type="button" id="clrpins">Clear pins</button></div>
+    <label class="em"><input type="checkbox" id="frames"> Also save every thermal image when recording (a second CSV, about 4 kB a second)</label>
+    <div class="row"><button class="btn plain" type="button" id="rot">Rotate 90&deg;</button><button class="btn plain" type="button" id="png">Save image (PNG)</button><button class="btn plain" type="button" id="camoff">Turn camera off</button></div>
+  </div>
+</div>
 <canvas id="cv" width="1000" height="320"></canvas>
 <p class="note" id="support"></p>
 <div class="row"><strong>Messages</strong></div><div id="log"></div>
@@ -46,7 +71,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
 (function () {
   var N = 3, COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)'];
   var $ = function (id) { return document.getElementById(id); };
-  var S = { port: null, reader: null, writer: null, sim: false, t: [], v: [[], [], []], amb: [[], [], []], last: null, rec: null, emis: [1, 1, 1], timer: null, t0: 0 };
+  var S = { cam: null, camEmis: 0.95, camOn: true, port: null, reader: null, writer: null, sim: false, t: [], v: [[], [], []], amb: [[], [], []], last: null, rec: null, emis: [1, 1, 1], timer: null, t0: 0 };
   var labels = ['Sensor 1', 'Sensor 2', 'Sensor 3'];
   try { var sv = JSON.parse(localStorage.getItem('templog_labels') || 'null'); if (sv && sv.length === N) labels = sv; } catch (e) {}
   function cssVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v.replace(/var\((.*)\)/, '$1')).trim(); }
@@ -66,25 +91,169 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   function msg(t) { var l = $('log'); l.textContent += t + '\n'; l.scrollTop = l.scrollHeight; }
   function setState(t) { $('state').textContent = t; }
   function connected() { return !!(S.port || S.sim); }
-  function buttons() { $('rec').disabled = !connected(); $('csv').disabled = !(S.rec && S.rec.rows.length) && !(S.lastRec && S.lastRec.rows.length); $('connect').textContent = S.port ? 'Disconnect' : 'Connect Pico'; $('sim').textContent = S.sim ? 'Stop simulating' : 'Simulate'; $('rec').textContent = S.rec ? 'Stop recording' : 'Start recording'; $('rec').className = 'btn' + (S.rec ? ' rec' : ''); }
+  function buttons() { $('rec').disabled = !connected(); $('csv').disabled = !(S.rec && S.rec.rows.length) && !(S.lastRec && S.lastRec.rows.length); var fr = (S.rec && S.rec.frames.length) ? S.rec : (S.lastRec && S.lastRec.frames.length ? S.lastRec : null); $('csvf').hidden = !fr; $('csvf').disabled = !fr; $('connect').textContent = S.port ? 'Disconnect' : 'Connect Pico'; $('sim').textContent = S.sim ? 'Stop simulating' : 'Simulate'; $('rec').textContent = S.rec ? 'Stop recording' : 'Start recording'; $('rec').className = 'btn' + (S.rec ? ' rec' : ''); }
 
   // ---- readings ----
   function num(s) { if (s === undefined || s === '') return null; var v = parseFloat(s); return isFinite(v) ? v : null; }
   function onLine(line) {
     line = line.trim(); if (!line) return;
-    if (line[0] === '#') { msg(line.slice(1).trim()); var m = /emis=([0-9.,]+)/.exec(line); if (m) m[1].split(',').forEach(function (e, i) { if (i < N && $('e' + i) !== document.activeElement) $('e' + i).value = e; }); return; }
+    if (line[0] === '#') { msg(line.slice(1).trim()); var m = /emis=([0-9.,]+)/.exec(line); if (m) m[1].split(',').forEach(function (e, i) { if (i < N && $('e' + i) !== document.activeElement) $('e' + i).value = e; }); var cm = /camemis=([0-9.]+)/.exec(line); if (cm && $('ce') !== document.activeElement) { $('ce').value = cm[1]; S.camEmis = parseFloat(cm[1]); } var cc = /\bcam=([01])/.exec(line); if (cc && cc[1] === '0') { S.cam = null; $('camwrap').hidden = true; } return; }
+    if (line[0] === 'C') { onCam(line); return; }
     if (line[0] !== 'T') return;
     var p = line.split(',');
     if (p.length < 2 + 2 * N) return;
     addReading(num(p[1]), [0, 1, 2].map(function (i) { return num(p[2 + i]); }), [0, 1, 2].map(function (i) { return num(p[2 + N + i]); }));
   }
+
+  // ---- thermal camera (C lines: seconds, die, min, max, avg, hot x, hot y, then 768 pixels) ----
+  var CW = 32, CH = 24, camBuf = null, camCtx = null, camImg = null;
+  var PALS = {
+    iron: [[0, 0, 0, 20], [0.2, 60, 10, 110], [0.45, 190, 40, 80], [0.7, 245, 130, 20], [0.9, 255, 225, 70], [1, 255, 255, 235]],
+    rainbow: [[0, 20, 20, 140], [0.25, 20, 120, 230], [0.5, 40, 200, 90], [0.75, 250, 220, 40], [1, 235, 40, 30]],
+    gray: [[0, 0, 0, 0], [1, 255, 255, 255]]
+  };
+  var STOPS = PALS.iron;
+  function heat(f) { f = Math.max(0, Math.min(1, f)); for (var i = 1; i < STOPS.length; i++) if (f <= STOPS[i][0]) { var a = STOPS[i - 1], b = STOPS[i], u = (f - a[0]) / (b[0] - a[0]); return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u]; } var z = STOPS[STOPS.length - 1]; return [z[1], z[2], z[3]]; }
+  function paintScale() { var st = []; STOPS.forEach(function (p) { var c = heat(p[0]); st.push('rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ') ' + Math.round(p[0] * 100) + '%'); }); $('camscale').style.background = 'linear-gradient(90deg,' + st.join(',') + ')'; }
+  var pins = [];    // the pixels (indexes) you clicked, newest last
+  try { pins = (JSON.parse(localStorage.getItem('templog_pins') || '[]') || []).filter(function (k) { return k >= 0 && k < 768; }).slice(0, 12); } catch (e) {}
+  var rot = 0;      // how far the picture is turned, clockwise, in 90 degree steps (0 to 3)
+  function saveCamPrefs() { try { localStorage.setItem('templog_cam', JSON.stringify({ pal: $('pal').value, smooth: $('smooth').checked, scm: $('scm').value, smin: $('smin').value, smax: $('smax').value, rot: rot, cont: $('cont').checked, cstep: $('cstep').value })); } catch (e) {} }
+  try { var cp = JSON.parse(localStorage.getItem('templog_cam') || 'null'); if (cp) { if (PALS[cp.pal]) $('pal').value = cp.pal; $('smooth').checked = cp.smooth !== false; if (cp.scm) $('scm').value = cp.scm; if (cp.smin) $('smin').value = cp.smin; if (cp.smax) $('smax').value = cp.smax; rot = (cp.rot | 0) & 3; $('cont').checked = !!cp.cont; if (cp.cstep) $('cstep').value = cp.cstep; } } catch (e) {}
+  function camPrefsChanged() { STOPS = PALS[$('pal').value] || PALS.iron; paintScale(); saveCamPrefs(); drawCam(); }
+  ['pal', 'smooth', 'scm', 'smin', 'smax', 'cont', 'cstep', 'othr', 'grid', 'extn'].forEach(function (id) { $(id).onchange = camPrefsChanged; });
+  STOPS = PALS[$('pal').value] || PALS.iron; paintScale();
+  setInterval(function () { if (S.cam && !S.sim && S.camTime && Date.now() - S.camTime > 4000) { $('camwarn').hidden = false; $('camimg').style.opacity = '0.35'; } }, 1000);
+  function onCam(line) {
+    var p = line.split(','); if (p.length < 8 + CW * CH) return;
+    var t = num(p[1]), px = new Array(CW * CH);
+    for (var i = 0; i < CW * CH; i++) { px[i] = parseFloat(p[8 + i]); if (!isFinite(px[i])) return; }
+    addCam(t, { die: num(p[2]), min: num(p[3]), max: num(p[4]), avg: num(p[5]), hx: parseInt(p[6], 10), hy: parseInt(p[7], 10), px: px });
+  }
+  function addCam(t, c) {
+    S.cam = c; S.camTime = Date.now(); $('camwrap').hidden = false; $('camwarn').hidden = true; $('camimg').style.opacity = '';
+    $('chot').textContent = c.max.toFixed(1) + ' °C  (column ' + (c.hx + 1) + ', row ' + (c.hy + 1) + ')'; $('ccold').textContent = c.min.toFixed(1) + ' °C'; $('cavg').textContent = c.avg.toFixed(1) + ' °C';
+    $('cdie').textContent = c.die === null ? '--' : c.die.toFixed(1) + ' °C'; $('cmin').textContent = c.min.toFixed(1) + '°'; $('cmax').textContent = c.max.toFixed(1) + '°';
+    drawCam();
+    if (S.rec) {
+      var last = S.rec.rows[S.rec.rows.length - 1], n = last ? last.length : 0;
+      if (last && last[1] === t) { last[n - 6] = c.die; last[n - 5] = c.min; last[n - 4] = c.max; last[n - 3] = c.avg; last[n - 2] = c.hx + 1; last[n - 1] = c.hy + 1; }
+      if ($('frames').checked) { S.rec.frames.push([new Date().toISOString(), t].concat(c.px.map(function (v) { return Math.round(v * 10) / 10; }))); buttons(); }
+    }
+  }
+  // Source pixel (x, y) in the 32 x 24 frame -> where it lands on the screen after rotating, and the way back.
+  function dims() { return (rot & 1) ? [CH, CW] : [CW, CH]; }
+  function toDisp(x, y) { return rot === 0 ? [x, y] : rot === 1 ? [CH - 1 - y, x] : rot === 2 ? [CW - 1 - x, CH - 1 - y] : [y, CW - 1 - x]; }
+  function toSrc(dx, dy) { return rot === 0 ? [dx, dy] : rot === 1 ? [dy, CH - 1 - dx] : rot === 2 ? [CW - 1 - dx, CH - 1 - dy] : [CW - 1 - dy, dx]; }
+  // Smooth the 32 x 24 temperatures up to 20 pixels per camera pixel (Catmull-Rom cubic, horizontal then vertical) and colour
+  // the result, so the edges stay crisp instead of being blurred by the browser.
+  var UP = 20;
+  function cubic(p0, p1, p2, p3, t) { return p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0))); }
+  function upsample(src, DW, DH, smooth) {
+    var W = DW * UP, H = DH * UP, out = new Float32Array(W * H), x, y;
+    if (!smooth) { for (y = 0; y < H; y++) for (x = 0; x < W; x++) out[y * W + x] = src[Math.floor(y / UP) * DW + Math.floor(x / UP)]; return out; }
+    var lo = Infinity, hi = -Infinity; for (x = 0; x < src.length; x++) { if (src[x] < lo) lo = src[x]; if (src[x] > hi) hi = src[x]; }
+    var tmp = new Float32Array(DH * W), cl = function (v, n) { return v < 0 ? 0 : v >= n ? n - 1 : v; };
+    for (y = 0; y < DH; y++) for (x = 0; x < W; x++) { var fx = (x + 0.5) / UP - 0.5, x0 = Math.floor(fx), t = fx - x0, r = y * DW; tmp[y * W + x] = cubic(src[r + cl(x0 - 1, DW)], src[r + cl(x0, DW)], src[r + cl(x0 + 1, DW)], src[r + cl(x0 + 2, DW)], t); }
+    for (y = 0; y < H; y++) { var fy = (y + 0.5) / UP - 0.5, y0 = Math.floor(fy), u = fy - y0, a = cl(y0 - 1, DH) * W, b = cl(y0, DH) * W, c2 = cl(y0 + 1, DH) * W, d = cl(y0 + 2, DH) * W;
+      for (x = 0; x < W; x++) { var v = cubic(tmp[a + x], tmp[b + x], tmp[c2 + x], tmp[d + x], u); out[y * W + x] = v < lo ? lo : v > hi ? hi : v; } }
+    return out;
+  }
+  // Marching squares on every 4th sample: a line wherever the field crosses `level`.
+  function contour(g, f, W, H, level, color, width) {
+    var K = 4, gw = Math.floor((W - 1) / K), gh = Math.floor((H - 1) / K);
+    g.strokeStyle = color; g.lineWidth = width; g.beginPath();
+    function v(i, j) { return f[(j * K) * W + i * K]; }
+    function lerp(p, q, ip, jp, iq, jq) { var t = (level - p) / (q - p); return [(ip + (iq - ip) * t) * K, (jp + (jq - jp) * t) * K]; }
+    for (var j = 0; j < gh; j++) for (var i = 0; i < gw; i++) {
+      var a = v(i, j), b = v(i + 1, j), c = v(i + 1, j + 1), d = v(i, j + 1), k = (a >= level ? 8 : 0) | (b >= level ? 4 : 0) | (c >= level ? 2 : 0) | (d >= level ? 1 : 0);
+      if (k === 0 || k === 15) continue;
+      var T = function () { return lerp(a, b, i, j, i + 1, j); }, R = function () { return lerp(b, c, i + 1, j, i + 1, j + 1); }, B = function () { return lerp(d, c, i, j + 1, i + 1, j + 1); }, Lf = function () { return lerp(a, d, i, j, i, j + 1); };
+      var segs = { 1: [[Lf, B]], 2: [[B, R]], 3: [[Lf, R]], 4: [[T, R]], 5: [[T, Lf], [B, R]], 6: [[T, B]], 7: [[T, Lf]], 8: [[T, Lf]], 9: [[T, B]], 10: [[T, R], [Lf, B]], 11: [[T, R]], 12: [[Lf, R]], 13: [[B, R]], 14: [[Lf, B]] }[k];
+      for (var s = 0; s < segs.length; s++) { var p = segs[s][0](), q = segs[s][1](); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+    }
+    g.stroke();
+  }
+  // The separate hot spots and cold spots in a frame: local peaks and dips of a lightly smoothed copy, strongest first, at
+  // least 5 pixels apart and standing out from their surroundings, so noise does not produce a crowd of labels.
+  function extrema(c, n) {
+    var sm = new Float32Array(CW * CH), i, x, y, dx, dy, lo = Infinity, hi = -Infinity;
+    for (y = 0; y < CH; y++) for (x = 0; x < CW; x++) { var t = 0, k = 0; for (dy = -1; dy <= 1; dy++) for (dx = -1; dx <= 1; dx++) { var xx = x + dx, yy = y + dy; if (xx >= 0 && xx < CW && yy >= 0 && yy < CH) { t += c.px[yy * CW + xx]; k++; } } sm[y * CW + x] = t / k; }
+    for (i = 0; i < sm.length; i++) { if (sm[i] < lo) lo = sm[i]; if (sm[i] > hi) hi = sm[i]; }
+    var need = Math.max(1, (hi - lo) * 0.06), mean = 0; for (i = 0; i < sm.length; i++) mean += sm[i]; mean /= sm.length;
+    function find(sign) {
+      var cand = [];
+      for (y = 0; y < CH; y++) for (x = 0; x < CW; x++) {
+        var v = sm[y * CW + x] * sign, best = true, ring = 0, rc = 0;
+        for (dy = -1; dy <= 1 && best; dy++) for (dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; var xx = x + dx, yy = y + dy; if (xx >= 0 && xx < CW && yy >= 0 && yy < CH && sm[yy * CW + xx] * sign > v) { best = false; break; } }
+        if (!best) continue;
+        for (dy = -4; dy <= 4; dy++) for (dx = -4; dx <= 4; dx++) { var ax = x + dx, ay = y + dy; if (Math.max(Math.abs(dx), Math.abs(dy)) === 4 && ax >= 0 && ax < CW && ay >= 0 && ay < CH) { ring += sm[ay * CW + ax] * sign; rc++; } }
+        if (rc && v - ring / rc >= need && v - sign * mean >= need * 0.5) cand.push([v, y * CW + x]);
+      }
+      cand.sort(function (a, b) { return b[0] - a[0]; });
+      var out = [];
+      cand.forEach(function (cd) { if (out.length >= n) return; var cx = cd[1] % CW, cy = Math.floor(cd[1] / CW); if (out.every(function (o) { return Math.max(Math.abs(o % CW - cx), Math.abs(Math.floor(o / CW) - cy)) >= 5; })) out.push(cd[1]); });
+      // report the true hottest / coldest pixel next to each smoothed peak
+      return out.map(function (k0) { var bx = k0 % CW, by = Math.floor(k0 / CW), bk = k0; for (var ddy = -1; ddy <= 1; ddy++) for (var ddx = -1; ddx <= 1; ddx++) { var qx = bx + ddx, qy = by + ddy; if (qx >= 0 && qx < CW && qy >= 0 && qy < CH && c.px[qy * CW + qx] * sign > c.px[bk] * sign) bk = qy * CW + qx; } return bk; });
+    }
+    return { highs: find(1), lows: find(-1) };
+  }
+  function camRange(c) {
+    if ($('scm').value === 'fixed') { var lo = parseFloat($('smin').value), hi = parseFloat($('smax').value); if (isFinite(lo) && isFinite(hi) && hi > lo) return [lo, hi]; }
+    return [c.min, c.min + Math.max(c.max - c.min, 2)];
+  }
+  function tag(g, x, y, text, color, size) {
+    g.font = 'bold ' + (size || 15) + 'px ui-monospace,Menlo,Consolas,monospace'; g.textBaseline = 'middle';
+    var w = g.measureText(text).width, tx = x + 12; if (tx + w > g.canvas.width - 4) tx = x - 12 - w; var ty = Math.max(10, Math.min(g.canvas.height - 10, y - 12));
+    g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(text, tx, ty); g.fillStyle = color; g.fillText(text, tx, ty);
+  }
+  function mark(g, x, y, color, shape) {
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.85)'; g.beginPath();
+    if (shape === 'cross') { g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.moveTo(x, y - 9); g.lineTo(x, y + 9); } else g.arc(x, y, 7, 0, Math.PI * 2);
+    g.stroke(); g.lineWidth = 1.5; g.strokeStyle = color; g.stroke();
+  }
+  function drawCam() {
+    var c = S.cam; if (!c) return;
+    var dm = dims(), DW = dm[0], DH = dm[1], i, disp = new Float32Array(DW * DH);
+    for (i = 0; i < CW * CH; i++) { var dd = toDisp(i % CW, Math.floor(i / CW)); disp[dd[1] * DW + dd[0]] = c.px[i]; }
+    var rg = camRange(c), lo = rg[0], span = rg[1] - rg[0], sm = $('smooth').checked, W = DW * UP, H = DH * UP, f = upsample(disp, DW, DH, sm);
+    var cv = $('camimg'); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv.style.width = W + 'px'; }
+    var g = cv.getContext('2d'), im = g.createImageData(W, H);
+    for (i = 0; i < W * H; i++) { var col = heat((f[i] - lo) / span); im.data[i * 4] = col[0]; im.data[i * 4 + 1] = col[1]; im.data[i * 4 + 2] = col[2]; im.data[i * 4 + 3] = 255; }
+    g.putImageData(im, 0, 0);
+    $('cmin').textContent = rg[0].toFixed(1) + '°'; $('cmax').textContent = rg[1].toFixed(1) + '°';
+    if ($('cont').checked) { var step = parseFloat($('cstep').value); if (!(step > 0)) step = 2; for (var lv = Math.ceil(c.min / step) * step; lv < c.max; lv += step) contour(g, f, W, H, lv, 'rgba(255,255,255,0.45)', 1); }
+    var thr = parseFloat($('othr').value); if (isFinite(thr) && thr > c.min && thr < c.max) { contour(g, f, W, H, thr, 'rgba(0,0,0,0.9)', 5); contour(g, f, W, H, thr, '#7dffb0', 2.5); }
+    var sx = cv.width / DW, sy = cv.height / DH, cold = 0;
+    for (i = 1; i < CW * CH; i++) if (c.px[i] < c.px[cold]) cold = i;
+    var cd = toDisp(cold % CW, Math.floor(cold / CW)), hd = toDisp(c.hx, c.hy);
+    mark(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, '#7cc8ff', 'ring'); tag(g, (cd[0] + 0.5) * sx, (cd[1] + 0.5) * sy, c.px[cold].toFixed(1) + '°', '#bfe3ff');
+    mark(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, '#ffffff', 'cross'); tag(g, (hd[0] + 0.5) * sx, (hd[1] + 0.5) * sy, c.max.toFixed(1) + '°', '#ffffff');
+    if ($('grid').checked) {
+      var ex = extrema(c, Math.max(1, Math.min(8, parseInt($('extn').value, 10) || 3)));
+      ex.lows.filter(function (k) { return k !== cold; }).forEach(function (k) { var d2 = toDisp(k % CW, Math.floor(k / CW)), x2 = (d2[0] + 0.5) * sx, y2 = (d2[1] + 0.5) * sy; mark(g, x2, y2, '#7cc8ff', 'ring'); tag(g, x2, y2, c.px[k].toFixed(1) + '°', '#bfe3ff'); });
+      ex.highs.filter(function (k) { return k !== c.hy * CW + c.hx; }).forEach(function (k) { var d2 = toDisp(k % CW, Math.floor(k / CW)), x2 = (d2[0] + 0.5) * sx, y2 = (d2[1] + 0.5) * sy; mark(g, x2, y2, '#ffffff', 'cross'); tag(g, x2, y2, c.px[k].toFixed(1) + '°', '#ffffff'); });
+    }
+    pins.forEach(function (k, n) { var pd = toDisp(k % CW, Math.floor(k / CW)), px = (pd[0] + 0.5) * sx, py = (pd[1] + 0.5) * sy; mark(g, px, py, '#7dffb0', 'ring'); tag(g, px, py, (n + 1) + ': ' + c.px[k].toFixed(1) + '°', '#b8ffd2'); });
+    $('cpin').innerHTML = pins.length ? pins.map(function (k, n) { return (n + 1) + ': ' + c.px[k].toFixed(1) + ' °C (col ' + (k % CW + 1) + ', row ' + (Math.floor(k / CW) + 1) + ')'; }).join('<br>') : '--';
+  }
+  function pixelAt(el, e) { var r = el.getBoundingClientRect(), dm = dims(), dx = Math.floor((e.clientX - r.left) / r.width * dm[0]), dy = Math.floor((e.clientY - r.top) / r.height * dm[1]); if (dx < 0 || dx >= dm[0] || dy < 0 || dy >= dm[1]) return null; var q = toSrc(dx, dy); return q; }
+  $('camimg').onmousemove = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (q) $('cptr').textContent = S.cam.px[q[1] * CW + q[0]].toFixed(1) + ' °C  (column ' + (q[0] + 1) + ', row ' + (q[1] + 1) + ')'; };
+  $('camimg').onclick = function (e) { if (!S.cam) return; var q = pixelAt(this, e); if (!q) return; var k = q[1] * CW + q[0]; var at = pins.indexOf(k); if (at >= 0) pins.splice(at, 1); else { pins.push(k); if (pins.length > 12) pins.shift(); } try { localStorage.setItem('templog_pins', JSON.stringify(pins)); } catch (x) {} drawCam(); };
+  $('ohalf').onclick = function () { if (!S.cam) return; $('othr').value = Math.round((S.cam.min + S.cam.max) / 2 * 10) / 10; camPrefsChanged(); };
+  $('clrpins').onclick = function () { pins = []; try { localStorage.setItem('templog_pins', '[]'); } catch (x) {} drawCam(); };
+  $('rot').onclick = function () { rot = (rot + 1) & 3; saveCamPrefs(); drawCam(); };
+  $('camimg').onmouseleave = function () { $('cptr').textContent = '--'; };
+  $('ces').onclick = function () { var e = parseFloat($('ce').value); if (!(e >= 0.1 && e <= 1)) { msg('Emissivity must be from 0.1 to 1.0'); return; } send('CE ' + e); if (S.sim) S.camEmis = e; };
+  $('camoff').onclick = function () { if (S.sim) { stopSim(); return; } send('CAM 0'); S.cam = null; $('camwrap').hidden = true; msg('Thermal camera turned off. Send CAM 1 (or unplug and replug the Pico) to turn it back on.'); };
+  $('png').onclick = function () { var a = document.createElement('a'); a.href = $('camimg').toDataURL('image/png'); a.download = 'Thermal_' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + '.png'; document.body.appendChild(a); a.click(); a.remove(); };
   function addReading(t, objs, ambs) {
     if (t === null) return;
     if (S.t.length && t < S.t[S.t.length - 1]) { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; }   // the Pico restarted
     S.t.push(t); for (var i = 0; i < N; i++) { S.v[i].push(objs[i]); S.amb[i].push(ambs[i]); }
     if (S.t.length > 20000) { S.t.splice(0, 2000); for (i = 0; i < N; i++) { S.v[i].splice(0, 2000); S.amb[i].splice(0, 2000); } }
     for (i = 0; i < N; i++) { $('b' + i).innerHTML = (objs[i] === null ? '--' : objs[i].toFixed(1)) + '<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip ' + (ambs[i] === null ? '--' : ambs[i].toFixed(1) + ' °C'); }
-    if (S.rec) { S.rec.rows.push([new Date().toISOString(), t].concat(objs, ambs)); buttons(); }
+    if (S.rec) { S.rec.rows.push([new Date().toISOString(), t].concat(objs, ambs, [null, null, null, null, null, null])); buttons(); }
     draw();
   }
 
@@ -117,11 +286,23 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
 
   // ---- serial ----
   function send(text) { if (S.writer) S.writer.write(new TextEncoder().encode(text + '\n')).catch(function () {}); }
-  async function connect() {
-    if (!navigator.serial) { msg('This browser has no serial access. Use Chrome or Edge on a computer.'); return; }
+  // A Pico always has the USB vendor id 0x2e8a, so the chooser lists only Picos, and once the browser has been given
+  // permission for one it is found and opened on its own on later visits and whenever it is plugged in.
+  var PICO_VID = 0x2e8a, connecting = false;
+  function isPico(p) { try { return p.getInfo().usbVendorId === PICO_VID; } catch (e) { return false; } }
+  async function connect(quiet) {
+    if (!navigator.serial) { if (!quiet) msg('This browser has no serial access. Use Chrome or Edge on a computer.'); return; }
+    if (S.port || connecting) return; connecting = true;
     try {
-      S.port = await navigator.serial.requestPort(); await S.port.open({ baudRate: 115200 });
-    } catch (e) { S.port = null; msg('Could not open the port: ' + (e && e.message || e)); buttons(); return; }
+      var port = (await navigator.serial.getPorts()).filter(isPico)[0];
+      if (!port) { if (quiet) { connecting = false; return; } port = await navigator.serial.requestPort({ filters: [{ usbVendorId: PICO_VID }] }); }
+      S.port = port; await S.port.open({ baudRate: 115200 });
+    } catch (e) {
+      S.port = null; connecting = false; buttons();
+      if (e && e.name === 'NotFoundError') { if (!quiet) msg('No Pico was chosen. Plug the Pico in with a data USB cable and try again.'); return; }
+      msg('Could not open the Pico: ' + (e && e.message || e) + ' Close Thonny or any other program or tab that is using it, then try again.'); return;
+    }
+    connecting = false;
     setState('Connected'); buttons(); stopSim();
     S.writer = S.port.writable.getWriter(); var dec = new TextDecoder(), buf = '';
     S.reader = S.port.readable.getReader(); msg('Connected.'); send('?');
@@ -136,23 +317,33 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   }
   // ---- simulation ----
   function startSim() {
-    S.sim = true; S.t0 = performance.now(); setState('Simulating'); buttons(); msg('Simulating three sensors.');
+    S.sim = true; S.t0 = performance.now(); setState('Simulating'); buttons(); msg('Simulating three sensors and the thermal camera.');
     S.timer = setInterval(function () {
       var t = (performance.now() - S.t0) / 1000, objs = [], ambs = [];
       for (var i = 0; i < N; i++) { var base = 24 + i * 3, rise = [38, 22, 12][i] * (1 - Math.exp(-t / (90 + i * 40))); objs.push(base + rise + Math.sin(t / 7 + i) * 0.15 + (Math.random() - 0.5) * 0.1); ambs.push(24 + i * 0.4 + rise * 0.05); }
       var r2 = function (v) { return Math.round(v * 100) / 100; };
-      addReading(Math.round(t * 10) / 10, objs.map(r2), ambs.map(r2));
+      var ts = Math.round(t * 10) / 10; addReading(ts, objs.map(r2), ambs.map(r2));
+      var px = [], tot = 0, mx = -1e9, mn = 1e9, hot = 0, warm = 24 + 30 * (1 - Math.exp(-t / 120));
+      for (var yy = 0; yy < CH; yy++) for (var xx = 0; xx < CW; xx++) { var dx = xx - 21 - Math.sin(t / 15) * 2, dy = yy - 11, v = 23 + (warm - 23) * Math.exp(-(dx * dx + dy * dy) / 40) + (Math.random() - 0.5) * 0.3; v = Math.round(v * 10) / 10; px.push(v); tot += v; if (v > mx) { mx = v; hot = px.length - 1; } if (v < mn) mn = v; }
+      addCam(ts, { die: 27, min: mn, max: mx, avg: Math.round(tot / px.length * 10) / 10, hx: hot % CW, hy: Math.floor(hot / CW), px: px });
     }, 1000);
   }
-  function stopSim() { if (S.timer) clearInterval(S.timer); S.timer = null; if (S.sim) { S.sim = false; if (S.rec) stopRec(); setState(S.port ? 'Connected' : 'Not connected'); buttons(); } }
+  function stopSim() { if (S.timer) clearInterval(S.timer); S.timer = null; if (S.sim) { S.sim = false; S.cam = null; $('camwrap').hidden = true; if (S.rec) stopRec(); setState(S.port ? 'Connected' : 'Not connected'); buttons(); } }
 
   // ---- recording and CSV ----
   function stopRec() { S.lastRec = S.rec; S.rec = null; msg('Recording stopped: ' + S.lastRec.rows.length + ' readings.'); buttons(); }
   function csvText(rec) {
     var h = ['time_iso', 'seconds'].concat(labels.map(function (l) { return l + ' object C'; }), labels.map(function (l) { return l + ' sensor C'; }));
-    return [h.map(function (c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(',')].concat(rec.rows.map(function (r) { return r.map(function (c) { return c === null ? '' : c; }).join(','); })).join('\n') + '\n';
+    var hasCam = rec.rows.some(function (r) { return r[r.length - 5] !== null; }), rows = rec.rows;
+    if (hasCam) h = h.concat(['Camera chip C', 'Camera coldest C', 'Camera hottest C', 'Camera average C', 'Camera hottest column', 'Camera hottest row']);
+    else rows = rows.map(function (r) { return r.slice(0, r.length - 6); });
+    return [h.map(function (c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(',')].concat(rows.map(function (r) { return r.map(function (c) { return c === null ? '' : c; }).join(','); })).join('\n') + '\n';
   }
-  $('rec').onclick = function () { if (S.rec) stopRec(); else { S.rec = { rows: [], start: new Date() }; msg('Recording started.'); buttons(); } };
+  function framesCsv(rec) {
+    var h = ['time_iso', 'seconds']; for (var y = 1; y <= CH; y++) for (var x = 1; x <= CW; x++) h.push('r' + y + 'c' + x);
+    return [h.join(',')].concat(rec.frames.map(function (r) { return r.join(','); })).join('\n') + '\n';
+  }
+  $('rec').onclick = function () { if (S.rec) stopRec(); else { S.rec = { rows: [], frames: [], start: new Date() }; msg('Recording started.'); buttons(); } };
   $('csv').onclick = function () {
     var rec = (S.rec && S.rec.rows.length) ? S.rec : S.lastRec; if (!rec || !rec.rows.length) return;
     var a = document.createElement('a'), d = rec.start, p = function (n) { return ('0' + n).slice(-2); };
@@ -160,14 +351,24 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     a.download = 'Temps_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + '.' + p(d.getMinutes()) + '.' + p(d.getSeconds()) + '.csv';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   };
-  $('connect').onclick = function () { if (S.port) disconnect(false); else connect(); };
+  $('csvf').onclick = function () {
+    var rec = (S.rec && S.rec.frames.length) ? S.rec : S.lastRec; if (!rec || !rec.frames.length) return;
+    var a = document.createElement('a'), d = rec.start, p = function (n) { return ('0' + n).slice(-2); };
+    a.href = URL.createObjectURL(new Blob([framesCsv(rec)], { type: 'text/csv' }));
+    a.download = 'ThermalImages_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + '.' + p(d.getMinutes()) + '.' + p(d.getSeconds()) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  };
+  $('connect').onclick = function () { if (S.port) { S.userOff = true; disconnect(false); } else { S.userOff = false; connect(false); } };
   $('sim').onclick = function () { if (S.sim) stopSim(); else if (S.port) msg('Disconnect the Pico first.'); else startSim(); };
-  $('clear').onclick = function () { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; for (var i = 0; i < N; i++) { $('b' + i).innerHTML = '--<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip --'; } S.t0 = performance.now(); draw(); };
+  $('clear').onclick = function () { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; for (var i = 0; i < N; i++) { $('b' + i).innerHTML = '--<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip --'; } S.t0 = performance.now(); S.cam = null; $('camwrap').hidden = true; draw(); };
   $('win').onchange = draw; window.addEventListener('resize', draw);
   $('theme').onclick = function () { var h = document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme') === 'light' ? 'dark' : 'light'); try { localStorage.setItem('hcri_theme', h.getAttribute('data-theme')); } catch (e) {} draw(); };
   try { var th = localStorage.getItem('hcri_theme'); if (th) document.documentElement.setAttribute('data-theme', th); } catch (e) {}
   window.addEventListener('beforeunload', function (e) { if (S.rec && S.rec.rows.length) { e.preventDefault(); e.returnValue = ''; } });
   $('support').textContent = navigator.serial ? '' : 'This browser cannot talk to the Pico. Use Chrome or Edge on a computer (you can still try Simulate).';
   buttons(); draw();
+  // Find the Pico on its own: when the page opens, and whenever one is plugged in (unless you pressed Disconnect).
+  function autoConnect() { if (!S.userOff && !S.sim) connect(true); }
+  if (navigator.serial) { navigator.serial.addEventListener('connect', function () { setTimeout(autoConnect, 500); }); autoConnect(); }
 })();
 </script></body></html>
