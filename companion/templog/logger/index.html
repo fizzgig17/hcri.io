@@ -175,11 +175,23 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
 
   // ---- serial ----
   function send(text) { if (S.writer) S.writer.write(new TextEncoder().encode(text + '\n')).catch(function () {}); }
-  async function connect() {
-    if (!navigator.serial) { msg('This browser has no serial access. Use Chrome or Edge on a computer.'); return; }
+  // A Pico always has the USB vendor id 0x2e8a, so the chooser lists only Picos, and once the browser has been given
+  // permission for one it is found and opened on its own on later visits and whenever it is plugged in.
+  var PICO_VID = 0x2e8a, connecting = false;
+  function isPico(p) { try { return p.getInfo().usbVendorId === PICO_VID; } catch (e) { return false; } }
+  async function connect(quiet) {
+    if (!navigator.serial) { if (!quiet) msg('This browser has no serial access. Use Chrome or Edge on a computer.'); return; }
+    if (S.port || connecting) return; connecting = true;
     try {
-      S.port = await navigator.serial.requestPort(); await S.port.open({ baudRate: 115200 });
-    } catch (e) { S.port = null; msg('Could not open the port: ' + (e && e.message || e)); buttons(); return; }
+      var port = (await navigator.serial.getPorts()).filter(isPico)[0];
+      if (!port) { if (quiet) { connecting = false; return; } port = await navigator.serial.requestPort({ filters: [{ usbVendorId: PICO_VID }] }); }
+      S.port = port; await S.port.open({ baudRate: 115200 });
+    } catch (e) {
+      S.port = null; connecting = false; buttons();
+      if (e && e.name === 'NotFoundError') { if (!quiet) msg('No Pico was chosen. Plug the Pico in with a data USB cable and try again.'); return; }
+      msg('Could not open the Pico: ' + (e && e.message || e) + ' Close Thonny or any other program or tab that is using it, then try again.'); return;
+    }
+    connecting = false;
     setState('Connected'); buttons(); stopSim();
     S.writer = S.port.writable.getWriter(); var dec = new TextDecoder(), buf = '';
     S.reader = S.port.readable.getReader(); msg('Connected.'); send('?');
@@ -235,7 +247,7 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
     a.download = 'ThermalImages_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + '.' + p(d.getMinutes()) + '.' + p(d.getSeconds()) + '.csv';
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   };
-  $('connect').onclick = function () { if (S.port) disconnect(false); else connect(); };
+  $('connect').onclick = function () { if (S.port) { S.userOff = true; disconnect(false); } else { S.userOff = false; connect(false); } };
   $('sim').onclick = function () { if (S.sim) stopSim(); else if (S.port) msg('Disconnect the Pico first.'); else startSim(); };
   $('clear').onclick = function () { S.t = []; S.v = [[], [], []]; S.amb = [[], [], []]; for (var i = 0; i < N; i++) { $('b' + i).innerHTML = '--<small> &deg;C</small>'; $('a' + i).textContent = 'sensor chip --'; } S.t0 = performance.now(); S.cam = null; $('camwrap').hidden = true; draw(); };
   $('win').onchange = draw; window.addEventListener('resize', draw);
@@ -244,5 +256,8 @@ select{background:var(--surface2);color:var(--text);border:1px solid var(--borde
   window.addEventListener('beforeunload', function (e) { if (S.rec && S.rec.rows.length) { e.preventDefault(); e.returnValue = ''; } });
   $('support').textContent = navigator.serial ? '' : 'This browser cannot talk to the Pico. Use Chrome or Edge on a computer (you can still try Simulate).';
   buttons(); draw();
+  // Find the Pico on its own: when the page opens, and whenever one is plugged in (unless you pressed Disconnect).
+  function autoConnect() { if (!S.userOff && !S.sim) connect(true); }
+  if (navigator.serial) { navigator.serial.addEventListener('connect', function () { setTimeout(autoConnect, 500); }); autoConnect(); }
 })();
 </script></body></html>
