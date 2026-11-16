@@ -90,7 +90,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
 import SiteFooter from './SiteFooter.jsx';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { getToken } from '../lib/api';
+import { getToken, downloadFile } from '../lib/api';
 import { fmtTZ } from '../lib/tz';
 import Votes from './Votes';
 import CatFilter from './CatFilter';
@@ -2496,6 +2496,9 @@ export default function Explore({ onBack, onSignIn, user: n, onHome: onHomeFn, o
       />
       <button onClick={() => setMrPasteOpen(true)} style={{ flexShrink: 0, background: `${r.accent}12`, border: `1px solid ${r.accent}40`, color: r.accent, borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 700 }}>
         📋 Paste
+      </button>
+      <button onClick={async () => { try { setMrStatus('Preparing CSV…'); await downloadFile('/reports/export', 'hcri-my-readings.csv'); setMrStatus('CSV downloaded'); } catch (e) { setMrStatus('Could not export: ' + e.message); } }} title="Download all your readings, with their lights, categories and calculated values, as a CSV" style={{ flexShrink: 0, background: `${r.accent}12`, border: `1px solid ${r.accent}40`, color: r.accent, borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'monospace' }}>
+        ⬇ CSV
       </button>
       {quickFor && (
         <QuickFieldsModal

@@ -59,3 +59,14 @@ export const api = {
   del:    (path)        => request('DELETE', path),
   upload: (path, body)  => request('POST', path, body, true),
 };
+
+// Downloads a CSV (or any file) the backend returns for a GET, with the bearer token, and saves it under `filename`.
+export async function downloadFile(path, filename) {
+  const res = await fetch(basePath() + 'index.php/api' + path, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || res.statusText); }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

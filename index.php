@@ -223,6 +223,10 @@ if (str_starts_with($uri, '/api/')) {
 
     }
 
+    if ($uri === '/api/reports/export') {
+        require __DIR__ . '/api/reports_export.php'; exit;
+    }
+
     if (preg_match('#^/api/reports/([A-Za-z0-9]+)(/recalc)?$#', $uri)) {
 
         require __DIR__ . '/api/reports_item.php'; exit;

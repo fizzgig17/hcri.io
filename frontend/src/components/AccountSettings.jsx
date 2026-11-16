@@ -12,7 +12,7 @@ import LicenseSelect from './LicenseSelect.jsx';
 import { licenseInfo } from '../lib/licenses.js';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../lib/ThemeContext.jsx';
-import { api, setToken } from '../lib/api';
+import { api, setToken, downloadFile } from '../lib/api';
 import { setTZ } from '../lib/tz';
 import AppHistory from './AppHistory.jsx';
 
@@ -701,6 +701,17 @@ export default function AccountSettings({ user, onClose, onUserUpdate }) {
                   }}
                   style={{ background:'none', border:`1px solid ${T.accent}66`, color:T.accent, borderRadius:8, padding:'8px 14px', fontSize:13, fontWeight:700, fontFamily:'monospace', cursor:'pointer' }}>
                   ⬇ Export my data
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true); clearNotice();
+                    try { await downloadFile('/reports/export', 'hcri-my-readings.csv'); notify('Your readings have been downloaded as a CSV.'); }
+                    catch { notify('Could not export your readings. Please try again.', false); }
+                    finally { setBusy(false); }
+                  }}
+                  style={{ background:'none', border:`1px solid ${T.accent}66`, color:T.accent, borderRadius:8, padding:'8px 14px', fontSize:13, fontWeight:700, fontFamily:'monospace', cursor:'pointer' }}>
+                  ⬇ Export my readings (CSV)
                 </button>
                 <button
                   disabled={busy}
