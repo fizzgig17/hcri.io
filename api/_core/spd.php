@@ -362,7 +362,10 @@ function calc_rf_rg(array $spd, float $cct, array $instrumentMeta=[]): array {
 
         $A = $Nbb*(2.0*$Ra + $Ga + 0.05*$Ba - 0.305);
 
-        $J = 100.0 * ($A/$A_w)**($c*$z);
+        // A strongly saturated source (e.g. a deep-red LED) can drive a test sample's achromatic response A below zero. A plain ** of a
+        // negative base is NaN, which used to run through ΔE, Rf, Rg and the hue bins and left the whole report without its TM-30 numbers.
+        // Such a sample is out of gamut, so it is treated as black (J = 0, no colourfulness): finite, and a large colour difference.
+        $J = 100.0 * max(0.0, $A/$A_w) ** ($c*$z);
 
         // t (temporary magnitude), Chroma C, Colourfulness M
 
@@ -442,7 +445,7 @@ function calc_rf_rg(array $spd, float $cct, array $instrumentMeta=[]): array {
 
     $meanDE = array_sum($dEs) / 99.0;
 
-    $Rf = (int)round(min(100.0, 10.0*log(exp((100.0-6.73*$meanDE)/10.0)+1.0)));
+    $Rf = is_finite($meanDE) ? (int)round(min(100.0, 10.0*log(exp((100.0-6.73*$meanDE)/10.0)+1.0))) : 0;
 
     // ── Bin assignments (by reference hue angle) ──────────────────────────────
 
