@@ -157,6 +157,22 @@ export default function AdminPanel({ onClose, me }) {
     }
   }
 
+  // Reports whose calculated values were lost (empty meta, no Rf/Rg, or the Rf 100 / Rg 60 left by a NaN): list them first, then fix only those.
+  const [broken, setBroken] = useState(null); // null | 'running' | { total, reports } | { fixed, failed }
+  async function checkBroken() {
+    setBroken('running');
+    try { setBroken(await adminFetch('/recalc', { method: 'POST', body: JSON.stringify({ broken: true, dryRun: true }) })); }
+    catch (e) { notify(e.message, 'err'); setBroken(null); }
+  }
+  async function fixBroken() {
+    setBroken('running');
+    try {
+      const r = await adminFetch('/recalc', { method: 'POST', body: JSON.stringify({ broken: true }) });
+      setBroken({ fixed: r.done, failed: r.failed, errors: r.errors || [] });
+      setUsers(await adminFetch('/users'));
+    } catch (e) { notify(e.message, 'err'); setBroken(null); }
+  }
+
   async function recalcUser(userId) {
     setRecalc('running');
     try {
@@ -298,6 +314,22 @@ export default function AdminPanel({ onClose, me }) {
               <button onClick={recalcAll} disabled={recalc === 'running'} style={{ ...S.btn('warn'), opacity: recalc === 'running' ? 0.5 : 1 }} title="Recompute all metrics (Rf, Rg, Ra, R9, bins) from stored SPD data">
                 {recalc === 'running' ? '⟳ Recalculating…' : '⟳ Recalc All'}
               </button>
+              <button onClick={checkBroken} disabled={broken === 'running'} style={{ ...S.btn('accent'), opacity: broken === 'running' ? 0.5 : 1 }} title="Find reports whose calculated values were lost (empty meta, no Rf/Rg, or Rf 100 with Rg 60), then fix only those">
+                {broken === 'running' ? '… Checking' : '🔍 Check broken'}
+              </button>
+              {broken && broken !== 'running' && (
+                <div style={{ width: '100%', fontSize: 12, color: t.text, border: `1px solid ${t.warn}60`, borderRadius: 6, padding: 8, marginTop: 6 }}>
+                  {broken.reports ? (<>
+                    <div><b>{broken.total}</b> report{broken.total === 1 ? '' : 's'} with lost values{broken.total > 0 ? ':' : ' — nothing to fix.'}</div>
+                    {broken.reports.slice(0, 15).map((r) => (
+                      <div key={r.id} style={{ color: t.dim }}>{r.publicId || r.id} · user {r.userId} · {String(r.label).slice(0, 40)} · Rf {r.rf ?? '–'} / Rg {r.rg ?? '–'} · meta {r.metaLength} B</div>
+                    ))}
+                    {broken.total > 15 && <div style={{ color: t.dim }}>…and {broken.total - 15} more</div>}
+                    {broken.total > 0 && <button onClick={fixBroken} style={{ ...S.btn('warn'), marginTop: 6 }}>Fix these {broken.total}</button>}
+                  </>) : (<div>Fixed {broken.fixed}{broken.failed ? ` · ${broken.failed} failed: ${(broken.errors || []).join('; ')}` : ''}</div>)}
+                  <button onClick={() => setBroken(null)} style={{ background: 'none', border: 'none', color: t.dim, cursor: 'pointer', marginLeft: 8 }}>✕</button>
+                </div>
+              )}
             </div>
             <div style={{ padding: '8px 14px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
               <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search users by name or email" style={{ ...S.input, boxSizing: 'border-box' }} />

@@ -27,6 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_error('POST required', 405);
 $body   = json_decode(file_get_contents('php://input'), true) ?? [];
 
 $userId = isset($body['userId']) ? (int)$body['userId'] : null;
+// broken=true : only reports whose calculated values look lost (empty meta, no Rf/Rg, or the Rf 100 / Rg 60 a NaN used to leave behind)
+// dryRun=true : list those reports and change nothing
+$broken = !empty($body['broken']);
+$dryRun = !empty($body['dryRun']);
+$brokenSql = " AND (meta IS NULL OR meta = '' OR rf IS NULL OR rg IS NULL OR (rf = 100 AND rg = 60))";
 
 
 
@@ -34,17 +39,24 @@ $userId = isset($body['userId']) ? (int)$body['userId'] : null;
 
 if ($userId) {
 
-    $s = $db->prepare('SELECT id, user_id FROM reports WHERE spd_data IS NOT NULL AND user_id = ? ORDER BY id');
+    $s = $db->prepare('SELECT id, user_id, public_id, label, rf, rg, cct, created_at, LENGTH(meta) AS meta_len FROM reports WHERE spd_data IS NOT NULL AND user_id = ?' . ($broken ? $brokenSql : '') . ' ORDER BY id');
 
     $s->execute([$userId]);
 
 } else {
 
-    $s = $db->query('SELECT id, user_id FROM reports WHERE spd_data IS NOT NULL ORDER BY id');
+    $s = $db->query('SELECT id, user_id, public_id, label, rf, rg, cct, created_at, LENGTH(meta) AS meta_len FROM reports WHERE spd_data IS NOT NULL' . ($broken ? $brokenSql : '') . ' ORDER BY id');
 
 }
 
 $rows = $s->fetchAll();
+
+if ($dryRun) {
+    json_out(['dryRun' => true, 'total' => count($rows), 'reports' => array_map(fn($r) => [
+        'id' => (int)$r['id'], 'publicId' => $r['public_id'], 'userId' => (int)$r['user_id'], 'label' => $r['label'],
+        'rf' => $r['rf'], 'rg' => $r['rg'], 'cct' => $r['cct'], 'metaLength' => (int)$r['meta_len'], 'createdAt' => $r['created_at'],
+    ], array_slice($rows, 0, 200))]);
+}
 
 
 
@@ -152,11 +164,13 @@ foreach ($rows as $row) {
 
 
 
+        $metaJson = json_encode($meta, JSON_PARTIAL_OUTPUT_ON_ERROR);   // a stray NaN/INF becomes 0 instead of losing the whole meta
+        if ($metaJson === false) throw new RuntimeException('could not encode the calculated values');
         $db->prepare('UPDATE reports SET spd_data=?, meta=?, rf=?, rg=?, cct=?, duv=?, cie_x=?, cie_y=? WHERE id=?')
 
            ->execute([
 
-               $cleanSpd, json_encode($meta),
+               $cleanSpd, $metaJson,
 
                $result['Rf'], $result['Rg'],
 
